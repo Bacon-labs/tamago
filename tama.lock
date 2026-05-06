@@ -10,9 +10,9 @@ verity_git = "https://github.com/lfglabs-dev/verity.git"
 verity_rev = "9b0114efcc0af589af63dd3f2eafcdf1a24dbf1e"
 
 [inputs]
-"TamaProof.lean" = "db06a2130ef6f14f3c1d9a4512fbd9d1252ab6677009cc795a23f677cd2da1f0"
-"TamaSpec.lean" = "2ad7656082290223fc1596896794661fe6750f844b007e45b02e4efa7cd1ed5a"
-"TamaSrc.lean" = "1c51caa63027cf27e005752dd8d78348f5c7ed8f35728782fb5cfe41b7f5b474"
+"TamaProof.lean" = "8935a2c00865dd0ec2d5f38e5491fa8527b639b25d45869a89a967f04bd987d5"
+"TamaSpec.lean" = "7842f5d5720dcc6dc937952f1863f391818edb340a1968dfb898ad000a563ee1"
+"TamaSrc.lean" = "22143a0fdf03f78e85035f4c89ed370696f55220b8738204f39c81aea4965db2"
 "foundry.toml" = "61f08413416c82d3fbc2e89988fe402fbfea3f877c954d108d109b2dd4bebf54"
 "lake-manifest.json" = "b1a0816d3f7854f51e88d47faf0306635af6736f28b653df83c37f625815a935"
 "lakefile.toml" = "05a9513ad383596d9e359a688cd9d37aba2c35e4bd362b3a903ca90409bf2393"

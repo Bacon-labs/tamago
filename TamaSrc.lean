@@ -1,4 +1,3 @@
-import src.ERC20Lite
 import src.ERC20
 import src.ERC721
 import src.WETH
