@@ -6,6 +6,11 @@ import {WETHIface} from "../../src/generated/verity/WETHIface.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract WETHTest is Test {
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Deposit(address indexed dst, uint256 wad);
+    event Withdrawal(address indexed src, uint256 wad);
+
     receive() external payable {}
 
     function deployToken() internal returns (WETHIface token) {
@@ -16,6 +21,10 @@ contract WETHTest is Test {
     function testFuzzDepositMintsWrappedEth(uint96 amount) public {
         WETHIface token = deployToken();
         assertEq(token.decimals(), 18);
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(0), address(this), amount);
+        vm.expectEmit(true, false, false, true, address(token));
+        emit Deposit(address(this), amount);
         assertTrue(token.deposit{value: amount}());
         assertEq(token.balanceOf(address(this)), amount);
         assertEq(token.totalSupply(), amount);
@@ -24,6 +33,8 @@ contract WETHTest is Test {
     // tama: mirrors=weth_approve_effect,weth_allowance_spec
     function testFuzzApproveUpdatesAllowance(address spender, uint256 amount) public {
         WETHIface token = deployToken();
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Approval(address(this), spender, amount);
         assertTrue(token.approve(spender, amount));
         assertEq(token.allowance(address(this), spender), amount);
     }
@@ -34,6 +45,8 @@ contract WETHTest is Test {
         assertTrue(token.deposit{value: depositAmount}());
         uint256 amount = depositAmount == 0 ? 0 : uint256(rawTransfer) % (uint256(depositAmount) + 1);
         uint256 recipientBefore = token.balanceOf(recipient);
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(this), recipient, amount);
         assertTrue(token.transfer(recipient, amount));
         if (recipient == address(this)) {
             assertEq(token.balanceOf(address(this)), depositAmount);
@@ -51,6 +64,8 @@ contract WETHTest is Test {
         assertTrue(token.deposit{value: depositAmount}());
         uint256 amount = depositAmount == 0 ? 0 : uint256(rawSpend) % (uint256(depositAmount) + 1);
         assertTrue(token.approve(spender, depositAmount));
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(this), recipient, amount);
         vm.prank(spender);
         assertTrue(token.transferFrom(address(this), recipient, amount));
         assertEq(token.allowance(address(this), spender), uint256(depositAmount) - amount);
@@ -62,6 +77,10 @@ contract WETHTest is Test {
         WETHIface token = deployToken();
         assertTrue(token.deposit{value: depositAmount}());
         uint256 amount = depositAmount == 0 ? 0 : uint256(rawWithdraw) % (uint256(depositAmount) + 1);
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(this), address(0), amount);
+        vm.expectEmit(true, false, false, true, address(token));
+        emit Withdrawal(address(this), amount);
         assertTrue(token.withdraw(amount));
         assertEq(token.balanceOf(address(this)), uint256(depositAmount) - amount);
         assertEq(token.totalSupply(), uint256(depositAmount) - amount);

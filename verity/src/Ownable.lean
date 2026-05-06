@@ -1,11 +1,12 @@
 import Contracts.Common
+import common.Events
 
 namespace src
 
 open Verity hiding pure bind
 open Contracts
 
-verity_contract Ownable where
+verity_contract OwnableBase where
   storage
     contractOwner : Address := slot 0
 
@@ -22,6 +23,7 @@ verity_contract Ownable where
     require (sender == currentOwner) "Caller is not the owner"
     require (newOwner != zeroAddress) "Invalid owner"
     setStorageAddr contractOwner newOwner
+    emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord newOwner]
     return true
 
   function renounceOwnership () : Bool := do
@@ -29,6 +31,22 @@ verity_contract Ownable where
     let currentOwner ← getStorageAddr contractOwner
     require (sender == currentOwner) "Caller is not the owner"
     setStorageAddr contractOwner zeroAddress
+    emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord zeroAddress]
     return true
+
+namespace Ownable
+
+abbrev contractOwner := OwnableBase.contractOwner
+
+abbrev owner := OwnableBase.owner
+abbrev transferOwnership := OwnableBase.transferOwnership
+abbrev renounceOwnership := OwnableBase.renounceOwnership
+
+def spec : Compiler.CompilationModel.CompilationModel :=
+  { OwnableBase.spec with
+    name := "Ownable"
+    events := [common.Events.ownershipTransferred] }
+
+end Ownable
 
 end src

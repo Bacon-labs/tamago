@@ -14,6 +14,15 @@ open src.WETH
 
 attribute [local simp] tokenSupply balances allowances
 attribute [local simp] src.ERC20.tokenSupply src.ERC20.balances src.ERC20.allowances
+attribute [local simp] src.ERC20Base.tokenSupply src.ERC20Base.balances
+  src.ERC20Base.allowances src.ERC20Base.maxUint256 src.ERC20Base.decimals
+  src.ERC20Base.totalSupply src.ERC20Base.balanceOf src.ERC20Base.allowance
+  src.ERC20Base.approve src.ERC20Base.transfer src.ERC20Base.transferFrom
+attribute [local simp] src.WETHBase.tokenSupply src.WETHBase.balances
+  src.WETHBase.allowances src.WETHBase.maxUint256 src.WETHBase.decimals
+  src.WETHBase.totalSupply src.WETHBase.balanceOf src.WETHBase.allowance
+  src.WETHBase.deposit src.WETHBase.approve src.WETHBase.transfer
+  src.WETHBase.transferFrom src.WETHBase.withdraw Contracts.emit emitEvent
 
 -- tama: discharges=weth_decimals_spec
 theorem decimals_returns_18 (s : ContractState) :

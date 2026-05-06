@@ -3,6 +3,10 @@
 pragma solidity ^0.8.20;
 
 interface WETHIface {
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Deposit(address indexed dst, uint256 wad);
+    event Withdrawal(address indexed src, uint256 wad);
     function decimals() external view returns (uint256);
     function totalSupply() external view returns (uint256);
     function balanceOf(address account) external view returns (uint256);

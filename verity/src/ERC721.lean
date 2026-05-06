@@ -1,5 +1,6 @@
 import Contracts.Common
 import src.Ownable
+import common.Events
 
 namespace src
 
@@ -11,7 +12,7 @@ open Verity.Stdlib.Math
 @[simp] def boolToWord (b : Bool) : Uint256 :=
   if b then 1 else 0
 
-verity_contract ERC721 where
+verity_contract ERC721Base where
   storage
     contractOwner : Address := slot 0
     tokenSupply : Uint256 := slot 1
@@ -40,6 +41,7 @@ verity_contract ERC721 where
     require (sender == currentOwner) "Caller is not the owner"
     require (newOwner != zeroAddress) "Invalid owner"
     setStorageAddr contractOwner newOwner
+    emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord newOwner]
     return true
 
   function renounceOwnership () : Bool := do
@@ -47,6 +49,7 @@ verity_contract ERC721 where
     let currentOwner ← getStorageAddr contractOwner
     require (sender == currentOwner) "Caller is not the owner"
     setStorageAddr contractOwner zeroAddress
+    emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord zeroAddress]
     return true
 
   function view balanceOf (account : Address) : Uint256 := do
@@ -77,11 +80,13 @@ verity_contract ERC721 where
     let operatorFlag ← getMapping2 operatorApprovals tokenOwner sender
     require ((sender == tokenOwner) || (operatorFlag != 0)) "Not authorized"
     setMappingUintAddr tokenApprovals tokenId approved
+    emit "Approval" [addressToWord tokenOwner, addressToWord approved, tokenId]
     return true
 
   function setApprovalForAll (operator : Address, approved : Bool) : Bool := do
     let sender ← msgSender
     setMapping2 operatorApprovals sender operator (boolToWord approved)
+    emit "ApprovalForAll" [addressToWord sender, addressToWord operator, boolToWord approved]
     return true
 
   function mint (toAddr : Address) : Uint256 := do
@@ -103,6 +108,7 @@ verity_contract ERC721 where
     setMapping balances toAddr newRecipientBalance
     setStorage tokenSupply newSupply
     setStorage nextTokenId (add tokenId 1)
+    emit "Transfer" [addressToWord zeroAddress, addressToWord toAddr, tokenId]
     return tokenId
 
   function transferFrom (fromAddr : Address, toAddr : Address, tokenId : Uint256) : Bool := do
@@ -133,6 +139,42 @@ verity_contract ERC721 where
 
     setMappingUintAddr tokenOwners tokenId toAddr
     setMappingUintAddr tokenApprovals tokenId zeroAddress
+    emit "Transfer" [addressToWord fromAddr, addressToWord toAddr, tokenId]
     return true
+
+namespace ERC721
+
+abbrev contractOwner := ERC721Base.contractOwner
+abbrev tokenSupply := ERC721Base.tokenSupply
+abbrev nextTokenId := ERC721Base.nextTokenId
+abbrev balances := ERC721Base.balances
+abbrev tokenOwners := ERC721Base.tokenOwners
+abbrev tokenApprovals := ERC721Base.tokenApprovals
+abbrev operatorApprovals := ERC721Base.operatorApprovals
+
+abbrev totalSupply := ERC721Base.totalSupply
+abbrev owner := ERC721Base.owner
+abbrev transferOwnership := ERC721Base.transferOwnership
+abbrev renounceOwnership := ERC721Base.renounceOwnership
+abbrev balanceOf := ERC721Base.balanceOf
+abbrev ownerOf := ERC721Base.ownerOf
+abbrev getApproved := ERC721Base.getApproved
+abbrev isApprovedForAll := ERC721Base.isApprovedForAll
+abbrev approve := ERC721Base.approve
+abbrev setApprovalForAll := ERC721Base.setApprovalForAll
+abbrev mint := ERC721Base.mint
+abbrev transferFrom := ERC721Base.transferFrom
+
+def spec : Compiler.CompilationModel.CompilationModel :=
+  { ERC721Base.spec with
+    name := "ERC721"
+    events := [
+      common.Events.ownershipTransferred,
+      common.Events.erc721Transfer,
+      common.Events.erc721Approval,
+      common.Events.approvalForAll
+    ] }
+
+end ERC721
 
 end src

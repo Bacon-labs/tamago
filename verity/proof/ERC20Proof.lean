@@ -12,6 +12,14 @@ open spec.ERC20Spec
 open src.ERC20
 
 attribute [local simp] contractOwner tokenSupply balances allowances
+  src.ERC20Base.contractOwner src.ERC20Base.tokenSupply src.ERC20Base.balances
+  src.ERC20Base.allowances src.ERC20Base.maxUint256
+  src.ERC20Base.decimals src.ERC20Base.totalSupply src.ERC20Base.balanceOf
+  src.ERC20Base.allowance src.ERC20Base.owner src.ERC20Base.transferOwnership
+  src.ERC20Base.renounceOwnership src.ERC20Base.approve src.ERC20Base.transfer
+  src.ERC20Base.transferFrom src.ERC20Base.mint src.ERC20Base.burn
+  src.OwnableBase.contractOwner src.OwnableBase.transferOwnership
+  src.OwnableBase.renounceOwnership Contracts.emit emitEvent
 
 -- tama: discharges=erc20_decimals_spec
 theorem decimals_returns_18 (s : ContractState) :
@@ -80,7 +88,7 @@ theorem transfer_total_supply_preserved_after_run (toAddr : Address) (amount : U
       Verity.require, Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
       h_balance]
     by_cases h_same : s.sender = toAddr
-    · simp [h_same, Verity.pure]
+    · simp [h_same, Verity.bind, Bind.bind, Verity.pure, Pure.pure, emitEvent]
     · by_cases h_overflow : Verity.Stdlib.Math.MAX_UINT256 <
           (s.storageMap 2 toAddr).val + amount.val
       · simp [h_same, h_overflow, getMapping, setMapping, Verity.require,
@@ -273,7 +281,8 @@ theorem transferFrom_effect_after_run
         simp [Verity.Stdlib.Math.MAX_UINT256, Verity.Core.MAX_UINT256] at h_max_ofNat
         by_cases h_same : fromAddr = toAddr
         · subst h_same
-          simp [h_max_ofNat, ContractResult.snd, Verity.pure, Pure.pure]
+          simp [h_max_ofNat, ContractResult.snd, Verity.bind, Bind.bind, Verity.pure,
+            Pure.pure, emitEvent]
         · have h_not_overflow :
               ¬ Verity.Stdlib.Math.MAX_UINT256 <
                 (s.storageMap 2 toAddr).val + amount.val := by

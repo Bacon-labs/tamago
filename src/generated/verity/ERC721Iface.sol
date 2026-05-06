@@ -3,6 +3,10 @@
 pragma solidity ^0.8.20;
 
 interface ERC721Iface {
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
     function totalSupply() external view returns (uint256);
     function owner() external view returns (address);
     function transferOwnership(address newOwner) external returns (bool);

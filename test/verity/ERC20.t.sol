@@ -6,6 +6,10 @@ import {ERC20Iface} from "../../src/generated/verity/ERC20Iface.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract ERC20Test is Test {
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
     function deployToken() internal returns (ERC20Iface token) {
         token = ERC20Deployer.deploy(address(this));
     }
@@ -17,6 +21,8 @@ contract ERC20Test is Test {
         assertEq(token.decimals(), 18);
         assertEq(token.owner(), address(this));
         assertEq(token.totalSupply(), 0);
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(0), account, amount);
         assertTrue(token.mint(account, amount));
         assertEq(token.balanceOf(account), amount);
         assertEq(token.totalSupply(), amount);
@@ -25,6 +31,8 @@ contract ERC20Test is Test {
     // tama: mirrors=erc20_approve_effect,erc20_allowance_spec
     function testFuzzApproveUpdatesAllowance(address spender, uint256 amount) public {
         ERC20Iface token = deployToken();
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Approval(address(this), spender, amount);
         assertTrue(token.approve(spender, amount));
         assertEq(token.allowance(address(this), spender), amount);
         assertEq(token.totalSupply(), 0);
@@ -37,6 +45,8 @@ contract ERC20Test is Test {
         uint256 amount = minted == 0 ? 0 : rawTransfer % (minted + 1);
         assertTrue(token.mint(address(this), minted));
         uint256 recipientBefore = token.balanceOf(recipient);
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(this), recipient, amount);
         assertTrue(token.transfer(recipient, amount));
         if (recipient == address(this)) {
             assertEq(token.balanceOf(address(this)), minted);
@@ -55,6 +65,8 @@ contract ERC20Test is Test {
         uint256 amount = minted == 0 ? 0 : rawSpend % (minted + 1);
         assertTrue(token.mint(address(this), minted));
         assertTrue(token.approve(spender, minted));
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(this), recipient, amount);
         vm.prank(spender);
         assertTrue(token.transferFrom(address(this), recipient, amount));
         assertEq(token.allowance(address(this), spender), minted - amount);
@@ -69,6 +81,8 @@ contract ERC20Test is Test {
         uint256 amount = minted == 0 ? 0 : rawSpend % (minted + 1);
         assertTrue(token.mint(address(this), minted));
         assertTrue(token.approve(spender, type(uint256).max));
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(this), recipient, amount);
         vm.prank(spender);
         assertTrue(token.transferFrom(address(this), recipient, amount));
         assertEq(token.allowance(address(this), spender), type(uint256).max);
@@ -95,6 +109,8 @@ contract ERC20Test is Test {
         vm.prank(attacker);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
         token.burn(account, amount);
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(account, address(0), amount);
         assertTrue(token.burn(account, amount));
         assertEq(token.balanceOf(account), minted - amount);
         assertEq(token.totalSupply(), minted - amount);
@@ -106,10 +122,14 @@ contract ERC20Test is Test {
         vm.assume(newOwner != address(this));
         ERC20Iface token = deployToken();
         uint256 amount = rawAmount % 1e30;
+        vm.expectEmit(true, true, false, true, address(token));
+        emit OwnershipTransferred(address(this), newOwner);
         assertTrue(token.transferOwnership(newOwner));
         assertEq(token.owner(), newOwner);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
         token.mint(account, amount);
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(0), account, amount);
         vm.prank(newOwner);
         assertTrue(token.mint(account, amount));
         assertEq(token.balanceOf(account), amount);
@@ -137,6 +157,8 @@ contract ERC20Test is Test {
     // tama: mirrors=erc20_owner_spec,erc20_renounceOwnership_effect,erc20_mint_effect
     function testFuzzRenounceOwnershipDisablesMint() public {
         ERC20Iface token = deployToken();
+        vm.expectEmit(true, true, false, true, address(token));
+        emit OwnershipTransferred(address(this), address(0));
         assertTrue(token.renounceOwnership());
         assertEq(token.owner(), address(0));
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 interface OwnableIface {
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     function owner() external view returns (address);
     function transferOwnership(address newOwner) external returns (bool);
     function renounceOwnership() external returns (bool);

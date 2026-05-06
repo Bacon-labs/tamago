@@ -9,7 +9,9 @@ open Verity
 open spec.OwnableSpec
 open src.Ownable
 
-attribute [local simp] contractOwner
+attribute [local simp] contractOwner src.OwnableBase.contractOwner
+  src.OwnableBase.owner src.OwnableBase.transferOwnership src.OwnableBase.renounceOwnership
+  Contracts.emit emitEvent
 
 -- tama: discharges=ownable_owner_spec
 theorem owner_returns_storage_owner (s : ContractState) :

@@ -22,6 +22,10 @@ name = "src"
 srcDir = "verity"
 
 [[lean_lib]]
+name = "common"
+srcDir = "verity"
+
+[[lean_lib]]
 name = "spec"
 srcDir = "verity"
 

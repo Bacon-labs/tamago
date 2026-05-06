@@ -6,6 +6,11 @@ import {ERC721Iface} from "../../src/generated/verity/ERC721Iface.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract ERC721Test is Test {
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
     function deployToken() internal returns (ERC721Iface token) {
         token = ERC721Deployer.deploy(address(this));
     }
@@ -16,6 +21,8 @@ contract ERC721Test is Test {
         ERC721Iface token = deployToken();
         assertEq(token.owner(), address(this));
         assertEq(token.totalSupply(), 0);
+        vm.expectEmit(true, true, true, true, address(token));
+        emit Transfer(address(0), recipient, 0);
         uint256 tokenId = token.mint(recipient);
         assertEq(tokenId, 0);
         assertEq(token.ownerOf(tokenId), recipient);
@@ -28,6 +35,8 @@ contract ERC721Test is Test {
         vm.assume(holder != address(0));
         ERC721Iface token = deployToken();
         uint256 tokenId = token.mint(holder);
+        vm.expectEmit(true, true, true, true, address(token));
+        emit Approval(holder, approved, tokenId);
         vm.prank(holder);
         assertTrue(token.approve(approved, tokenId));
         assertEq(token.getApproved(tokenId), approved);
@@ -48,6 +57,8 @@ contract ERC721Test is Test {
     // tama: mirrors=erc721_isApprovedForAll_spec,erc721_setApprovalForAll_effect
     function testFuzzSetApprovalForAll(address operator, bool approved) public {
         ERC721Iface token = deployToken();
+        vm.expectEmit(true, true, false, true, address(token));
+        emit ApprovalForAll(address(this), operator, approved);
         assertTrue(token.setApprovalForAll(operator, approved));
         assertEq(token.isApprovedForAll(address(this), operator), approved);
     }
@@ -85,6 +96,8 @@ contract ERC721Test is Test {
         uint256 tokenId = token.mint(holder);
         vm.prank(holder);
         assertTrue(token.approve(address(this), tokenId));
+        vm.expectEmit(true, true, true, true, address(token));
+        emit Transfer(holder, recipient, tokenId);
         assertTrue(token.transferFrom(holder, recipient, tokenId));
         assertEq(token.ownerOf(tokenId), recipient);
         assertEq(token.balanceOf(holder), 0);
@@ -130,10 +143,14 @@ contract ERC721Test is Test {
         vm.assume(newOwner != address(this));
         vm.assume(recipient != address(0));
         ERC721Iface token = deployToken();
+        vm.expectEmit(true, true, false, true, address(token));
+        emit OwnershipTransferred(address(this), newOwner);
         assertTrue(token.transferOwnership(newOwner));
         assertEq(token.owner(), newOwner);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
         token.mint(recipient);
+        vm.expectEmit(true, true, true, true, address(token));
+        emit Transfer(address(0), recipient, 0);
         vm.prank(newOwner);
         uint256 tokenId = token.mint(recipient);
         assertEq(token.ownerOf(tokenId), recipient);
@@ -161,6 +178,8 @@ contract ERC721Test is Test {
     // tama: mirrors=erc721_owner_spec,erc721_renounceOwnership_effect,erc721_mint_effect
     function testFuzzRenounceOwnershipDisablesMint() public {
         ERC721Iface token = deployToken();
+        vm.expectEmit(true, true, false, true, address(token));
+        emit OwnershipTransferred(address(this), address(0));
         assertTrue(token.renounceOwnership());
         assertEq(token.owner(), address(0));
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));

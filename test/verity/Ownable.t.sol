@@ -6,6 +6,8 @@ import {OwnableIface} from "../../src/generated/verity/OwnableIface.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract OwnableTest is Test {
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
     function deployOwnable() internal returns (OwnableIface ownable) {
         ownable = OwnableDeployer.deploy(address(this));
     }
@@ -15,6 +17,8 @@ contract OwnableTest is Test {
         vm.assume(newOwner != address(0));
         OwnableIface ownable = deployOwnable();
         assertEq(ownable.owner(), address(this));
+        vm.expectEmit(true, true, false, true, address(ownable));
+        emit OwnershipTransferred(address(this), newOwner);
         assertTrue(ownable.transferOwnership(newOwner));
         assertEq(ownable.owner(), newOwner);
     }
@@ -41,6 +45,8 @@ contract OwnableTest is Test {
     // tama: mirrors=ownable_renounceOwnership_effect
     function testFuzzRenounceOwnership() public {
         OwnableIface ownable = deployOwnable();
+        vm.expectEmit(true, true, false, true, address(ownable));
+        emit OwnershipTransferred(address(this), address(0));
         assertTrue(ownable.renounceOwnership());
         assertEq(ownable.owner(), address(0));
     }

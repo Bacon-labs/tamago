@@ -12,6 +12,15 @@ open spec.ERC721Spec
 open src.ERC721
 
 attribute [local simp] contractOwner tokenSupply nextTokenId balances tokenOwners tokenApprovals operatorApprovals
+  src.ERC721Base.contractOwner src.ERC721Base.tokenSupply src.ERC721Base.nextTokenId
+  src.ERC721Base.balances src.ERC721Base.tokenOwners src.ERC721Base.tokenApprovals
+  src.ERC721Base.operatorApprovals src.ERC721Base.totalSupply src.ERC721Base.owner
+  src.ERC721Base.transferOwnership src.ERC721Base.renounceOwnership
+  src.ERC721Base.balanceOf src.ERC721Base.ownerOf src.ERC721Base.getApproved
+  src.ERC721Base.isApprovedForAll src.ERC721Base.approve
+  src.ERC721Base.setApprovalForAll src.ERC721Base.mint src.ERC721Base.transferFrom
+  src.OwnableBase.contractOwner src.OwnableBase.transferOwnership
+  src.OwnableBase.renounceOwnership Contracts.emit emitEvent
 
 -- tama: discharges=erc721_totalSupply_spec
 theorem totalSupply_returns_storage_supply (s : ContractState) :
