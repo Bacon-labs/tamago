@@ -5,6 +5,8 @@ pragma solidity ^0.8.20;
 interface ERC721Iface {
     function totalSupply() external view returns (uint256);
     function owner() external view returns (address);
+    function transferOwnership(address newOwner) external returns (bool);
+    function renounceOwnership() external returns (bool);
     function balanceOf(address account) external view returns (uint256);
     function ownerOf(uint256 tokenId) external view returns (address);
     function getApproved(uint256 tokenId) external view returns (address);

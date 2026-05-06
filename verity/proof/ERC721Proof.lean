@@ -1,4 +1,5 @@
 import spec.ERC721Spec
+import proof.OwnableProof
 import Verity.Proofs.Stdlib.Automation
 
 namespace proof.ERC721Proof
@@ -20,7 +21,24 @@ theorem totalSupply_returns_storage_supply (s : ContractState) :
 -- tama: discharges=erc721_owner_spec
 theorem owner_returns_storage_owner (s : ContractState) :
   erc721_owner_spec ((owner).run s).fst s := by
-  simp [erc721_owner_spec, owner, contractOwner, Bind.bind, Pure.pure]
+  simp [erc721_owner_spec, spec.OwnableSpec.ownable_owner_spec, owner, contractOwner,
+    src.Ownable.contractOwner, Bind.bind, Pure.pure]
+
+-- tama: discharges=erc721_transferOwnership_effect
+theorem transferOwnership_effect_after_run (newOwner : Address) (s : ContractState) :
+  erc721_transferOwnership_effect newOwner s ((transferOwnership newOwner).run s) := by
+  simpa [erc721_transferOwnership_effect, spec.OwnableSpec.ownable_transferOwnership_effect,
+    transferOwnership, src.Ownable.transferOwnership, contractOwner, src.Ownable.contractOwner,
+    Bind.bind, Pure.pure, Verity.bind, Verity.pure]
+    using proof.OwnableProof.transferOwnership_effect_after_run newOwner s
+
+-- tama: discharges=erc721_renounceOwnership_effect
+theorem renounceOwnership_effect_after_run (s : ContractState) :
+  erc721_renounceOwnership_effect s ((renounceOwnership).run s) := by
+  simpa [erc721_renounceOwnership_effect, spec.OwnableSpec.ownable_renounceOwnership_effect,
+    renounceOwnership, src.Ownable.renounceOwnership, contractOwner, src.Ownable.contractOwner,
+    Bind.bind, Pure.pure, Verity.bind, Verity.pure]
+    using proof.OwnableProof.renounceOwnership_effect_after_run s
 
 -- tama: discharges=erc721_balanceOf_spec
 theorem balanceOf_returns_storage_balance (account : Address) (s : ContractState) :

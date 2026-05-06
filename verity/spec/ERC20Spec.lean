@@ -1,10 +1,12 @@
 import src.ERC20
+import spec.OwnableSpec
 
 namespace spec.ERC20Spec
 
 open Verity
 open Verity.EVM.Uint256
 open src.ERC20
+open spec.OwnableSpec
 
 def erc20_decimals_spec (result : Uint256) : Prop :=
   result = 18
@@ -19,7 +21,15 @@ def erc20_allowance_spec (ownerAddr spender : Address) (result : Uint256) (s : C
   result = s.storageMap2 allowances.slot ownerAddr spender
 
 def erc20_owner_spec (result : Address) (s : ContractState) : Prop :=
-  result = s.storageAddr contractOwner.slot
+  ownable_owner_spec result s
+
+def erc20_transferOwnership_effect
+    (newOwner : Address) (s : ContractState) (result : ContractResult Bool) : Prop :=
+  ownable_transferOwnership_effect newOwner s result
+
+def erc20_renounceOwnership_effect
+    (s : ContractState) (result : ContractResult Bool) : Prop :=
+  ownable_renounceOwnership_effect s result
 
 def erc20_approve_effect
     (spender : Address) (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=

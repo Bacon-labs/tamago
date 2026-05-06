@@ -8,6 +8,8 @@ interface ERC20Iface {
     function balanceOf(address account) external view returns (uint256);
     function allowance(address ownerAddr, address spender) external view returns (uint256);
     function owner() external view returns (address);
+    function transferOwnership(address newOwner) external returns (bool);
+    function renounceOwnership() external returns (bool);
     function approve(address spender, uint256 amount) external returns (bool);
     function transfer(address toAddr, uint256 amount) external returns (bool);
     function transferFrom(address fromAddr, address toAddr, uint256 amount) external returns (bool);

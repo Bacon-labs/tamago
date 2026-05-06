@@ -1,4 +1,5 @@
 import Contracts.Common
+import src.Ownable
 
 namespace src
 
@@ -32,6 +33,21 @@ verity_contract ERC721 where
   function view owner () : Address := do
     let currentOwner ← getStorageAddr contractOwner
     return currentOwner
+
+  function transferOwnership (newOwner : Address) : Bool := do
+    let sender ← msgSender
+    let currentOwner ← getStorageAddr contractOwner
+    require (sender == currentOwner) "Caller is not the owner"
+    require (newOwner != zeroAddress) "Invalid owner"
+    setStorageAddr contractOwner newOwner
+    return true
+
+  function renounceOwnership () : Bool := do
+    let sender ← msgSender
+    let currentOwner ← getStorageAddr contractOwner
+    require (sender == currentOwner) "Caller is not the owner"
+    setStorageAddr contractOwner zeroAddress
+    return true
 
   function view balanceOf (account : Address) : Uint256 := do
     require (account != zeroAddress) "Invalid owner"

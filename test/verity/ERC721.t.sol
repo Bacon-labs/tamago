@@ -123,4 +123,57 @@ contract ERC721Test is Test {
         assertEq(token.ownerOf(tokenId), recipient);
         assertEq(token.balanceOf(recipient), 1);
     }
+
+    // tama: mirrors=erc721_owner_spec,erc721_transferOwnership_effect,erc721_mint_effect
+    function testFuzzTransferOwnershipMovesMintAuthority(address newOwner, address recipient) public {
+        vm.assume(newOwner != address(0));
+        vm.assume(newOwner != address(this));
+        vm.assume(recipient != address(0));
+        ERC721Iface token = deployToken();
+        assertTrue(token.transferOwnership(newOwner));
+        assertEq(token.owner(), newOwner);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        token.mint(recipient);
+        vm.prank(newOwner);
+        uint256 tokenId = token.mint(recipient);
+        assertEq(token.ownerOf(tokenId), recipient);
+    }
+
+    // tama: mirrors=erc721_transferOwnership_effect
+    function testFuzzTransferOwnershipUnauthorizedReverts(address attacker, address newOwner) public {
+        vm.assume(attacker != address(this));
+        vm.assume(newOwner != address(0));
+        ERC721Iface token = deployToken();
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        token.transferOwnership(newOwner);
+        assertEq(token.owner(), address(this));
+    }
+
+    // tama: mirrors=erc721_transferOwnership_effect
+    function testFuzzTransferOwnershipToZeroReverts() public {
+        ERC721Iface token = deployToken();
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid owner"));
+        token.transferOwnership(address(0));
+        assertEq(token.owner(), address(this));
+    }
+
+    // tama: mirrors=erc721_owner_spec,erc721_renounceOwnership_effect,erc721_mint_effect
+    function testFuzzRenounceOwnershipDisablesMint() public {
+        ERC721Iface token = deployToken();
+        assertTrue(token.renounceOwnership());
+        assertEq(token.owner(), address(0));
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        token.mint(address(this));
+    }
+
+    // tama: mirrors=erc721_renounceOwnership_effect
+    function testFuzzRenounceOwnershipUnauthorizedReverts(address attacker) public {
+        vm.assume(attacker != address(this));
+        ERC721Iface token = deployToken();
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        token.renounceOwnership();
+        assertEq(token.owner(), address(this));
+    }
 }

@@ -1,16 +1,26 @@
 import src.ERC721
+import spec.OwnableSpec
 
 namespace spec.ERC721Spec
 
 open Verity
 open Verity.EVM.Uint256
 open src.ERC721
+open spec.OwnableSpec
 
 def erc721_totalSupply_spec (result : Uint256) (s : ContractState) : Prop :=
   result = s.storage tokenSupply.slot
 
 def erc721_owner_spec (result : Address) (s : ContractState) : Prop :=
-  result = s.storageAddr contractOwner.slot
+  ownable_owner_spec result s
+
+def erc721_transferOwnership_effect
+    (newOwner : Address) (s : ContractState) (result : ContractResult Bool) : Prop :=
+  ownable_transferOwnership_effect newOwner s result
+
+def erc721_renounceOwnership_effect
+    (s : ContractState) (result : ContractResult Bool) : Prop :=
+  ownable_renounceOwnership_effect s result
 
 def erc721_balanceOf_spec (account : Address) (result : ContractResult Uint256) (s : ContractState) : Prop :=
   (account = zeroAddress →
