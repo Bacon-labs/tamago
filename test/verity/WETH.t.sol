@@ -39,7 +39,7 @@ contract WETHTest is Test {
         assertEq(token.allowance(address(this), spender), amount);
     }
 
-    // tama: mirrors=weth_transfer_total_supply_preserved,weth_transfer_balances_effect
+    // tama: mirrors=weth_transfer_balances_effect
     function testFuzzTransferPreservesSupply(address recipient, uint96 depositAmount, uint96 rawTransfer) public {
         WETHIface token = deployToken();
         assertTrue(token.deposit{value: depositAmount}());
@@ -57,7 +57,7 @@ contract WETHTest is Test {
         assertEq(token.totalSupply(), depositAmount);
     }
 
-    // tama: mirrors=weth_transferFrom_total_supply_preserved,weth_transferFrom_effect
+    // tama: mirrors=weth_transferFrom_effect
     function testFuzzTransferFromUpdatesAllowance(address spender, address recipient, uint96 depositAmount, uint96 rawSpend) public {
         vm.assume(spender != address(this));
         WETHIface token = deployToken();

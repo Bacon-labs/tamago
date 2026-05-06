@@ -60,28 +60,12 @@ theorem approve_updates_allowance_only (spender : Address) (amount : Uint256) (s
   simpa [erc4626_approve_effect, src.ERC4626.approve, src.ERC20.approve]
     using proof.ERC20Proof.approve_updates_allowance_only spender amount s
 
--- tama: discharges=erc4626_transfer_total_supply_preserved
-theorem transfer_total_supply_preserved_after_run
-    (toAddr : Address) (amount : Uint256) (s : ContractState) :
-  erc4626_transfer_total_supply_preserved s ((src.ERC4626.transfer toAddr amount).run s).snd := by
-  simpa [erc4626_transfer_total_supply_preserved, src.ERC4626.transfer, src.ERC20.transfer]
-    using proof.ERC20Proof.transfer_total_supply_preserved_after_run toAddr amount s
-
 -- tama: discharges=erc4626_transfer_balances_effect
 theorem transfer_balances_effect_after_run
     (toAddr : Address) (amount : Uint256) (s : ContractState) :
   erc4626_transfer_balances_effect toAddr amount s ((src.ERC4626.transfer toAddr amount).run s) := by
   simpa [erc4626_transfer_balances_effect, src.ERC4626.transfer, src.ERC20.transfer]
     using proof.ERC20Proof.transfer_balances_effect_after_run toAddr amount s
-
--- tama: discharges=erc4626_transferFrom_total_supply_preserved
-theorem transferFrom_total_supply_preserved_after_run
-    (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState) :
-  erc4626_transferFrom_total_supply_preserved s
-    ((src.ERC4626.transferFrom fromAddr toAddr amount).run s).snd := by
-  simpa [erc4626_transferFrom_total_supply_preserved, src.ERC4626.transferFrom,
-    src.ERC20.transferFrom]
-    using proof.ERC20Proof.transferFrom_total_supply_preserved_after_run fromAddr toAddr amount s
 
 -- tama: discharges=erc4626_transferFrom_effect
 theorem transferFrom_effect_after_run
@@ -173,7 +157,7 @@ theorem deposit_mints_shares_and_tracks_assets
             (div (mul assets (add (s.storage 1) 1)) (add (s.storage 4) 1)).val := by
       simpa using h_balance_overflow
     simp [deposit, assetToken, balances, tokenSupply, managedAssets, msgSender,
-      Verity.contractAddress, getStorageAddr, getStorage, getMapping, safeTransferFrom,
+      common.ECM.selfAddressModule, Verity.wordToAddress, getStorageAddr, getStorage, getMapping, safeTransferFrom,
       Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_overflow,
       Verity.pure, Pure.pure]
@@ -196,7 +180,7 @@ theorem deposit_mints_shares_and_tracks_assets
               (div (mul assets (add (s.storage 1) 1)) (add (s.storage 4) 1)).val := by
         simpa using h_supply_overflow
       simp [deposit, assetToken, balances, tokenSupply, managedAssets, msgSender,
-        Verity.contractAddress, getStorageAddr, getStorage, getMapping, safeTransferFrom,
+        common.ECM.selfAddressModule, Verity.wordToAddress, getStorageAddr, getStorage, getMapping, safeTransferFrom,
         Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
         Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
         h_not_balance_overflow, h_overflow, Verity.pure, Pure.pure]
@@ -217,7 +201,7 @@ theorem deposit_mints_shares_and_tracks_assets
             Verity.Stdlib.Math.MAX_UINT256 < (s.storage 4).val + assets.val := by
           simpa using h_assets_overflow
         simp [deposit, assetToken, balances, tokenSupply, managedAssets, msgSender,
-          Verity.contractAddress, getStorageAddr, getStorage, getMapping, setMapping,
+          common.ECM.selfAddressModule, Verity.wordToAddress, getStorageAddr, getStorage, getMapping, setMapping,
           setStorage, safeTransferFrom, Contract.run, ContractResult.snd, Verity.bind,
           Bind.bind, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_not_balance_overflow, h_not_supply_overflow,
@@ -230,7 +214,7 @@ theorem deposit_mints_shares_and_tracks_assets
             ¬ Verity.Stdlib.Math.MAX_UINT256 < (s.storage 4).val + assets.val := by omega
         refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;>
           simp [deposit, assetToken, balances, tokenSupply, managedAssets, msgSender,
-            Verity.contractAddress, getStorageAddr, getStorage, getMapping, setMapping,
+            common.ECM.selfAddressModule, Verity.wordToAddress, getStorageAddr, getStorage, getMapping, setMapping,
             setStorage, safeTransferFrom, mstore, rawLog, emitEvent,
             Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
             Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
@@ -248,7 +232,7 @@ theorem mint_mints_shares_and_tracks_assets
         Verity.Stdlib.Math.MAX_UINT256 < (s.storageMap 2 receiver).val + shares.val := by
       simpa using h_balance_overflow
     simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
-      Verity.contractAddress, getStorageAddr, getStorage, getMapping, safeTransferFrom,
+      common.ECM.selfAddressModule, Verity.wordToAddress, getStorageAddr, getStorage, getMapping, safeTransferFrom,
       Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_overflow,
       Verity.pure, Pure.pure]
@@ -265,7 +249,7 @@ theorem mint_mints_shares_and_tracks_assets
           Verity.Stdlib.Math.MAX_UINT256 < (s.storage 1).val + shares.val := by
         simpa using h_supply_overflow
       simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
-        Verity.contractAddress, getStorageAddr, getStorage, getMapping, safeTransferFrom,
+        common.ECM.selfAddressModule, Verity.wordToAddress, getStorageAddr, getStorage, getMapping, safeTransferFrom,
         Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
         Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
         h_not_balance_overflow, h_overflow, Verity.pure, Pure.pure]
@@ -286,7 +270,7 @@ theorem mint_mints_shares_and_tracks_assets
                   (add (s.storage 1) 1)).val := by
           simpa using h_assets_overflow
         simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
-          Verity.contractAddress, getStorageAddr, getStorage, getMapping, setMapping,
+          common.ECM.selfAddressModule, Verity.wordToAddress, getStorageAddr, getStorage, getMapping, setMapping,
           setStorage, safeTransferFrom, Contract.run, ContractResult.snd, Verity.bind,
           Bind.bind, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_not_balance_overflow, h_not_supply_overflow,
@@ -310,7 +294,7 @@ theorem mint_mints_shares_and_tracks_assets
           omega
         refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;>
           simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
-            Verity.contractAddress, getStorageAddr, getStorage, getMapping, setMapping,
+            common.ECM.selfAddressModule, Verity.wordToAddress, getStorageAddr, getStorage, getMapping, setMapping,
             setStorage, safeTransferFrom, mstore, rawLog, emitEvent,
             Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
             Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,

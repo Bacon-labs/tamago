@@ -38,15 +38,9 @@ def weth_deposit_effect (s : ContractState) (result : ContractResult Bool) : Pro
       result.snd.storage tokenSupply.slot =
         (s.storage tokenSupply.slot) + s.msgValue))
 
-def weth_transfer_total_supply_preserved (s s' : ContractState) : Prop :=
-  erc20_transfer_total_supply_preserved s s'
-
 def weth_transfer_balances_effect
     (toAddr : Address) (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=
   erc20_transfer_balances_effect toAddr amount s result
-
-def weth_transferFrom_total_supply_preserved (s s' : ContractState) : Prop :=
-  erc20_transferFrom_total_supply_preserved s s'
 
 def weth_transferFrom_effect
     (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState)

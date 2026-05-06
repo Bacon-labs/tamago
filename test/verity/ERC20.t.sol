@@ -38,7 +38,7 @@ contract ERC20Test is Test {
         assertEq(token.totalSupply(), 0);
     }
 
-    // tama: mirrors=erc20_transfer_total_supply_preserved,erc20_transfer_balances_effect
+    // tama: mirrors=erc20_transfer_balances_effect
     function testFuzzTransferMovesBalancesAndPreservesSupply(address recipient, uint256 rawMint, uint256 rawTransfer) public {
         ERC20Iface token = deployToken();
         uint256 minted = rawMint % 1e30;
@@ -57,7 +57,7 @@ contract ERC20Test is Test {
         assertEq(token.totalSupply(), minted);
     }
 
-    // tama: mirrors=erc20_transferFrom_total_supply_preserved,erc20_transferFrom_effect
+    // tama: mirrors=erc20_transferFrom_effect
     function testFuzzTransferFromUpdatesAllowance(address spender, address recipient, uint256 rawMint, uint256 rawSpend) public {
         vm.assume(spender != address(this));
         ERC20Iface token = deployToken();

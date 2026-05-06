@@ -96,26 +96,12 @@ theorem deposit_mints_msg_value (s : ContractState) :
           Verity.Stdlib.Math.safeAdd, h_not_balance_overflow, h_not_supply_overflow,
           Verity.pure, Pure.pure]
 
--- tama: discharges=weth_transfer_total_supply_preserved
-theorem transfer_total_supply_preserved_after_run
-    (toAddr : Address) (amount : Uint256) (s : ContractState) :
-  weth_transfer_total_supply_preserved s ((src.WETH.transfer toAddr amount).run s).snd := by
-  simpa [weth_transfer_total_supply_preserved, src.WETH.transfer, src.ERC20.transfer]
-    using proof.ERC20Proof.transfer_total_supply_preserved_after_run toAddr amount s
-
 -- tama: discharges=weth_transfer_balances_effect
 theorem transfer_balances_effect_after_run
     (toAddr : Address) (amount : Uint256) (s : ContractState) :
   weth_transfer_balances_effect toAddr amount s ((src.WETH.transfer toAddr amount).run s) := by
   simpa [weth_transfer_balances_effect, src.WETH.transfer, src.ERC20.transfer]
     using proof.ERC20Proof.transfer_balances_effect_after_run toAddr amount s
-
--- tama: discharges=weth_transferFrom_total_supply_preserved
-theorem transferFrom_total_supply_preserved_after_run
-    (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState) :
-  weth_transferFrom_total_supply_preserved s ((src.WETH.transferFrom fromAddr toAddr amount).run s).snd := by
-  simpa [weth_transferFrom_total_supply_preserved, src.WETH.transferFrom, src.ERC20.transferFrom]
-    using proof.ERC20Proof.transferFrom_total_supply_preserved_after_run fromAddr toAddr amount s
 
 -- tama: discharges=weth_transferFrom_effect
 theorem transferFrom_effect_after_run

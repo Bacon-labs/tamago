@@ -157,7 +157,7 @@ contract ERC4626Test is Test {
         assertEq(vault.allowance(address(this), spender), amount);
     }
 
-    // tama: mirrors=erc4626_transfer_total_supply_preserved,erc4626_transfer_balances_effect
+    // tama: mirrors=erc4626_transfer_balances_effect
     function testFuzzShareTransferMovesBalances(address receiver, uint256 rawDeposit, uint256 rawTransfer) public {
         (ERC20Iface assetToken, ERC4626Iface vault) = deployPair();
         uint256 deposited = small(rawDeposit);
@@ -179,7 +179,7 @@ contract ERC4626Test is Test {
         assertEq(vault.totalAssets(), deposited);
     }
 
-    // tama: mirrors=erc4626_transferFrom_total_supply_preserved,erc4626_transferFrom_effect
+    // tama: mirrors=erc4626_transferFrom_effect
     function testFuzzShareTransferFromUpdatesAllowance(address spender, address receiver, uint256 rawDeposit, uint256 rawSpend) public {
         vm.assume(spender != address(this));
         (ERC20Iface assetToken, ERC4626Iface vault) = deployPair();

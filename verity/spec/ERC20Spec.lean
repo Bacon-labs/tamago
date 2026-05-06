@@ -38,9 +38,6 @@ def erc20_approve_effect
   result.snd.storageMap = s.storageMap ∧
   result.snd.storage tokenSupply.slot = s.storage tokenSupply.slot
 
-def erc20_transfer_total_supply_preserved (s s' : ContractState) : Prop :=
-  s'.storage tokenSupply.slot = s.storage tokenSupply.slot
-
 def erc20_transfer_balances_effect
     (toAddr : Address) (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=
   (amount.val > (s.storageMap balances.slot s.sender).val →
@@ -48,7 +45,8 @@ def erc20_transfer_balances_effect
   (amount.val ≤ (s.storageMap balances.slot s.sender).val →
     (s.sender = toAddr →
       result = ContractResult.success true result.snd ∧
-      result.snd.storageMap = s.storageMap) ∧
+      result.snd.storageMap = s.storageMap ∧
+      result.snd.storage tokenSupply.slot = s.storage tokenSupply.slot) ∧
     (s.sender ≠ toAddr →
       ((s.storageMap balances.slot toAddr).val + amount.val > Verity.Stdlib.Math.MAX_UINT256 →
         result = ContractResult.revert "Recipient balance overflow" s) ∧
@@ -57,10 +55,8 @@ def erc20_transfer_balances_effect
         result.snd.storageMap balances.slot s.sender =
           (s.storageMap balances.slot s.sender) - amount ∧
         result.snd.storageMap balances.slot toAddr =
-          (s.storageMap balances.slot toAddr) + amount)))
-
-def erc20_transferFrom_total_supply_preserved (s s' : ContractState) : Prop :=
-  s'.storage tokenSupply.slot = s.storage tokenSupply.slot
+          (s.storageMap balances.slot toAddr) + amount ∧
+        result.snd.storage tokenSupply.slot = s.storage tokenSupply.slot)))
 
 def erc20_transferFrom_effect
     (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState)
@@ -79,10 +75,12 @@ def erc20_transferFrom_effect
           result.snd.storageMap balances.slot fromAddr =
             (s.storageMap balances.slot fromAddr) - amount ∧
           result.snd.storageMap balances.slot toAddr =
-            (s.storageMap balances.slot toAddr) + amount)) ∧
+            (s.storageMap balances.slot toAddr) + amount ∧
+          result.snd.storage tokenSupply.slot = s.storage tokenSupply.slot)) ∧
       (fromAddr = toAddr →
         result = ContractResult.success true result.snd ∧
-        result.snd.storageMap = s.storageMap) ∧
+        result.snd.storageMap = s.storageMap ∧
+        result.snd.storage tokenSupply.slot = s.storage tokenSupply.slot) ∧
       ((fromAddr = toAddr ∨
           (s.storageMap balances.slot toAddr).val + amount.val ≤ Verity.Stdlib.Math.MAX_UINT256) →
         (s.storageMap2 allowances.slot fromAddr s.sender =

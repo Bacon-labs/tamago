@@ -24,15 +24,9 @@ def erc4626_approve_effect
     (spender : Address) (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=
   erc20_approve_effect spender amount s result
 
-def erc4626_transfer_total_supply_preserved (s s' : ContractState) : Prop :=
-  erc20_transfer_total_supply_preserved s s'
-
 def erc4626_transfer_balances_effect
     (toAddr : Address) (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=
   erc20_transfer_balances_effect toAddr amount s result
-
-def erc4626_transferFrom_total_supply_preserved (s s' : ContractState) : Prop :=
-  erc20_transferFrom_total_supply_preserved s s'
 
 def erc4626_transferFrom_effect
     (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState)

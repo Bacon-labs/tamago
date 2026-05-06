@@ -78,26 +78,6 @@ theorem approve_updates_allowance_only (spender : Address) (amount : Uint256) (s
   · simp [approve, allowances, msgSender, setMapping2, Contract.run,
       ContractResult.snd, Verity.bind, Bind.bind, Verity.pure, Pure.pure]
 
--- tama: discharges=erc20_transfer_total_supply_preserved
-theorem transfer_total_supply_preserved_after_run (toAddr : Address) (amount : Uint256) (s : ContractState) :
-  erc20_transfer_total_supply_preserved s ((transfer toAddr amount).run s).snd := by
-  unfold erc20_transfer_total_supply_preserved
-  by_cases h_balance : amount.val ≤ (s.storageMap 2 s.sender).val
-  · simp [transfer, balances, tokenSupply, msgSender, getMapping, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Pure.pure, Verity.pure,
-      Verity.require, Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
-      h_balance]
-    by_cases h_same : s.sender = toAddr
-    · simp [h_same, Verity.bind, Bind.bind, Verity.pure, Pure.pure, emitEvent]
-    · by_cases h_overflow : Verity.Stdlib.Math.MAX_UINT256 <
-          (s.storageMap 2 toAddr).val + amount.val
-      · simp [h_same, h_overflow, getMapping, setMapping, Verity.require,
-          Verity.bind, Verity.pure]
-      · simp [h_same, h_overflow, getMapping, setMapping, Verity.require,
-          Verity.bind, Verity.pure]
-  · simp [transfer, balances, tokenSupply, msgSender, getMapping, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_balance]
-
 -- tama: discharges=erc20_transfer_balances_effect
 theorem transfer_balances_effect_after_run
     (toAddr : Address) (amount : Uint256) (s : ContractState) :
@@ -116,7 +96,7 @@ theorem transfer_balances_effect_after_run
     refine ⟨?_, ?_⟩
     · intro h_same
       subst h_same
-      simp [transfer, balances, msgSender, getMapping, Contract.run, ContractResult.snd,
+      simp [transfer, balances, tokenSupply, msgSender, getMapping, Contract.run, ContractResult.snd,
         Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require, h_balance_raw]
     · intro h_ne
       refine ⟨?_, ?_⟩
@@ -136,7 +116,7 @@ theorem transfer_balances_effect_after_run
         have h_not_overflow :
             ¬ Verity.Stdlib.Math.MAX_UINT256 <
               (s.storageMap 2 toAddr).val + amount.val := by omega
-        refine ⟨?_, ?_, ?_⟩
+        refine ⟨?_, ?_, ?_, ?_⟩
         · simp [transfer, balances, msgSender, getMapping, setMapping, Contract.run,
             ContractResult.snd, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require,
             Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_balance_raw, h_ne,
@@ -151,52 +131,10 @@ theorem transfer_balances_effect_after_run
             ContractResult.snd, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require,
             Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_balance_raw, h_ne,
             h_not_overflow, HSub.hSub]
-
--- tama: discharges=erc20_transferFrom_total_supply_preserved
-theorem transferFrom_total_supply_preserved_after_run
-    (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState) :
-  erc20_transferFrom_total_supply_preserved s ((transferFrom fromAddr toAddr amount).run s).snd := by
-  unfold erc20_transferFrom_total_supply_preserved
-  by_cases h_allowance : amount.val ≤ (s.storageMap2 3 fromAddr s.sender).val
-  · by_cases h_balance : amount.val ≤ (s.storageMap 2 fromAddr).val
-    · simp [transferFrom, allowances, balances, tokenSupply, msgSender, getMapping2,
-        getMapping, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Pure.pure,
-        Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
-        Verity.Stdlib.Math.safeAdd, h_allowance, h_balance]
-      by_cases h_same : fromAddr = toAddr
-      · subst h_same
-        by_cases h_max :
-            s.storageMap2 3 fromAddr s.sender =
-              maxUint256
-        · simp [Verity.Stdlib.Math.MAX_UINT256, Verity.Core.MAX_UINT256] at h_max
-          simp [h_max, setMapping2, Verity.pure, Verity.bind]
-        · simp [Verity.Stdlib.Math.MAX_UINT256, Verity.Core.MAX_UINT256] at h_max
-          simp [h_max, setMapping2, Verity.pure, Verity.bind]
-      · by_cases h_overflow : Verity.Stdlib.Math.MAX_UINT256 <
-            (s.storageMap 2 toAddr).val + amount.val
-        · by_cases h_max :
-              s.storageMap2 3 fromAddr s.sender =
-                maxUint256
-          · simp [Verity.Stdlib.Math.MAX_UINT256, Verity.Core.MAX_UINT256] at h_max
-            simp [h_same, h_overflow, h_max, getMapping, setMapping, setMapping2,
-              Verity.require, Verity.bind, Verity.pure]
-          · simp [Verity.Stdlib.Math.MAX_UINT256, Verity.Core.MAX_UINT256] at h_max
-            simp [h_same, h_overflow, h_max, getMapping, setMapping, setMapping2,
-              Verity.require, Verity.bind, Verity.pure]
-        · by_cases h_max :
-              s.storageMap2 3 fromAddr s.sender =
-                maxUint256
-          · simp [Verity.Stdlib.Math.MAX_UINT256, Verity.Core.MAX_UINT256] at h_max
-            simp [h_same, h_overflow, h_max, getMapping, setMapping, setMapping2,
-              Verity.require, Verity.bind, Verity.pure]
-          · simp [Verity.Stdlib.Math.MAX_UINT256, Verity.Core.MAX_UINT256] at h_max
-            simp [h_same, h_overflow, h_max, getMapping, setMapping, setMapping2,
-              Verity.require, Verity.bind, Verity.pure]
-    · simp [transferFrom, allowances, balances, tokenSupply, msgSender, getMapping2,
-        getMapping, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
-        h_allowance, h_balance]
-  · simp [transferFrom, allowances, tokenSupply, msgSender, getMapping2,
-      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_allowance]
+        · simp [transfer, balances, tokenSupply, msgSender, getMapping, setMapping, Contract.run,
+            ContractResult.snd, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require,
+            Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_balance_raw, h_ne,
+            h_not_overflow]
 
 -- tama: discharges=erc20_transferFrom_effect
 theorem transferFrom_effect_after_run
@@ -253,11 +191,11 @@ theorem transferFrom_effect_after_run
               s.storageMap2 3 fromAddr s.sender =
                 maxUint256
           · simp [Verity.Stdlib.Math.MAX_UINT256, Verity.Core.MAX_UINT256] at h_max
-            refine ⟨?_, ?_, ?_⟩ <;>
+            refine ⟨?_, ?_, ?_, ?_⟩ <;>
               simp [h_ne, h_not_overflow, h_max, getMapping, setMapping, setMapping2,
                 Verity.require, Verity.bind, Verity.pure, HSub.hSub]
           · simp [Verity.Stdlib.Math.MAX_UINT256, Verity.Core.MAX_UINT256] at h_max
-            refine ⟨?_, ?_, ?_⟩ <;>
+            refine ⟨?_, ?_, ?_, ?_⟩ <;>
               simp [h_ne, h_not_overflow, h_max, getMapping, setMapping, setMapping2,
                 Verity.require, Verity.bind, Verity.pure, HSub.hSub]
       · intro h_eq

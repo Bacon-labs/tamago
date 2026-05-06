@@ -1,4 +1,5 @@
 import Contracts.Common
+import common.ECM
 import common.Events
 
 namespace src
@@ -150,7 +151,8 @@ verity_contract ERC4626Base where
   function allow_post_interaction_writes deposit (assets : Uint256, receiver : Address) : Uint256 := do
     let sender ← msgSender
     let currentAsset ← getStorageAddr assetToken
-    let self ← Verity.contractAddress
+    let selfWord ← ecmCall common.ECM.selfAddressModule [0]
+    let self := wordToAddress selfWord
     let currentAssets ← getStorage managedAssets
     let currentSupply ← getStorage tokenSupply
     let shares := div (mul assets (add currentSupply 1)) (add currentAssets 1)
@@ -169,7 +171,8 @@ verity_contract ERC4626Base where
   function allow_post_interaction_writes mint (shares : Uint256, receiver : Address) : Uint256 := do
     let sender ← msgSender
     let currentAsset ← getStorageAddr assetToken
-    let self ← Verity.contractAddress
+    let selfWord ← ecmCall common.ECM.selfAddressModule [0]
+    let self := wordToAddress selfWord
     let currentAssets ← getStorage managedAssets
     let currentSupply ← getStorage tokenSupply
     let denominator := add currentSupply 1
