@@ -25,6 +25,8 @@ contract FixedPointMathLibTest is Test {
         uint256 product = uint256(x) * uint256(y);
         assertEq(lib_.mulDivDown(x, y, denominator), product / denominator);
         assertEq(lib_.mulDivUp(x, y, denominator), (product + denominator - 1) / denominator);
+        assertEq(lib_.mulDivDown(x, y, 0), 0);
+        assertEq(lib_.mulDivUp(x, y, 0), 0);
     }
 
     // tama: mirrors=fixed_mulWadDown_spec,fixed_mulWadUp_spec
@@ -42,6 +44,8 @@ contract FixedPointMathLibTest is Test {
         uint256 product = uint256(x) * WAD;
         assertEq(lib_.divWadDown(x, denominator), product / denominator);
         assertEq(lib_.divWadUp(x, denominator), (product + denominator - 1) / denominator);
+        assertEq(lib_.divWadDown(x, 0), 0);
+        assertEq(lib_.divWadUp(x, 0), 0);
     }
 
     // tama: mirrors=fixed_ceilDiv_spec

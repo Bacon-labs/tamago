@@ -6,27 +6,54 @@ open Verity
 open Verity.EVM.Uint256
 
 def fixed_WAD_spec (result : Uint256) : Prop :=
-  result = 1000000000000000000
+  result.val = 1000000000000000000
 
 def fixed_mulDivDown_spec (x y denominator result : Uint256) : Prop :=
-  result = div (mul x y) denominator
+  result.val =
+    if denominator.val = 0 then
+      0
+    else
+      ((x.val * y.val) % Verity.Core.Uint256.modulus) / denominator.val
 
 def fixed_mulDivUp_spec (x y denominator result : Uint256) : Prop :=
-  result = div (add (mul x y) (sub denominator 1)) denominator
+  result.val =
+    if denominator.val = 0 then
+      0
+    else
+      ((((x.val * y.val) % Verity.Core.Uint256.modulus) + (denominator.val - 1)) %
+        Verity.Core.Uint256.modulus) / denominator.val
 
 def fixed_mulWadDown_spec (x y result : Uint256) : Prop :=
-  result = div (mul x y) 1000000000000000000
+  result.val =
+    ((x.val * y.val) % Verity.Core.Uint256.modulus) / 1000000000000000000
 
 def fixed_mulWadUp_spec (x y result : Uint256) : Prop :=
-  result = div (add (mul x y) (sub 1000000000000000000 1)) 1000000000000000000
+  result.val =
+    ((((x.val * y.val) % Verity.Core.Uint256.modulus) + (1000000000000000000 - 1)) %
+      Verity.Core.Uint256.modulus) / 1000000000000000000
 
 def fixed_divWadDown_spec (x y result : Uint256) : Prop :=
-  result = div (mul x 1000000000000000000) y
+  result.val =
+    if y.val = 0 then
+      0
+    else
+      ((x.val * 1000000000000000000) % Verity.Core.Uint256.modulus) / y.val
 
 def fixed_divWadUp_spec (x y result : Uint256) : Prop :=
-  result = div (add (mul x 1000000000000000000) (sub y 1)) y
+  result.val =
+    if y.val = 0 then
+      0
+    else
+      ((((x.val * 1000000000000000000) % Verity.Core.Uint256.modulus) + (y.val - 1)) %
+        Verity.Core.Uint256.modulus) / y.val
 
 def fixed_ceilDiv_spec (x y result : Uint256) : Prop :=
-  result = if x == 0 then 0 else add (div (sub x 1) y) 1
+  result.val =
+    if x.val = 0 then
+      0
+    else if y.val = 0 then
+      1
+    else
+      ((x.val - 1) / y.val) + 1
 
 end spec.FixedPointMathLibSpec
