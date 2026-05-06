@@ -12,9 +12,10 @@ contract WETHTest is Test {
         token = WETHDeployer.deploy();
     }
 
-    // tama: mirrors=weth_deposit_effect,weth_totalSupply_spec,weth_balanceOf_spec
+    // tama: mirrors=weth_decimals_spec,weth_deposit_effect,weth_totalSupply_spec,weth_balanceOf_spec
     function testFuzzDepositMintsWrappedEth(uint96 amount) public {
         WETHIface token = deployToken();
+        assertEq(token.decimals(), 18);
         assertTrue(token.deposit{value: amount}());
         assertEq(token.balanceOf(address(this)), amount);
         assertEq(token.totalSupply(), amount);
@@ -27,12 +28,32 @@ contract WETHTest is Test {
         assertEq(token.allowance(address(this), spender), amount);
     }
 
-    // tama: mirrors=weth_transfer_total_supply_preserved
+    // tama: mirrors=weth_transfer_total_supply_preserved,weth_transfer_balances_effect
     function testFuzzTransferPreservesSupply(address recipient, uint96 depositAmount, uint96 rawTransfer) public {
         WETHIface token = deployToken();
         assertTrue(token.deposit{value: depositAmount}());
         uint256 amount = depositAmount == 0 ? 0 : uint256(rawTransfer) % (uint256(depositAmount) + 1);
+        uint256 recipientBefore = token.balanceOf(recipient);
         assertTrue(token.transfer(recipient, amount));
+        if (recipient == address(this)) {
+            assertEq(token.balanceOf(address(this)), depositAmount);
+        } else {
+            assertEq(token.balanceOf(address(this)), uint256(depositAmount) - amount);
+            assertEq(token.balanceOf(recipient), recipientBefore + amount);
+        }
+        assertEq(token.totalSupply(), depositAmount);
+    }
+
+    // tama: mirrors=weth_transferFrom_total_supply_preserved,weth_transferFrom_effect
+    function testFuzzTransferFromUpdatesAllowance(address spender, address recipient, uint96 depositAmount, uint96 rawSpend) public {
+        vm.assume(spender != address(this));
+        WETHIface token = deployToken();
+        assertTrue(token.deposit{value: depositAmount}());
+        uint256 amount = depositAmount == 0 ? 0 : uint256(rawSpend) % (uint256(depositAmount) + 1);
+        assertTrue(token.approve(spender, depositAmount));
+        vm.prank(spender);
+        assertTrue(token.transferFrom(address(this), recipient, amount));
+        assertEq(token.allowance(address(this), spender), uint256(depositAmount) - amount);
         assertEq(token.totalSupply(), depositAmount);
     }
 
@@ -46,7 +67,7 @@ contract WETHTest is Test {
         assertEq(token.totalSupply(), uint256(depositAmount) - amount);
     }
 
-    // tama: mirrors=weth_withdraw_insufficient_no_change
+    // tama: mirrors=weth_withdraw_effect
     function testFuzzWithdrawInsufficientReverts(uint96 depositAmount, uint96 extra) public {
         WETHIface token = deployToken();
         assertTrue(token.deposit{value: depositAmount}());

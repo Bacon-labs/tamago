@@ -47,7 +47,7 @@ contract ERC20Test is Test {
         assertEq(token.totalSupply(), minted);
     }
 
-    // tama: mirrors=erc20_transferFrom_total_supply_preserved,erc20_transferFrom_allowance_effect
+    // tama: mirrors=erc20_transferFrom_total_supply_preserved,erc20_transferFrom_effect
     function testFuzzTransferFromUpdatesAllowance(address spender, address recipient, uint256 rawMint, uint256 rawSpend) public {
         vm.assume(spender != address(this));
         ERC20Iface token = deployToken();
@@ -61,7 +61,7 @@ contract ERC20Test is Test {
         assertEq(token.totalSupply(), minted);
     }
 
-    // tama: mirrors=erc20_transferFrom_allowance_effect
+    // tama: mirrors=erc20_transferFrom_effect
     function testFuzzTransferFromKeepsInfiniteAllowance(address spender, address recipient, uint256 rawMint, uint256 rawSpend) public {
         vm.assume(spender != address(this));
         ERC20Iface token = deployToken();
@@ -74,7 +74,7 @@ contract ERC20Test is Test {
         assertEq(token.allowance(address(this), spender), type(uint256).max);
     }
 
-    // tama: mirrors=erc20_mint_unauthorized_no_change
+    // tama: mirrors=erc20_mint_effect
     function testFuzzMintUnauthorizedReverts(address attacker, address account, uint256 amount) public {
         vm.assume(attacker != address(this));
         ERC20Iface token = deployToken();
@@ -85,7 +85,7 @@ contract ERC20Test is Test {
         assertEq(token.totalSupply(), 0);
     }
 
-    // tama: mirrors=erc20_burn_effect,erc20_burn_unauthorized_no_change
+    // tama: mirrors=erc20_burn_effect
     function testFuzzBurnOwnerOnly(address account, address attacker, uint256 rawMint, uint256 rawBurn) public {
         vm.assume(attacker != address(this));
         ERC20Iface token = deployToken();
