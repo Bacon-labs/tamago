@@ -1,7 +1,7 @@
 # Tama Standard Contracts
 
 This project contains standalone Tama/Verity examples for ERC20, ERC721, WETH,
-and FixedPointMathLib.
+Ownable, and ERC4626.
 
 ## WETH native ETH limitation
 
