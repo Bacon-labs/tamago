@@ -33,6 +33,18 @@ contract ERC721Test is Test {
         assertEq(token.getApproved(tokenId), approved);
     }
 
+    // tama: mirrors=erc721_approve_effect
+    function testFuzzApproveUnauthorizedReverts(address holder, address attacker, address approved) public {
+        vm.assume(holder != address(0));
+        vm.assume(attacker != holder);
+        ERC721Iface token = deployToken();
+        uint256 tokenId = token.mint(holder);
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Not authorized"));
+        token.approve(approved, tokenId);
+        assertEq(token.getApproved(tokenId), address(0));
+    }
+
     // tama: mirrors=erc721_isApprovedForAll_spec,erc721_setApprovalForAll_effect
     function testFuzzSetApprovalForAll(address operator, bool approved) public {
         ERC721Iface token = deployToken();
@@ -40,16 +52,20 @@ contract ERC721Test is Test {
         assertEq(token.isApprovedForAll(address(this), operator), approved);
     }
 
-    // tama: mirrors=erc721_ownerOf_spec,erc721_getApproved_spec
+    // tama: mirrors=erc721_balanceOf_spec,erc721_ownerOf_spec,erc721_getApproved_spec,erc721_approve_effect
     function testFuzzMissingTokenViewsRevert(uint256 tokenId) public {
         ERC721Iface token = deployToken();
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid owner"));
+        token.balanceOf(address(0));
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "Token does not exist"));
         token.ownerOf(tokenId);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "Token does not exist"));
         token.getApproved(tokenId);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Token does not exist"));
+        token.approve(address(1), tokenId);
     }
 
-    // tama: mirrors=erc721_mint_unauthorized_no_change
+    // tama: mirrors=erc721_mint_effect
     function testFuzzMintUnauthorizedReverts(address attacker, address recipient) public {
         vm.assume(attacker != address(this));
         vm.assume(recipient != address(0));
@@ -60,14 +76,50 @@ contract ERC721Test is Test {
         assertEq(token.totalSupply(), 0);
     }
 
-    // tama: mirrors=erc721_transferFrom_zero_recipient_no_change
+    // tama: mirrors=erc721_transferFrom_effect
+    function testFuzzTransferFromMovesToken(address holder, address recipient) public {
+        vm.assume(holder != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(holder != recipient);
+        ERC721Iface token = deployToken();
+        uint256 tokenId = token.mint(holder);
+        vm.prank(holder);
+        assertTrue(token.approve(address(this), tokenId));
+        assertTrue(token.transferFrom(holder, recipient, tokenId));
+        assertEq(token.ownerOf(tokenId), recipient);
+        assertEq(token.balanceOf(holder), 0);
+        assertEq(token.balanceOf(recipient), 1);
+        assertEq(token.getApproved(tokenId), address(0));
+    }
+
+    // tama: mirrors=erc721_transferFrom_effect
+    function testFuzzTransferFromUnauthorizedReverts(address holder, address recipient, address attacker) public {
+        vm.assume(holder != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(attacker != address(0));
+        vm.assume(attacker != holder);
+        ERC721Iface token = deployToken();
+        uint256 tokenId = token.mint(holder);
+        vm.prank(attacker);
+        (bool ok, bytes memory data) = address(token).call(
+            abi.encodeCall(ERC721Iface.transferFrom, (holder, recipient, tokenId))
+        );
+        assertFalse(ok);
+        assertEq(data, abi.encodeWithSignature("Error(string)", "Not authorized"));
+        assertEq(token.ownerOf(tokenId), holder);
+    }
+
+    // tama: mirrors=erc721_transferFrom_effect
     function testFuzzTransferToZeroRevertsWithoutChangingOwner(address recipient) public {
         vm.assume(recipient != address(0));
         ERC721Iface token = deployToken();
         uint256 tokenId = token.mint(recipient);
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid recipient"));
-        token.transferFrom(recipient, address(0), tokenId);
+        (bool ok, bytes memory data) = address(token).call(
+            abi.encodeCall(ERC721Iface.transferFrom, (recipient, address(0), tokenId))
+        );
+        assertFalse(ok);
+        assertEq(data, abi.encodeWithSignature("Error(string)", "Invalid recipient"));
         assertEq(token.ownerOf(tokenId), recipient);
         assertEq(token.balanceOf(recipient), 1);
     }
