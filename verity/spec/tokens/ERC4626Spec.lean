@@ -1,12 +1,12 @@
-import src.ERC4626
-import spec.ERC20Spec
+import src.tokens.ERC4626
+import spec.tokens.ERC20Spec
 
-namespace spec.ERC4626Spec
+namespace spec.tokens.ERC4626Spec
 
 open Verity
 open Verity.EVM.Uint256
 open src.ERC4626
-open spec.ERC20Spec
+open spec.tokens.ERC20Spec
 
 def erc4626_decimals_spec (result : Uint256) : Prop :=
   erc20_decimals_spec result
@@ -231,4 +231,4 @@ def erc4626_redeem_effect
                 Verity.EVM.Uint256.sub
                   (s.storageMap2 allowances.slot ownerAddr s.sender) shares)))))
 
-end spec.ERC4626Spec
+end spec.tokens.ERC4626Spec

@@ -1,5 +1,5 @@
-import src.Ownable
-import src.ERC20
-import src.ERC721
-import src.WETH
-import src.ERC4626
+import src.auth.Ownable
+import src.tokens.ERC20
+import src.tokens.ERC721
+import src.tokens.WETH
+import src.tokens.ERC4626

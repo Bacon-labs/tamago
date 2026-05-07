@@ -1,14 +1,14 @@
-import spec.ERC20Spec
-import proof.OwnableProof
+import spec.tokens.ERC20Spec
+import proof.auth.OwnableProof
 import Verity.Proofs.Stdlib.Automation
 
-namespace proof.ERC20Proof
+namespace proof.tokens.ERC20Proof
 
 set_option linter.unusedSimpArgs false
 
 open Verity
 open Verity.EVM.Uint256
-open spec.ERC20Spec
+open spec.tokens.ERC20Spec
 open src.ERC20
 
 attribute [local simp] contractOwner tokenSupply balances allowances
@@ -44,24 +44,24 @@ theorem allowance_returns_storage_allowance (ownerAddr spender : Address) (s : C
 -- tama: discharges=erc20_owner_spec
 theorem owner_returns_storage_owner (s : ContractState) :
   erc20_owner_spec ((owner).run s).fst s := by
-  simp [erc20_owner_spec, spec.OwnableSpec.ownable_owner_spec, owner, contractOwner,
+  simp [erc20_owner_spec, spec.auth.OwnableSpec.ownable_owner_spec, owner, contractOwner,
     src.Ownable.contractOwner, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc20_transferOwnership_effect
 theorem transferOwnership_effect_after_run (newOwner : Address) (s : ContractState) :
   erc20_transferOwnership_effect newOwner s ((transferOwnership newOwner).run s) := by
-  simpa [erc20_transferOwnership_effect, spec.OwnableSpec.ownable_transferOwnership_effect,
+  simpa [erc20_transferOwnership_effect, spec.auth.OwnableSpec.ownable_transferOwnership_effect,
     transferOwnership, src.Ownable.transferOwnership, contractOwner, src.Ownable.contractOwner,
     Bind.bind, Pure.pure, Verity.bind, Verity.pure]
-    using proof.OwnableProof.transferOwnership_effect_after_run newOwner s
+    using proof.auth.OwnableProof.transferOwnership_effect_after_run newOwner s
 
 -- tama: discharges=erc20_renounceOwnership_effect
 theorem renounceOwnership_effect_after_run (s : ContractState) :
   erc20_renounceOwnership_effect s ((renounceOwnership).run s) := by
-  simpa [erc20_renounceOwnership_effect, spec.OwnableSpec.ownable_renounceOwnership_effect,
+  simpa [erc20_renounceOwnership_effect, spec.auth.OwnableSpec.ownable_renounceOwnership_effect,
     renounceOwnership, src.Ownable.renounceOwnership, contractOwner, src.Ownable.contractOwner,
     Bind.bind, Pure.pure, Verity.bind, Verity.pure]
-    using proof.OwnableProof.renounceOwnership_effect_after_run s
+    using proof.auth.OwnableProof.renounceOwnership_effect_after_run s
 
 -- tama: discharges=erc20_approve_effect
 theorem approve_updates_allowance_only (spender : Address) (amount : Uint256) (s : ContractState) :
@@ -351,4 +351,4 @@ theorem burn_effect_after_run (fromAddr : Address) (amount : Uint256) (s : Contr
             Verity.bind, Bind.bind, Verity.require, h_owner_raw, h_balance_raw, h_supply_raw,
             Verity.pure, Pure.pure]
 
-end proof.ERC20Proof
+end proof.tokens.ERC20Proof

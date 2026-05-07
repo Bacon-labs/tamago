@@ -1,6 +1,6 @@
-import src.Ownable
+import src.auth.Ownable
 
-namespace spec.OwnableSpec
+namespace spec.auth.OwnableSpec
 
 open Verity
 open src.Ownable
@@ -41,4 +41,4 @@ def ownable_renounceOwnership_effect
     result.snd.storageMap2 = s.storageMap2 ∧
     result.snd.storageArray = s.storageArray)
 
-end spec.OwnableSpec
+end spec.auth.OwnableSpec

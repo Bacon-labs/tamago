@@ -1,6 +1,6 @@
 import TamaSrc
-import spec.OwnableSpec
-import spec.ERC20Spec
-import spec.ERC721Spec
-import spec.WETHSpec
-import spec.ERC4626Spec
+import spec.auth.OwnableSpec
+import spec.tokens.ERC20Spec
+import spec.tokens.ERC721Spec
+import spec.tokens.WETHSpec
+import spec.tokens.ERC4626Spec

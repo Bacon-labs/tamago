@@ -1,15 +1,15 @@
-import spec.WETHSpec
-import proof.ERC20Proof
+import spec.tokens.WETHSpec
+import proof.tokens.ERC20Proof
 import Verity.Proofs.Stdlib.Automation
 
-namespace proof.WETHProof
+namespace proof.tokens.WETHProof
 
 set_option linter.unusedSimpArgs false
 
 open Verity
 open Verity.EVM.Uint256
 open Contracts
-open spec.WETHSpec
+open spec.tokens.WETHSpec
 open src.WETH
 
 attribute [local simp] tokenSupply balances allowances
@@ -28,31 +28,31 @@ attribute [local simp] src.WETHBase.tokenSupply src.WETHBase.balances
 theorem decimals_returns_18 (s : ContractState) :
   weth_decimals_spec ((src.WETH.decimals).run s).fst := by
   simpa [weth_decimals_spec, src.WETH.decimals, src.ERC20.decimals]
-    using proof.ERC20Proof.decimals_returns_18 s
+    using proof.tokens.ERC20Proof.decimals_returns_18 s
 
 -- tama: discharges=weth_totalSupply_spec
 theorem totalSupply_returns_storage_supply (s : ContractState) :
   weth_totalSupply_spec ((src.WETH.totalSupply).run s).fst s := by
   simpa [weth_totalSupply_spec, src.WETH.totalSupply, src.ERC20.totalSupply]
-    using proof.ERC20Proof.totalSupply_returns_storage_supply s
+    using proof.tokens.ERC20Proof.totalSupply_returns_storage_supply s
 
 -- tama: discharges=weth_balanceOf_spec
 theorem balanceOf_returns_storage_balance (account : Address) (s : ContractState) :
   weth_balanceOf_spec account ((src.WETH.balanceOf account).run s).fst s := by
   simpa [weth_balanceOf_spec, src.WETH.balanceOf, src.ERC20.balanceOf]
-    using proof.ERC20Proof.balanceOf_returns_storage_balance account s
+    using proof.tokens.ERC20Proof.balanceOf_returns_storage_balance account s
 
 -- tama: discharges=weth_allowance_spec
 theorem allowance_returns_storage_allowance (ownerAddr spender : Address) (s : ContractState) :
   weth_allowance_spec ownerAddr spender ((src.WETH.allowance ownerAddr spender).run s).fst s := by
   simpa [weth_allowance_spec, src.WETH.allowance, src.ERC20.allowance]
-    using proof.ERC20Proof.allowance_returns_storage_allowance ownerAddr spender s
+    using proof.tokens.ERC20Proof.allowance_returns_storage_allowance ownerAddr spender s
 
 -- tama: discharges=weth_approve_effect
 theorem approve_updates_allowance_only (spender : Address) (amount : Uint256) (s : ContractState) :
   weth_approve_effect spender amount s ((src.WETH.approve spender amount).run s) := by
   simpa [weth_approve_effect, src.WETH.approve, src.ERC20.approve]
-    using proof.ERC20Proof.approve_updates_allowance_only spender amount s
+    using proof.tokens.ERC20Proof.approve_updates_allowance_only spender amount s
 
 -- tama: discharges=weth_deposit_effect
 theorem deposit_mints_msg_value (s : ContractState) :
@@ -101,7 +101,7 @@ theorem transfer_balances_effect_after_run
     (toAddr : Address) (amount : Uint256) (s : ContractState) :
   weth_transfer_balances_effect toAddr amount s ((src.WETH.transfer toAddr amount).run s) := by
   simpa [weth_transfer_balances_effect, src.WETH.transfer, src.ERC20.transfer]
-    using proof.ERC20Proof.transfer_balances_effect_after_run toAddr amount s
+    using proof.tokens.ERC20Proof.transfer_balances_effect_after_run toAddr amount s
 
 -- tama: discharges=weth_transferFrom_effect
 theorem transferFrom_effect_after_run
@@ -109,7 +109,7 @@ theorem transferFrom_effect_after_run
   weth_transferFrom_effect fromAddr toAddr amount s
     ((src.WETH.transferFrom fromAddr toAddr amount).run s) := by
   simpa [weth_transferFrom_effect, src.WETH.transferFrom, src.ERC20.transferFrom]
-    using proof.ERC20Proof.transferFrom_effect_after_run fromAddr toAddr amount s
+    using proof.tokens.ERC20Proof.transferFrom_effect_after_run fromAddr toAddr amount s
 
 -- tama: discharges=weth_withdraw_effect
 theorem withdraw_burns_wrapped_balance_on_success (amount : Uint256) (s : ContractState) :
@@ -143,4 +143,4 @@ theorem withdraw_burns_wrapped_balance_on_success (amount : Uint256) (s : Contra
           ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_balance_raw,
           h_supply_raw, Verity.pure, Pure.pure]
 
-end proof.WETHProof
+end proof.tokens.WETHProof

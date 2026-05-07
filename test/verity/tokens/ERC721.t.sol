@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ERC721Deployer} from "../../src/generated/verity/ERC721Deployer.sol";
-import {ERC721Iface} from "../../src/generated/verity/ERC721Iface.sol";
+import {ERC721Deployer} from "../../../src/generated/verity/ERC721Deployer.sol";
+import {ERC721Iface} from "../../../src/generated/verity/ERC721Iface.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract ERC721Test is Test {

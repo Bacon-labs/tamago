@@ -1,12 +1,12 @@
-import src.ERC721
-import spec.OwnableSpec
+import src.tokens.ERC721
+import spec.auth.OwnableSpec
 
-namespace spec.ERC721Spec
+namespace spec.tokens.ERC721Spec
 
 open Verity
 open Verity.EVM.Uint256
 open src.ERC721
-open spec.OwnableSpec
+open spec.auth.OwnableSpec
 
 def erc721_totalSupply_spec (result : Uint256) (s : ContractState) : Prop :=
   result = s.storage tokenSupply.slot
@@ -129,4 +129,4 @@ def erc721_transferFrom_effect
                 result.snd.storageMap balances.slot toAddr =
                   (s.storageMap balances.slot toAddr) + 1)))))))
 
-end spec.ERC721Spec
+end spec.tokens.ERC721Spec

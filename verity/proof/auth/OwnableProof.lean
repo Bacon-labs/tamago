@@ -1,12 +1,12 @@
-import spec.OwnableSpec
+import spec.auth.OwnableSpec
 import Verity.Proofs.Stdlib.Automation
 
-namespace proof.OwnableProof
+namespace proof.auth.OwnableProof
 
 set_option linter.unusedSimpArgs false
 
 open Verity
-open spec.OwnableSpec
+open spec.auth.OwnableSpec
 open src.Ownable
 
 attribute [local simp] contractOwner src.OwnableBase.contractOwner
@@ -120,4 +120,4 @@ theorem renounceOwnership_effect_after_run (s : ContractState) :
         setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
         Verity.require, Verity.pure, Pure.pure, h_owner_raw]
 
-end proof.OwnableProof
+end proof.auth.OwnableProof

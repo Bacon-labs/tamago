@@ -1,5 +1,5 @@
 import Contracts.Common
-import src.Ownable
+import src.auth.Ownable
 import common.Events
 
 namespace src

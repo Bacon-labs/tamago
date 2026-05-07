@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {OwnableDeployer} from "../../src/generated/verity/OwnableDeployer.sol";
-import {OwnableIface} from "../../src/generated/verity/OwnableIface.sol";
+import {OwnableDeployer} from "../../../src/generated/verity/OwnableDeployer.sol";
+import {OwnableIface} from "../../../src/generated/verity/OwnableIface.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract OwnableTest is Test {

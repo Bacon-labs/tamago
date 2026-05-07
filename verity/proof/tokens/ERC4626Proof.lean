@@ -1,15 +1,15 @@
-import spec.ERC4626Spec
-import proof.ERC20Proof
+import spec.tokens.ERC4626Spec
+import proof.tokens.ERC20Proof
 import Verity.Proofs.Stdlib.Automation
 
-namespace proof.ERC4626Proof
+namespace proof.tokens.ERC4626Proof
 
 set_option linter.unusedSimpArgs false
 
 open Verity
 open Verity.EVM.Uint256
 open Contracts
-open spec.ERC4626Spec
+open spec.tokens.ERC4626Spec
 open src.ERC4626
 
 attribute [local simp] assetToken tokenSupply balances allowances managedAssets
@@ -34,38 +34,38 @@ attribute [local simp] src.ERC4626Base.assetToken src.ERC4626Base.tokenSupply
 theorem decimals_returns_18 (s : ContractState) :
   erc4626_decimals_spec ((src.ERC4626.decimals).run s).fst := by
   simpa [erc4626_decimals_spec, src.ERC4626.decimals, src.ERC20.decimals]
-    using proof.ERC20Proof.decimals_returns_18 s
+    using proof.tokens.ERC20Proof.decimals_returns_18 s
 
 -- tama: discharges=erc4626_totalSupply_spec
 theorem totalSupply_returns_storage_supply (s : ContractState) :
   erc4626_totalSupply_spec ((src.ERC4626.totalSupply).run s).fst s := by
   simpa [erc4626_totalSupply_spec, src.ERC4626.totalSupply, src.ERC20.totalSupply]
-    using proof.ERC20Proof.totalSupply_returns_storage_supply s
+    using proof.tokens.ERC20Proof.totalSupply_returns_storage_supply s
 
 -- tama: discharges=erc4626_balanceOf_spec
 theorem balanceOf_returns_storage_balance (account : Address) (s : ContractState) :
   erc4626_balanceOf_spec account ((src.ERC4626.balanceOf account).run s).fst s := by
   simpa [erc4626_balanceOf_spec, src.ERC4626.balanceOf, src.ERC20.balanceOf]
-    using proof.ERC20Proof.balanceOf_returns_storage_balance account s
+    using proof.tokens.ERC20Proof.balanceOf_returns_storage_balance account s
 
 -- tama: discharges=erc4626_allowance_spec
 theorem allowance_returns_storage_allowance (ownerAddr spender : Address) (s : ContractState) :
   erc4626_allowance_spec ownerAddr spender ((src.ERC4626.allowance ownerAddr spender).run s).fst s := by
   simpa [erc4626_allowance_spec, src.ERC4626.allowance, src.ERC20.allowance]
-    using proof.ERC20Proof.allowance_returns_storage_allowance ownerAddr spender s
+    using proof.tokens.ERC20Proof.allowance_returns_storage_allowance ownerAddr spender s
 
 -- tama: discharges=erc4626_approve_effect
 theorem approve_updates_allowance_only (spender : Address) (amount : Uint256) (s : ContractState) :
   erc4626_approve_effect spender amount s ((src.ERC4626.approve spender amount).run s) := by
   simpa [erc4626_approve_effect, src.ERC4626.approve, src.ERC20.approve]
-    using proof.ERC20Proof.approve_updates_allowance_only spender amount s
+    using proof.tokens.ERC20Proof.approve_updates_allowance_only spender amount s
 
 -- tama: discharges=erc4626_transfer_balances_effect
 theorem transfer_balances_effect_after_run
     (toAddr : Address) (amount : Uint256) (s : ContractState) :
   erc4626_transfer_balances_effect toAddr amount s ((src.ERC4626.transfer toAddr amount).run s) := by
   simpa [erc4626_transfer_balances_effect, src.ERC4626.transfer, src.ERC20.transfer]
-    using proof.ERC20Proof.transfer_balances_effect_after_run toAddr amount s
+    using proof.tokens.ERC20Proof.transfer_balances_effect_after_run toAddr amount s
 
 -- tama: discharges=erc4626_transferFrom_effect
 theorem transferFrom_effect_after_run
@@ -73,7 +73,7 @@ theorem transferFrom_effect_after_run
   erc4626_transferFrom_effect fromAddr toAddr amount s
     ((src.ERC4626.transferFrom fromAddr toAddr amount).run s) := by
   simpa [erc4626_transferFrom_effect, src.ERC4626.transferFrom, src.ERC20.transferFrom]
-    using proof.ERC20Proof.transferFrom_effect_after_run fromAddr toAddr amount s
+    using proof.tokens.ERC20Proof.transferFrom_effect_after_run fromAddr toAddr amount s
 
 -- tama: discharges=erc4626_asset_spec
 theorem asset_returns_storage_asset (s : ContractState) :
@@ -758,4 +758,4 @@ theorem redeem_burns_shares_and_sends_assets
                     h_allowance_max, h_allowance_not_max_raw, h_supply_raw, h_assets_raw,
                     assets, Verity.pure, Pure.pure, HSub.hSub]
 
-end proof.ERC4626Proof
+end proof.tokens.ERC4626Proof

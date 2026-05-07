@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {WETHDeployer} from "../../src/generated/verity/WETHDeployer.sol";
-import {WETHIface} from "../../src/generated/verity/WETHIface.sol";
+import {WETHDeployer} from "../../../src/generated/verity/WETHDeployer.sol";
+import {WETHIface} from "../../../src/generated/verity/WETHIface.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract WETHTest is Test {

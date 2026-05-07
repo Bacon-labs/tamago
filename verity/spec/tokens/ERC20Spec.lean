@@ -1,12 +1,12 @@
-import src.ERC20
-import spec.OwnableSpec
+import src.tokens.ERC20
+import spec.auth.OwnableSpec
 
-namespace spec.ERC20Spec
+namespace spec.tokens.ERC20Spec
 
 open Verity
 open Verity.EVM.Uint256
 open src.ERC20
-open spec.OwnableSpec
+open spec.auth.OwnableSpec
 
 def erc20_decimals_spec (result : Uint256) : Prop :=
   result = 18
@@ -129,4 +129,4 @@ def erc20_burn_effect
         result.snd.storage tokenSupply.slot =
           Verity.EVM.Uint256.sub (s.storage tokenSupply.slot) amount)))
 
-end spec.ERC20Spec
+end spec.tokens.ERC20Spec

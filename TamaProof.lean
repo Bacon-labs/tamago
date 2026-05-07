@@ -1,6 +1,6 @@
 import TamaSpec
-import proof.OwnableProof
-import proof.ERC20Proof
-import proof.ERC721Proof
-import proof.ERC4626Proof
-import proof.WETHProof
+import proof.auth.OwnableProof
+import proof.tokens.ERC20Proof
+import proof.tokens.ERC721Proof
+import proof.tokens.ERC4626Proof
+import proof.tokens.WETHProof

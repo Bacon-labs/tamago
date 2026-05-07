@@ -1,13 +1,13 @@
-import src.WETH
-import spec.ERC20Spec
+import src.tokens.WETH
+import spec.tokens.ERC20Spec
 
-namespace spec.WETHSpec
+namespace spec.tokens.WETHSpec
 
 open Verity
 open Verity.EVM.Uint256
 open Contracts
 open src.WETH
-open spec.ERC20Spec
+open spec.tokens.ERC20Spec
 
 def weth_decimals_spec (result : Uint256) : Prop :=
   erc20_decimals_spec result
@@ -61,4 +61,4 @@ def weth_withdraw_effect
       result.snd.storage tokenSupply.slot =
         Verity.EVM.Uint256.sub (s.storage tokenSupply.slot) amount))
 
-end spec.WETHSpec
+end spec.tokens.WETHSpec
