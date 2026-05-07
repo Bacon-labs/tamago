@@ -1,7 +1,7 @@
 import Contracts.Common
 import common.Events
 
-namespace src
+namespace src.tokens
 
 open Verity hiding pure bind
 open Contracts
@@ -131,4 +131,4 @@ def spec : Compiler.CompilationModel.CompilationModel :=
 
 end WETH
 
-end src
+end src.tokens

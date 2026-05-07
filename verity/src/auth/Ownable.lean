@@ -1,7 +1,7 @@
 import Contracts.Common
 import common.Events
 
-namespace src
+namespace src.auth
 
 open Verity hiding pure bind
 open Contracts
@@ -49,4 +49,4 @@ def spec : Compiler.CompilationModel.CompilationModel :=
 
 end Ownable
 
-end src
+end src.auth

@@ -3,7 +3,7 @@ import src.auth.Ownable
 namespace spec.auth.OwnableSpec
 
 open Verity
-open src.Ownable
+open src.auth.Ownable
 
 def ownable_owner_spec (result : Address) (s : ContractState) : Prop :=
   result = s.storageAddr contractOwner.slot

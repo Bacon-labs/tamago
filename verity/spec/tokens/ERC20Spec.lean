@@ -5,7 +5,7 @@ namespace spec.tokens.ERC20Spec
 
 open Verity
 open Verity.EVM.Uint256
-open src.ERC20
+open src.tokens.ERC20
 open spec.auth.OwnableSpec
 
 def erc20_decimals_spec (result : Uint256) : Prop :=

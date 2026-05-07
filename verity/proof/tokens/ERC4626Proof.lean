@@ -10,69 +10,69 @@ open Verity
 open Verity.EVM.Uint256
 open Contracts
 open spec.tokens.ERC4626Spec
-open src.ERC4626
+open src.tokens.ERC4626
 
 attribute [local simp] assetToken tokenSupply balances allowances managedAssets
-attribute [local simp] src.ERC20.tokenSupply src.ERC20.balances src.ERC20.allowances
-attribute [local simp] src.ERC20Base.tokenSupply src.ERC20Base.balances
-  src.ERC20Base.allowances src.ERC20Base.maxUint256 src.ERC20Base.decimals
-  src.ERC20Base.totalSupply src.ERC20Base.balanceOf src.ERC20Base.allowance
-  src.ERC20Base.approve src.ERC20Base.transfer src.ERC20Base.transferFrom
-attribute [local simp] src.ERC4626Base.assetToken src.ERC4626Base.tokenSupply
-  src.ERC4626Base.balances src.ERC4626Base.allowances src.ERC4626Base.managedAssets
-  src.ERC4626Base.maxUint256 src.ERC4626Base.decimals src.ERC4626Base.totalSupply
-  src.ERC4626Base.balanceOf src.ERC4626Base.allowance src.ERC4626Base.approve
-  src.ERC4626Base.transfer src.ERC4626Base.transferFrom src.ERC4626Base.asset
-  src.ERC4626Base.totalAssets src.ERC4626Base.convertToShares
-  src.ERC4626Base.convertToAssets src.ERC4626Base.maxDeposit src.ERC4626Base.maxMint
-  src.ERC4626Base.maxWithdraw src.ERC4626Base.maxRedeem src.ERC4626Base.previewDeposit
-  src.ERC4626Base.previewMint src.ERC4626Base.previewWithdraw src.ERC4626Base.previewRedeem
-  src.ERC4626Base.deposit src.ERC4626Base.mint src.ERC4626Base.withdraw
-  src.ERC4626Base.redeem Contracts.emit emitEvent
+attribute [local simp] src.tokens.ERC20.tokenSupply src.tokens.ERC20.balances src.tokens.ERC20.allowances
+attribute [local simp] src.tokens.ERC20Base.tokenSupply src.tokens.ERC20Base.balances
+  src.tokens.ERC20Base.allowances src.tokens.ERC20Base.maxUint256 src.tokens.ERC20Base.decimals
+  src.tokens.ERC20Base.totalSupply src.tokens.ERC20Base.balanceOf src.tokens.ERC20Base.allowance
+  src.tokens.ERC20Base.approve src.tokens.ERC20Base.transfer src.tokens.ERC20Base.transferFrom
+attribute [local simp] src.tokens.ERC4626Base.assetToken src.tokens.ERC4626Base.tokenSupply
+  src.tokens.ERC4626Base.balances src.tokens.ERC4626Base.allowances src.tokens.ERC4626Base.managedAssets
+  src.tokens.ERC4626Base.maxUint256 src.tokens.ERC4626Base.decimals src.tokens.ERC4626Base.totalSupply
+  src.tokens.ERC4626Base.balanceOf src.tokens.ERC4626Base.allowance src.tokens.ERC4626Base.approve
+  src.tokens.ERC4626Base.transfer src.tokens.ERC4626Base.transferFrom src.tokens.ERC4626Base.asset
+  src.tokens.ERC4626Base.totalAssets src.tokens.ERC4626Base.convertToShares
+  src.tokens.ERC4626Base.convertToAssets src.tokens.ERC4626Base.maxDeposit src.tokens.ERC4626Base.maxMint
+  src.tokens.ERC4626Base.maxWithdraw src.tokens.ERC4626Base.maxRedeem src.tokens.ERC4626Base.previewDeposit
+  src.tokens.ERC4626Base.previewMint src.tokens.ERC4626Base.previewWithdraw src.tokens.ERC4626Base.previewRedeem
+  src.tokens.ERC4626Base.deposit src.tokens.ERC4626Base.mint src.tokens.ERC4626Base.withdraw
+  src.tokens.ERC4626Base.redeem Contracts.emit emitEvent
 
 -- tama: discharges=erc4626_decimals_spec
 theorem decimals_returns_18 (s : ContractState) :
-  erc4626_decimals_spec ((src.ERC4626.decimals).run s).fst := by
-  simpa [erc4626_decimals_spec, src.ERC4626.decimals, src.ERC20.decimals]
+  erc4626_decimals_spec ((src.tokens.ERC4626.decimals).run s).fst := by
+  simpa [erc4626_decimals_spec, src.tokens.ERC4626.decimals, src.tokens.ERC20.decimals]
     using proof.tokens.ERC20Proof.decimals_returns_18 s
 
 -- tama: discharges=erc4626_totalSupply_spec
 theorem totalSupply_returns_storage_supply (s : ContractState) :
-  erc4626_totalSupply_spec ((src.ERC4626.totalSupply).run s).fst s := by
-  simpa [erc4626_totalSupply_spec, src.ERC4626.totalSupply, src.ERC20.totalSupply]
+  erc4626_totalSupply_spec ((src.tokens.ERC4626.totalSupply).run s).fst s := by
+  simpa [erc4626_totalSupply_spec, src.tokens.ERC4626.totalSupply, src.tokens.ERC20.totalSupply]
     using proof.tokens.ERC20Proof.totalSupply_returns_storage_supply s
 
 -- tama: discharges=erc4626_balanceOf_spec
 theorem balanceOf_returns_storage_balance (account : Address) (s : ContractState) :
-  erc4626_balanceOf_spec account ((src.ERC4626.balanceOf account).run s).fst s := by
-  simpa [erc4626_balanceOf_spec, src.ERC4626.balanceOf, src.ERC20.balanceOf]
+  erc4626_balanceOf_spec account ((src.tokens.ERC4626.balanceOf account).run s).fst s := by
+  simpa [erc4626_balanceOf_spec, src.tokens.ERC4626.balanceOf, src.tokens.ERC20.balanceOf]
     using proof.tokens.ERC20Proof.balanceOf_returns_storage_balance account s
 
 -- tama: discharges=erc4626_allowance_spec
 theorem allowance_returns_storage_allowance (ownerAddr spender : Address) (s : ContractState) :
-  erc4626_allowance_spec ownerAddr spender ((src.ERC4626.allowance ownerAddr spender).run s).fst s := by
-  simpa [erc4626_allowance_spec, src.ERC4626.allowance, src.ERC20.allowance]
+  erc4626_allowance_spec ownerAddr spender ((src.tokens.ERC4626.allowance ownerAddr spender).run s).fst s := by
+  simpa [erc4626_allowance_spec, src.tokens.ERC4626.allowance, src.tokens.ERC20.allowance]
     using proof.tokens.ERC20Proof.allowance_returns_storage_allowance ownerAddr spender s
 
 -- tama: discharges=erc4626_approve_effect
 theorem approve_updates_allowance_only (spender : Address) (amount : Uint256) (s : ContractState) :
-  erc4626_approve_effect spender amount s ((src.ERC4626.approve spender amount).run s) := by
-  simpa [erc4626_approve_effect, src.ERC4626.approve, src.ERC20.approve]
+  erc4626_approve_effect spender amount s ((src.tokens.ERC4626.approve spender amount).run s) := by
+  simpa [erc4626_approve_effect, src.tokens.ERC4626.approve, src.tokens.ERC20.approve]
     using proof.tokens.ERC20Proof.approve_updates_allowance_only spender amount s
 
 -- tama: discharges=erc4626_transfer_balances_effect
 theorem transfer_balances_effect_after_run
     (toAddr : Address) (amount : Uint256) (s : ContractState) :
-  erc4626_transfer_balances_effect toAddr amount s ((src.ERC4626.transfer toAddr amount).run s) := by
-  simpa [erc4626_transfer_balances_effect, src.ERC4626.transfer, src.ERC20.transfer]
+  erc4626_transfer_balances_effect toAddr amount s ((src.tokens.ERC4626.transfer toAddr amount).run s) := by
+  simpa [erc4626_transfer_balances_effect, src.tokens.ERC4626.transfer, src.tokens.ERC20.transfer]
     using proof.tokens.ERC20Proof.transfer_balances_effect_after_run toAddr amount s
 
 -- tama: discharges=erc4626_transferFrom_effect
 theorem transferFrom_effect_after_run
     (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState) :
   erc4626_transferFrom_effect fromAddr toAddr amount s
-    ((src.ERC4626.transferFrom fromAddr toAddr amount).run s) := by
-  simpa [erc4626_transferFrom_effect, src.ERC4626.transferFrom, src.ERC20.transferFrom]
+    ((src.tokens.ERC4626.transferFrom fromAddr toAddr amount).run s) := by
+  simpa [erc4626_transferFrom_effect, src.tokens.ERC4626.transferFrom, src.tokens.ERC20.transferFrom]
     using proof.tokens.ERC20Proof.transferFrom_effect_after_run fromAddr toAddr amount s
 
 -- tama: discharges=erc4626_asset_spec

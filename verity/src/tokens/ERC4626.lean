@@ -2,7 +2,7 @@ import Contracts.Common
 import common.ECM
 import common.Events
 
-namespace src
+namespace src.tokens
 
 open Verity hiding pure bind
 open Contracts
@@ -297,4 +297,4 @@ def spec : Compiler.CompilationModel.CompilationModel :=
 
 end ERC4626
 
-end src
+end src.tokens

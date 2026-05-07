@@ -6,7 +6,7 @@ namespace spec.tokens.WETHSpec
 open Verity
 open Verity.EVM.Uint256
 open Contracts
-open src.WETH
+open src.tokens.WETH
 open spec.tokens.ERC20Spec
 
 def weth_decimals_spec (result : Uint256) : Prop :=

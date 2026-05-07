@@ -5,7 +5,7 @@ namespace spec.tokens.ERC721Spec
 
 open Verity
 open Verity.EVM.Uint256
-open src.ERC721
+open src.tokens.ERC721
 open spec.auth.OwnableSpec
 
 def erc721_totalSupply_spec (result : Uint256) (s : ContractState) : Prop :=
@@ -48,7 +48,7 @@ def erc721_isApprovedForAll_spec (ownerAddr operator : Address) (result : Bool) 
 def erc721_setApprovalForAll_effect
     (operator : Address) (approved : Bool) (s : ContractState) (result : ContractResult Bool) : Prop :=
   result = ContractResult.success true result.snd ∧
-  result.snd.storageMap2 operatorApprovals.slot s.sender operator = src.boolToWord approved ∧
+  result.snd.storageMap2 operatorApprovals.slot s.sender operator = src.tokens.boolToWord approved ∧
   result.snd.storage tokenSupply.slot = s.storage tokenSupply.slot ∧
   result.snd.storageMap = s.storageMap ∧
   result.snd.storageMapUint = s.storageMapUint

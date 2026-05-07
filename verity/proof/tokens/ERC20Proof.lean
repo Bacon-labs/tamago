@@ -9,17 +9,17 @@ set_option linter.unusedSimpArgs false
 open Verity
 open Verity.EVM.Uint256
 open spec.tokens.ERC20Spec
-open src.ERC20
+open src.tokens.ERC20
 
 attribute [local simp] contractOwner tokenSupply balances allowances
-  src.ERC20Base.contractOwner src.ERC20Base.tokenSupply src.ERC20Base.balances
-  src.ERC20Base.allowances src.ERC20Base.maxUint256
-  src.ERC20Base.decimals src.ERC20Base.totalSupply src.ERC20Base.balanceOf
-  src.ERC20Base.allowance src.ERC20Base.owner src.ERC20Base.transferOwnership
-  src.ERC20Base.renounceOwnership src.ERC20Base.approve src.ERC20Base.transfer
-  src.ERC20Base.transferFrom src.ERC20Base.mint src.ERC20Base.burn
-  src.OwnableBase.contractOwner src.OwnableBase.transferOwnership
-  src.OwnableBase.renounceOwnership Contracts.emit emitEvent
+  src.tokens.ERC20Base.contractOwner src.tokens.ERC20Base.tokenSupply src.tokens.ERC20Base.balances
+  src.tokens.ERC20Base.allowances src.tokens.ERC20Base.maxUint256
+  src.tokens.ERC20Base.decimals src.tokens.ERC20Base.totalSupply src.tokens.ERC20Base.balanceOf
+  src.tokens.ERC20Base.allowance src.tokens.ERC20Base.owner src.tokens.ERC20Base.transferOwnership
+  src.tokens.ERC20Base.renounceOwnership src.tokens.ERC20Base.approve src.tokens.ERC20Base.transfer
+  src.tokens.ERC20Base.transferFrom src.tokens.ERC20Base.mint src.tokens.ERC20Base.burn
+  src.auth.OwnableBase.contractOwner src.auth.OwnableBase.transferOwnership
+  src.auth.OwnableBase.renounceOwnership Contracts.emit emitEvent
 
 -- tama: discharges=erc20_decimals_spec
 theorem decimals_returns_18 (s : ContractState) :
@@ -45,13 +45,13 @@ theorem allowance_returns_storage_allowance (ownerAddr spender : Address) (s : C
 theorem owner_returns_storage_owner (s : ContractState) :
   erc20_owner_spec ((owner).run s).fst s := by
   simp [erc20_owner_spec, spec.auth.OwnableSpec.ownable_owner_spec, owner, contractOwner,
-    src.Ownable.contractOwner, Bind.bind, Pure.pure]
+    src.auth.Ownable.contractOwner, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc20_transferOwnership_effect
 theorem transferOwnership_effect_after_run (newOwner : Address) (s : ContractState) :
   erc20_transferOwnership_effect newOwner s ((transferOwnership newOwner).run s) := by
   simpa [erc20_transferOwnership_effect, spec.auth.OwnableSpec.ownable_transferOwnership_effect,
-    transferOwnership, src.Ownable.transferOwnership, contractOwner, src.Ownable.contractOwner,
+    transferOwnership, src.auth.Ownable.transferOwnership, contractOwner, src.auth.Ownable.contractOwner,
     Bind.bind, Pure.pure, Verity.bind, Verity.pure]
     using proof.auth.OwnableProof.transferOwnership_effect_after_run newOwner s
 
@@ -59,7 +59,7 @@ theorem transferOwnership_effect_after_run (newOwner : Address) (s : ContractSta
 theorem renounceOwnership_effect_after_run (s : ContractState) :
   erc20_renounceOwnership_effect s ((renounceOwnership).run s) := by
   simpa [erc20_renounceOwnership_effect, spec.auth.OwnableSpec.ownable_renounceOwnership_effect,
-    renounceOwnership, src.Ownable.renounceOwnership, contractOwner, src.Ownable.contractOwner,
+    renounceOwnership, src.auth.Ownable.renounceOwnership, contractOwner, src.auth.Ownable.contractOwner,
     Bind.bind, Pure.pure, Verity.bind, Verity.pure]
     using proof.auth.OwnableProof.renounceOwnership_effect_after_run s
 

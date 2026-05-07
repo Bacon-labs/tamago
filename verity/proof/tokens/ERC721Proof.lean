@@ -9,18 +9,18 @@ set_option linter.unusedSimpArgs false
 open Verity
 open Verity.EVM.Uint256
 open spec.tokens.ERC721Spec
-open src.ERC721
+open src.tokens.ERC721
 
 attribute [local simp] contractOwner tokenSupply nextTokenId balances tokenOwners tokenApprovals operatorApprovals
-  src.ERC721Base.contractOwner src.ERC721Base.tokenSupply src.ERC721Base.nextTokenId
-  src.ERC721Base.balances src.ERC721Base.tokenOwners src.ERC721Base.tokenApprovals
-  src.ERC721Base.operatorApprovals src.ERC721Base.totalSupply src.ERC721Base.owner
-  src.ERC721Base.transferOwnership src.ERC721Base.renounceOwnership
-  src.ERC721Base.balanceOf src.ERC721Base.ownerOf src.ERC721Base.getApproved
-  src.ERC721Base.isApprovedForAll src.ERC721Base.approve
-  src.ERC721Base.setApprovalForAll src.ERC721Base.mint src.ERC721Base.transferFrom
-  src.OwnableBase.contractOwner src.OwnableBase.transferOwnership
-  src.OwnableBase.renounceOwnership Contracts.emit emitEvent
+  src.tokens.ERC721Base.contractOwner src.tokens.ERC721Base.tokenSupply src.tokens.ERC721Base.nextTokenId
+  src.tokens.ERC721Base.balances src.tokens.ERC721Base.tokenOwners src.tokens.ERC721Base.tokenApprovals
+  src.tokens.ERC721Base.operatorApprovals src.tokens.ERC721Base.totalSupply src.tokens.ERC721Base.owner
+  src.tokens.ERC721Base.transferOwnership src.tokens.ERC721Base.renounceOwnership
+  src.tokens.ERC721Base.balanceOf src.tokens.ERC721Base.ownerOf src.tokens.ERC721Base.getApproved
+  src.tokens.ERC721Base.isApprovedForAll src.tokens.ERC721Base.approve
+  src.tokens.ERC721Base.setApprovalForAll src.tokens.ERC721Base.mint src.tokens.ERC721Base.transferFrom
+  src.auth.OwnableBase.contractOwner src.auth.OwnableBase.transferOwnership
+  src.auth.OwnableBase.renounceOwnership Contracts.emit emitEvent
 
 -- tama: discharges=erc721_totalSupply_spec
 theorem totalSupply_returns_storage_supply (s : ContractState) :
@@ -31,13 +31,13 @@ theorem totalSupply_returns_storage_supply (s : ContractState) :
 theorem owner_returns_storage_owner (s : ContractState) :
   erc721_owner_spec ((owner).run s).fst s := by
   simp [erc721_owner_spec, spec.auth.OwnableSpec.ownable_owner_spec, owner, contractOwner,
-    src.Ownable.contractOwner, Bind.bind, Pure.pure]
+    src.auth.Ownable.contractOwner, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc721_transferOwnership_effect
 theorem transferOwnership_effect_after_run (newOwner : Address) (s : ContractState) :
   erc721_transferOwnership_effect newOwner s ((transferOwnership newOwner).run s) := by
   simpa [erc721_transferOwnership_effect, spec.auth.OwnableSpec.ownable_transferOwnership_effect,
-    transferOwnership, src.Ownable.transferOwnership, contractOwner, src.Ownable.contractOwner,
+    transferOwnership, src.auth.Ownable.transferOwnership, contractOwner, src.auth.Ownable.contractOwner,
     Bind.bind, Pure.pure, Verity.bind, Verity.pure]
     using proof.auth.OwnableProof.transferOwnership_effect_after_run newOwner s
 
@@ -45,7 +45,7 @@ theorem transferOwnership_effect_after_run (newOwner : Address) (s : ContractSta
 theorem renounceOwnership_effect_after_run (s : ContractState) :
   erc721_renounceOwnership_effect s ((renounceOwnership).run s) := by
   simpa [erc721_renounceOwnership_effect, spec.auth.OwnableSpec.ownable_renounceOwnership_effect,
-    renounceOwnership, src.Ownable.renounceOwnership, contractOwner, src.Ownable.contractOwner,
+    renounceOwnership, src.auth.Ownable.renounceOwnership, contractOwner, src.auth.Ownable.contractOwner,
     Bind.bind, Pure.pure, Verity.bind, Verity.pure]
     using proof.auth.OwnableProof.renounceOwnership_effect_after_run s
 
@@ -92,7 +92,7 @@ theorem setApprovalForAll_updates_operator_slot
   unfold erc721_setApprovalForAll_effect
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · cases approved <;>
-      simp [setApprovalForAll, operatorApprovals, src.boolToWord, msgSender,
+      simp [setApprovalForAll, operatorApprovals, src.tokens.boolToWord, msgSender,
         setMapping2, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
         Verity.pure, Pure.pure]
   · simp [setApprovalForAll, operatorApprovals, msgSender, setMapping2,

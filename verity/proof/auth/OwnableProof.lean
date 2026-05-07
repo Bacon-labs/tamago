@@ -7,10 +7,10 @@ set_option linter.unusedSimpArgs false
 
 open Verity
 open spec.auth.OwnableSpec
-open src.Ownable
+open src.auth.Ownable
 
-attribute [local simp] contractOwner src.OwnableBase.contractOwner
-  src.OwnableBase.owner src.OwnableBase.transferOwnership src.OwnableBase.renounceOwnership
+attribute [local simp] contractOwner src.auth.OwnableBase.contractOwner
+  src.auth.OwnableBase.owner src.auth.OwnableBase.transferOwnership src.auth.OwnableBase.renounceOwnership
   Contracts.emit emitEvent
 
 -- tama: discharges=ownable_owner_spec
