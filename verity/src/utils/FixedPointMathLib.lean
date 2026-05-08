@@ -308,7 +308,7 @@ verity_contract FixedPointMathLibBase where
     else
       return r
 
-  function view log10Up (x : Uint256) : Uint256 := do
+  function log10Up (x : Uint256) : Uint256 := do
     let r ← log10 x
     let mut scale := 1
     let mut exponent := r

@@ -10,11 +10,11 @@ interface FixedPointMathLibIface {
     function avg(uint256 x, uint256 y) external view returns (uint256);
     function sqrt(uint256 x) external view returns (uint256);
     function cbrt(uint256 x) external view returns (uint256);
+    function log256(uint256 x) external view returns (uint256);
+    function log256Up(uint256 x) external view returns (uint256);
     function log2(uint256 x) external view returns (uint256);
     function log2Up(uint256 x) external view returns (uint256);
     function log10(uint256 x) external view returns (uint256);
-    function log10Up(uint256 x) external view returns (uint256);
-    function log256(uint256 x) external view returns (uint256);
-    function log256Up(uint256 x) external view returns (uint256);
+    function log10Up(uint256 x) external returns (uint256);
     function clamp(uint256 x, uint256 minValue, uint256 maxValue) external view returns (uint256);
 }

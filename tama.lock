@@ -17,7 +17,7 @@ verity_rev = "9b0114efcc0af589af63dd3f2eafcdf1a24dbf1e"
 "lake-manifest.json" = "b1a0816d3f7854f51e88d47faf0306635af6736f28b653df83c37f625815a935"
 "lakefile.toml" = "746fefd486a42d7a38bda68ebfba920b1192fdd4d3d9a349d3da428e80362963"
 lean-toolchain = "8f6680f8389e8adee06cb2bd44372c6d60dce0e8301630b61a99a5642d1bd71b"
-"tama.toml" = "7dd4efc3d172b1286407a6fb2b947e4ee320e7eb84e383d47edc6a42d2c2e0ae"
+"tama.toml" = "87d0b3d9db87fdb65ee7f04ffd74ef8cf9690d0914503716c235726cdfd1705c"
 
 [yul]
 evm_version = "cancun"
