@@ -32,3 +32,9 @@ srcDir = "verity"
 [[lean_lib]]
 name = "proof"
 srcDir = "verity"
+
+[[lean_exe]]
+name = "verity-compiler"
+root = "Compiler.Main"
+srcDir = ".lake/packages/verity"
+supportInterpreter = true
