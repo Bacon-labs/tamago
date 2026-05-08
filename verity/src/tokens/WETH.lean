@@ -8,6 +8,59 @@ open Contracts
 open Verity.EVM.Uint256
 open Verity.Stdlib.Math
 
+namespace WETHNative
+
+/--
+Lean-side model for sending native ETH out of the contract.
+
+The compiler model below emits the corresponding low-level `call`. The source
+semantics additionally records the contract's native balance decrease when that
+call reports success, so specs can state exact ETH-balance effects instead of
+only wrapped-token accounting.
+-/
+def transfer (toAddr : Address) (amount : Uint256) : Contract Uint256 :=
+  fun state =>
+    let sent := call 50000 (addressToWord toAddr) amount 0 0 0 0
+    if sent == 0 then
+      ContractResult.success sent state
+    else
+      ContractResult.success sent { state with selfBalance := sub state.selfBalance amount }
+
+def transfer_model : Compiler.CompilationModel.FunctionSpec := {
+  name := "wethNativeTransfer"
+  params := [
+    { name := "toAddr", ty := Compiler.CompilationModel.ParamType.address },
+    { name := "amount", ty := Compiler.CompilationModel.ParamType.uint256 }
+  ]
+  returnType := some Compiler.CompilationModel.FieldType.uint256
+  returns := [Compiler.CompilationModel.ParamType.uint256]
+  body := [
+    Compiler.CompilationModel.Stmt.unsafeBlock
+      "native ETH transfer uses a low-level value call"
+      [
+        Compiler.CompilationModel.Stmt.return
+          (Compiler.CompilationModel.Expr.call
+            (Compiler.CompilationModel.Expr.literal 50000)
+            (Compiler.CompilationModel.Expr.param "toAddr")
+            (Compiler.CompilationModel.Expr.param "amount")
+            (Compiler.CompilationModel.Expr.literal 0)
+            (Compiler.CompilationModel.Expr.literal 0)
+            (Compiler.CompilationModel.Expr.literal 0)
+            (Compiler.CompilationModel.Expr.literal 0))
+      ]
+  ]
+  localObligations := [
+    {
+      name := "native_eth_transfer_balance_effect",
+      obligation :=
+        "A successful low-level value call transfers exactly `amount` wei out of the current contract, decreasing `selfBalance` by that amount.",
+      proofStatus := Compiler.ProofStatus.assumed
+    }
+  ]
+}
+
+end WETHNative
+
 verity_contract WETHBase where
   storage
     tokenSupply : Uint256 := slot 1
@@ -96,8 +149,12 @@ verity_contract WETHBase where
     require (currentBalance >= amount) "Insufficient balance"
     let currentSupply ← getStorage tokenSupply
     require (currentSupply >= amount) "Insufficient supply"
+    let currentEth ← selfBalance
+    require (currentEth >= amount) "Insufficient ETH backing"
     setMapping balances sender (sub currentBalance amount)
     setStorage tokenSupply (sub currentSupply amount)
+    let sent ← WETHNative.transfer sender amount
+    require (sent != 0) "ETH transfer failed"
     emit "Transfer" [addressToWord sender, addressToWord zeroAddress, amount]
     emit "Withdrawal" [addressToWord sender, amount]
     return true
