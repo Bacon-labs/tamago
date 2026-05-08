@@ -109,4 +109,10 @@ jobs:
       - run: env -u CI tama check
       - run: env -u CI tama build --locked
       - run: env -u CI tama test
-      - run: env -u CI tama audit
+      - run: env -u CI tama audit structure
+      - run: env -u CI tama audit selectors
+      - run: env -u CI tama audit storage-layout
+      - run: env -u CI tama audit coverage
+      - name: Report trust boundary
+        run: env -u CI tama audit trust-boundary
+        continue-on-error: true
