@@ -3,14 +3,18 @@
 This project contains standalone Tama/Verity examples for ERC20, ERC721, WETH,
 Ownable, and ERC4626.
 
-## WETH native ETH limitation
+## WETH native ETH boundary
 
 The WETH example verifies ERC20-compatible wrapped-balance accounting for
-`deposit`, `withdraw`, `approve`, `transfer`, and `transferFrom`. Current Tama
-audit treats Verity low-level native ETH `call` mechanics as an error, and
-`ContractState` does not model per-address native ETH balances. For that reason
-this audit-clean V1 does not claim or prove recipient native ETH delivery on
-`withdraw`; it proves the wrapped accounting effects and revert branches only.
+`deposit`, `withdraw`, `approve`, `transfer`, and `transferFrom`. `withdraw`
+uses Verity's low-level native ETH `call` to pay the caller and reverts if that
+call fails. The Lean `ContractState` model does not mutate per-address native
+ETH balances for low-level calls, so the proofs establish wrapped-token
+accounting, native backing checks, and the transfer-failure branch; Foundry
+mirror tests check the concrete EVM ETH balance deltas.
+`tama audit coverage` covers the proof/mirror mapping for these properties.
+Full trust-boundary audit still reports the low-level WETH call as an explicit
+unsafe boundary unless the project replaces it with an accepted ECM/Yul helper.
 
 Run:
 
