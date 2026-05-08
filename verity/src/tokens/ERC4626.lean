@@ -1,5 +1,4 @@
 import Contracts.Common
-import common.ECM
 import common.Events
 
 namespace src.tokens
@@ -8,6 +7,47 @@ open Verity hiding pure bind
 open Contracts
 open Verity.EVM.Uint256
 open Verity.Stdlib.Math
+
+def erc4626AssetSafeTransferFromEvent
+    (token fromAddr toAddr : Address) (amount : Uint256) : Event :=
+  {
+    name := "ERC4626AssetSafeTransferFrom",
+    args := [addressToWord token, addressToWord fromAddr, addressToWord toAddr, amount],
+    indexedArgs := []
+  }
+
+def erc4626AssetSafeTransferEvent
+    (token fromAddr toAddr : Address) (amount : Uint256) : Event :=
+  {
+    name := "ERC4626AssetSafeTransfer",
+    args := [addressToWord token, addressToWord fromAddr, addressToWord toAddr, amount],
+    indexedArgs := []
+  }
+
+def traceERC4626AssetSafeTransferFrom
+    (token fromAddr toAddr : Address) (amount : Uint256) : Contract Unit :=
+  fun state =>
+    ContractResult.success () { state with
+      events := state.events ++ [erc4626AssetSafeTransferFromEvent token fromAddr toAddr amount]
+    }
+
+def traceERC4626AssetSafeTransfer
+    (token toAddr : Address) (amount : Uint256) : Contract Unit :=
+  fun state =>
+    ContractResult.success () { state with
+      events :=
+        state.events ++
+          [erc4626AssetSafeTransferEvent token state.thisAddress toAddr amount]
+    }
+
+def safeTransferFrom
+    (token fromAddr toAddr : Address) (amount : Uint256) : Contract Unit := do
+  Contracts.safeTransferFrom token fromAddr toAddr amount
+  traceERC4626AssetSafeTransferFrom token fromAddr toAddr amount
+
+def safeTransfer (token toAddr : Address) (amount : Uint256) : Contract Unit := do
+  Contracts.safeTransfer token toAddr amount
+  traceERC4626AssetSafeTransfer token toAddr amount
 
 verity_contract ERC4626Base where
   storage
@@ -151,8 +191,7 @@ verity_contract ERC4626Base where
   function allow_post_interaction_writes deposit (assets : Uint256, receiver : Address) : Uint256 := do
     let sender ← msgSender
     let currentAsset ← getStorageAddr assetToken
-    let selfWord ← ecmCall common.ECM.selfAddressModule [0]
-    let self := wordToAddress selfWord
+    let self ← Verity.contractAddress
     let currentAssets ← getStorage managedAssets
     let currentSupply ← getStorage tokenSupply
     let shares := div (mul assets (add currentSupply 1)) (add currentAssets 1)
@@ -171,8 +210,7 @@ verity_contract ERC4626Base where
   function allow_post_interaction_writes mint (shares : Uint256, receiver : Address) : Uint256 := do
     let sender ← msgSender
     let currentAsset ← getStorageAddr assetToken
-    let selfWord ← ecmCall common.ECM.selfAddressModule [0]
-    let self := wordToAddress selfWord
+    let self ← Verity.contractAddress
     let currentAssets ← getStorage managedAssets
     let currentSupply ← getStorage tokenSupply
     let denominator := add currentSupply 1
