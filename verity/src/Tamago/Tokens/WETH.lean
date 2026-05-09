@@ -71,6 +71,17 @@ def transfer_model : Compiler.CompilationModel.FunctionSpec := {
 
 end WETHNative
 
+/-
+@title WETH
+@notice Wrapped ETH token with ERC20-compatible balances, allowances, deposits,
+withdrawals, and transfers.
+@dev Deposits mint wrapped balances for `msg.value`; withdrawals burn wrapped
+balances and perform a native ETH transfer to the caller. The native transfer is
+modeled through an explicit external call module for auditing.
+Limitations: metadata accessors `name()` and `symbol()` are intentionally not
+implemented, and ETH wrapping is exposed through `deposit()` rather than a
+receive or fallback entrypoint.
+-/
 verity_contract WETHBase where
   storage
     tokenSupply : Uint256 := slot 1

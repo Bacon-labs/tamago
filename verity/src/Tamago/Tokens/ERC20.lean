@@ -9,6 +9,15 @@ open Contracts
 open Verity.EVM.Uint256
 open Verity.Stdlib.Math
 
+/-
+@title ERC20
+@notice Fungible token with allowances, owner-controlled minting and burning,
+and 18-decimal accounting.
+@dev This contract implements the core ERC20 balance, allowance, transfer,
+approval, mint, and burn flows. It also includes Ownable-style owner management.
+Limitations: metadata accessors `name()` and `symbol()` are intentionally not
+implemented.
+-/
 verity_contract ERC20Base where
   storage
     contractOwner : Address := slot 0

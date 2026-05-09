@@ -84,6 +84,16 @@ def selfAddress_model : Compiler.CompilationModel.FunctionSpec := {
 
 end ERC4626Runtime
 
+/-
+@title ERC4626
+@notice Tokenized vault with ERC20-style share accounting, asset/share previews,
+deposits, minting, withdrawals, and redemptions.
+@dev The vault tracks managed assets explicitly and uses safe ERC20 transfers
+for underlying asset movement. Share math uses virtual assets and shares to
+avoid empty-vault division edge cases.
+Limitations: ERC20 metadata accessors `name()` and `symbol()` are intentionally
+not implemented.
+-/
 verity_contract ERC4626Base where
   storage
     assetToken : Address := slot 0

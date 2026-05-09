@@ -6,6 +6,13 @@ namespace Tamago.Auth
 open Verity hiding pure bind
 open Contracts
 
+/-
+@title Ownable
+@notice Single-owner authorization primitive with ownership transfer and renunciation.
+@dev The constructor sets the initial owner directly. `transferOwnership` and
+`renounceOwnership` are restricted to the current owner, and ownership changes
+emit `OwnershipTransferred`.
+-/
 verity_contract OwnableBase where
   storage
     contractOwner : Address := slot 0

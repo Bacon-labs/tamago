@@ -6,6 +6,13 @@ open Verity hiding pure bind
 open Contracts
 open Verity.EVM.Uint256
 
+/-
+@title FixedPointMathLib
+@notice Stateless unsigned integer math helpers for fixed-point-oriented
+contracts and tests.
+@dev Provides saturating arithmetic, distance, average, square and cube roots,
+binary, decimal, and byte logarithms, and clamping.
+-/
 verity_contract FixedPointMathLibBase where
   storage
 

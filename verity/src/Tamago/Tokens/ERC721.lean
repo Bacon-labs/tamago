@@ -12,6 +12,16 @@ open Verity.Stdlib.Math
 @[simp] def boolToWord (b : Bool) : Uint256 :=
   if b then 1 else 0
 
+/-
+@title ERC721
+@notice Non-fungible token with owner-controlled minting, approvals, operator
+approvals, and transfer behavior.
+@dev Token IDs are minted sequentially from `nextTokenId`. Ownership and
+approval state follow the core ERC721 transfer authorization model.
+Limitations: metadata functions such as `name()`, `symbol()`, and `tokenURI()`
+are not implemented, and safe transfer entrypoints such as `safeTransferFrom()`
+are not implemented.
+-/
 verity_contract ERC721Base where
   storage
     contractOwner : Address := slot 0
