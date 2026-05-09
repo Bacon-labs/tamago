@@ -142,3 +142,7 @@ tama audit
 
 The CI workflow in `.github/workflows/ci.yml` runs the same checks on pushes to
 `main` and on pull requests.
+
+## License
+
+Tamago is released under the MIT License. See [LICENSE](LICENSE).
