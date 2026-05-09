@@ -10,14 +10,14 @@ verity_git = "https://github.com/lfglabs-dev/verity.git"
 verity_rev = "9b0114efcc0af589af63dd3f2eafcdf1a24dbf1e"
 
 [inputs]
-"TamaProof.lean" = "36349120db05a51b8dd8856a230a8b3de9486a797f2e133f2e759b768552e590"
-"TamaSpec.lean" = "59bbfa381bcf13f933001ae17f96690a3dd090bf496104cd627530ff09b66a5e"
-"TamaSrc.lean" = "8fff746df91737ccb45111b7306db27571615ad469ca861ebda3489a42179ba0"
 "foundry.toml" = "61f08413416c82d3fbc2e89988fe402fbfea3f877c954d108d109b2dd4bebf54"
 "lake-manifest.json" = "b1a0816d3f7854f51e88d47faf0306635af6736f28b653df83c37f625815a935"
-"lakefile.toml" = "05cb16c8af8dbb34c5a94006ca9c2374d6359a68fa20746c9f7501e9a01aa9e8"
+"lakefile.toml" = "c6eaa7757853b86c5b5d6c3cdfb0c3d50c5b197757f586931634bb3bea818079"
 lean-toolchain = "8f6680f8389e8adee06cb2bd44372c6d60dce0e8301630b61a99a5642d1bd71b"
-"tama.toml" = "9066495218fae7e778b1a299e83cabe2770ae96f28338577124578a18cedbee5"
+"tama.toml" = "bff9848951560d5e9de4313538a3b01590677ad5edd7df257b891c5bbd1ebda2"
+"verity/proof/Tamago/Proof.lean" = "b686ebff43522d6598405a8e36d83e11f78dc6518f206878122db5eac00dea69"
+"verity/spec/Tamago/Spec.lean" = "7d6749a149656cd4bc8e4404b9fb911c2cb693038cedd7a59a6e3be523dcb86b"
+"verity/src/Tamago.lean" = "e24d9b1c2ad0e3d37ce959f57ddedc1caa798b0b559bb639bc0be6d39e15d006"
 
 [yul]
 evm_version = "cancun"

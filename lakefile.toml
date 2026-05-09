@@ -1,6 +1,6 @@
 name = "tamago"
 version = "0.1.0"
-defaultTargets = ["TamaProof"]
+defaultTargets = ["Tamago", "Tamago.Spec", "Tamago.Proof"]
 buildDir = "artifacts/lean"
 
 [[require]]
@@ -9,29 +9,20 @@ git = "https://github.com/lfglabs-dev/verity.git"
 rev = "9b0114efcc0af589af63dd3f2eafcdf1a24dbf1e"
 
 [[lean_lib]]
-name = "TamaSrc"
+name = "Tamago"
+srcDir = "verity/src"
 
 [[lean_lib]]
-name = "TamaSpec"
+name = "Tamago.Common"
+srcDir = "verity/common"
 
 [[lean_lib]]
-name = "TamaProof"
+name = "Tamago.Spec"
+srcDir = "verity/spec"
 
 [[lean_lib]]
-name = "src"
-srcDir = "verity"
-
-[[lean_lib]]
-name = "common"
-srcDir = "verity"
-
-[[lean_lib]]
-name = "spec"
-srcDir = "verity"
-
-[[lean_lib]]
-name = "proof"
-srcDir = "verity"
+name = "Tamago.Proof"
+srcDir = "verity/proof"
 
 [[lean_exe]]
 name = "verity-compiler"
