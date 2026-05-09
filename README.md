@@ -1,6 +1,8 @@
 # Tamago
 
-Tamago is a standard smart contract suite for Tama/Verity projects, similar to solmate/solady for Solidity.
+Tamago is a standard smart contract suite for [Verity](https://veritylang.com), similar to solmate/solady for Solidity.
+
+Tamago uses [Tama](https://tama.tools), a modern toolchain for Verity projects.
 
 All contracts in Tamago are **formally verified** via Lean, meaning they're mathematically proven to adhere to the specs. The specs are also double-checked via Foundry mirror tests.
 
