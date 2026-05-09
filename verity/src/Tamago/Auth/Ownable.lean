@@ -17,13 +17,26 @@ verity_contract OwnableBase where
   storage
     contractOwner : Address := slot 0
 
+  /-
+  @notice Initializes the contract owner.
+  @param initialOwner Address that receives ownership at deployment.
+  -/
   constructor (initialOwner : Address) := do
     setStorageAddr contractOwner initialOwner
 
+  /-
+  @notice Returns the current owner.
+  @return Current owner address.
+  -/
   function view owner () : Address := do
     let currentOwner ← getStorageAddr contractOwner
     return currentOwner
 
+  /-
+  @notice Transfers ownership to a nonzero address.
+  @param newOwner Address that will become the owner.
+  @return True on success.
+  -/
   function transferOwnership (newOwner : Address) : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
@@ -33,6 +46,10 @@ verity_contract OwnableBase where
     emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord newOwner]
     return true
 
+  /-
+  @notice Renounces ownership and leaves the contract without an owner.
+  @return True on success.
+  -/
   function renounceOwnership () : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner

@@ -19,6 +19,12 @@ verity_contract FixedPointMathLibBase where
   constants
     maxUint256 : Uint256 := (sub 0 1)
 
+  /-
+  @notice Adds two unsigned integers and saturates on overflow.
+  @param x First addend.
+  @param y Second addend.
+  @return Sum, or max uint256 if the addition would overflow.
+  -/
   function view saturatingAdd (x : Uint256, y : Uint256) : Uint256 := do
     let room := sub maxUint256 x
     if y > room then
@@ -26,6 +32,12 @@ verity_contract FixedPointMathLibBase where
     else
       return (add x y)
 
+  /-
+  @notice Multiplies two unsigned integers and saturates on overflow.
+  @param x First factor.
+  @param y Second factor.
+  @return Product, or max uint256 if the multiplication would overflow.
+  -/
   function view saturatingMul (x : Uint256, y : Uint256) : Uint256 := do
     let limit := div maxUint256 x
     if (x != 0) && (y > limit) then
@@ -33,24 +45,47 @@ verity_contract FixedPointMathLibBase where
     else
       return (mul x y)
 
+  /-
+  @notice Subtracts and saturates at zero on underflow.
+  @param x Minuend.
+  @param y Subtrahend.
+  @return Difference, or zero if `y` is greater than `x`.
+  -/
   function view saturatingSub (x : Uint256, y : Uint256) : Uint256 := do
     if y > x then
       return 0
     else
       return (sub x y)
 
+  /-
+  @notice Computes the absolute distance between two unsigned integers.
+  @param x First value.
+  @param y Second value.
+  @return Absolute difference between `x` and `y`.
+  -/
   function view dist (x : Uint256, y : Uint256) : Uint256 := do
     if x >= y then
       return (sub x y)
     else
       return (sub y x)
 
+  /-
+  @notice Computes the average of two unsigned integers without overflow.
+  @param x First value.
+  @param y Second value.
+  @return Floor average of `x` and `y`.
+  -/
   function view avg (x : Uint256, y : Uint256) : Uint256 := do
     if x >= y then
       return (add y (div (sub x y) 2))
     else
       return (add x (div (sub y x) 2))
 
+  /-
+  @notice Computes the integer square root.
+  @param x Input value.
+  @return Floor square root of `x`.
+  -/
   function view sqrt (x : Uint256) : Uint256 := do
     let mut z := 181
     let mut r := 0
@@ -84,6 +119,11 @@ verity_contract FixedPointMathLibBase where
     else
       return z
 
+  /-
+  @notice Computes the integer cube root.
+  @param x Input value.
+  @return Floor cube root of `x`.
+  -/
   function view cbrt (x : Uint256) : Uint256 := do
     let mut r := 0
     if 0xffffffffffffffffffffffffffffffff < x then
@@ -125,6 +165,11 @@ verity_contract FixedPointMathLibBase where
     else
       return z
 
+  /-
+  @notice Computes the base-256 logarithm.
+  @param x Input value.
+  @return Floor log base 256 of `x`.
+  -/
   function view log256 (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
@@ -153,6 +198,11 @@ verity_contract FixedPointMathLibBase where
     else
       return r
 
+  /-
+  @notice Computes the base-256 logarithm rounded up.
+  @param x Input value.
+  @return Ceiling log base 256 of `x`.
+  -/
   function view log256Up (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
@@ -185,6 +235,11 @@ verity_contract FixedPointMathLibBase where
     else
       return r
 
+  /-
+  @notice Computes the binary logarithm.
+  @param x Input value.
+  @return Floor log base 2 of `x`.
+  -/
   function view log2 (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
@@ -228,6 +283,11 @@ verity_contract FixedPointMathLibBase where
     else
       return r
 
+  /-
+  @notice Computes the binary logarithm rounded up.
+  @param x Input value.
+  @return Ceiling log base 2 of `x`.
+  -/
   function view log2Up (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
@@ -275,6 +335,11 @@ verity_contract FixedPointMathLibBase where
     else
       return r
 
+  /-
+  @notice Computes the decimal logarithm.
+  @param x Input value.
+  @return Floor log base 10 of `x`.
+  -/
   function view log10 (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
@@ -315,6 +380,11 @@ verity_contract FixedPointMathLibBase where
     else
       return r
 
+  /-
+  @notice Computes the decimal logarithm rounded up.
+  @param x Input value.
+  @return Ceiling log base 10 of `x`.
+  -/
   function log10Up (x : Uint256) : Uint256 := do
     let r ← log10 x
     let mut scale := 1
@@ -358,6 +428,13 @@ verity_contract FixedPointMathLibBase where
     else
       return r
 
+  /-
+  @notice Clamps a value between lower and upper bounds.
+  @param x Value to clamp.
+  @param minValue Lower bound.
+  @param maxValue Upper bound.
+  @return `x` bounded to the inclusive range [`minValue`, `maxValue`].
+  -/
   function view clamp (x : Uint256, minValue : Uint256, maxValue : Uint256) : Uint256 := do
     let boundedBelow := max x minValue
     return (min boundedBelow maxValue)

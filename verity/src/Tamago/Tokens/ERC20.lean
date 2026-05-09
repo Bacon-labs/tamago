@@ -28,29 +28,61 @@ verity_contract ERC20Base where
   constants
     maxUint256 : Uint256 := (sub 0 1)
 
+  /-
+  @notice Initializes token ownership and zero supply.
+  @param initialOwner Address that receives ownership at deployment.
+  -/
   constructor (initialOwner : Address) := do
     setStorageAddr contractOwner initialOwner
     setStorage tokenSupply 0
 
+  /-
+  @notice Returns the token decimal precision.
+  @return Fixed decimal precision of 18.
+  -/
   function view decimals () : Uint256 := do
     return 18
 
+  /-
+  @notice Returns the total token supply.
+  @return Current total supply.
+  -/
   function view totalSupply () : Uint256 := do
     let currentSupply ← getStorage tokenSupply
     return currentSupply
 
+  /-
+  @notice Returns an account balance.
+  @param account Address whose balance is queried.
+  @return Current token balance for `account`.
+  -/
   function view balanceOf (account : Address) : Uint256 := do
     let currentBalance ← getMapping balances account
     return currentBalance
 
+  /-
+  @notice Returns the allowance from an owner to a spender.
+  @param ownerAddr Token owner address.
+  @param spender Address allowed to spend from `ownerAddr`.
+  @return Remaining allowance.
+  -/
   function view allowance (ownerAddr : Address, spender : Address) : Uint256 := do
     let currentAllowance ← getMapping2 allowances ownerAddr spender
     return currentAllowance
 
+  /-
+  @notice Returns the current contract owner.
+  @return Current owner address.
+  -/
   function view owner () : Address := do
     let currentOwner ← getStorageAddr contractOwner
     return currentOwner
 
+  /-
+  @notice Transfers ownership to a nonzero address.
+  @param newOwner Address that will become the owner.
+  @return True on success.
+  -/
   function transferOwnership (newOwner : Address) : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
@@ -60,6 +92,10 @@ verity_contract ERC20Base where
     emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord newOwner]
     return true
 
+  /-
+  @notice Renounces ownership and leaves the token without an owner.
+  @return True on success.
+  -/
   function renounceOwnership () : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
@@ -68,12 +104,24 @@ verity_contract ERC20Base where
     emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord zeroAddress]
     return true
 
+  /-
+  @notice Sets the caller's allowance for a spender.
+  @param spender Address allowed to spend the caller's tokens.
+  @param amount Allowance amount to set.
+  @return True on success.
+  -/
   function approve (spender : Address, amount : Uint256) : Bool := do
     let sender ← msgSender
     setMapping2 allowances sender spender amount
     emit "Approval" [addressToWord sender, addressToWord spender, amount]
     return true
 
+  /-
+  @notice Transfers tokens from the caller to another address.
+  @param toAddr Recipient address.
+  @param amount Token amount to transfer.
+  @return True on success.
+  -/
   function transfer (toAddr : Address, amount : Uint256) : Bool := do
     let sender ← msgSender
     let senderBalance ← getMapping balances sender
@@ -88,6 +136,13 @@ verity_contract ERC20Base where
     emit "Transfer" [addressToWord sender, addressToWord toAddr, amount]
     return true
 
+  /-
+  @notice Transfers tokens from an approved owner to another address.
+  @param fromAddr Address tokens are debited from.
+  @param toAddr Recipient address.
+  @param amount Token amount to transfer.
+  @return True on success.
+  -/
   function transferFrom (fromAddr : Address, toAddr : Address, amount : Uint256) : Bool := do
     let spender ← msgSender
     let currentAllowance ← getMapping2 allowances fromAddr spender
@@ -110,6 +165,12 @@ verity_contract ERC20Base where
     emit "Transfer" [addressToWord fromAddr, addressToWord toAddr, amount]
     return true
 
+  /-
+  @notice Mints tokens to an address.
+  @param toAddr Address that receives minted tokens.
+  @param amount Token amount to mint.
+  @return True on success.
+  -/
   function mint (toAddr : Address, amount : Uint256) : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
@@ -123,6 +184,12 @@ verity_contract ERC20Base where
     emit "Transfer" [addressToWord zeroAddress, addressToWord toAddr, amount]
     return true
 
+  /-
+  @notice Burns tokens from an address.
+  @param fromAddr Address whose balance is burned.
+  @param amount Token amount to burn.
+  @return True on success.
+  -/
   function burn (fromAddr : Address, amount : Uint256) : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner

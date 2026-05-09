@@ -32,19 +32,36 @@ verity_contract ERC721Base where
     tokenApprovals : Uint256 → Uint256 := slot 5
     operatorApprovals : Address → Address → Uint256 := slot 6
 
+  /-
+  @notice Initializes token ownership, supply, and token ID tracking.
+  @param initialOwner Address that receives ownership at deployment.
+  -/
   constructor (initialOwner : Address) := do
     setStorageAddr contractOwner initialOwner
     setStorage tokenSupply 0
     setStorage nextTokenId 0
 
+  /-
+  @notice Returns the total number of minted tokens.
+  @return Current total supply.
+  -/
   function view totalSupply () : Uint256 := do
     let currentSupply ← getStorage tokenSupply
     return currentSupply
 
+  /-
+  @notice Returns the current contract owner.
+  @return Current owner address.
+  -/
   function view owner () : Address := do
     let currentOwner ← getStorageAddr contractOwner
     return currentOwner
 
+  /-
+  @notice Transfers ownership to a nonzero address.
+  @param newOwner Address that will become the owner.
+  @return True on success.
+  -/
   function transferOwnership (newOwner : Address) : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
@@ -54,6 +71,10 @@ verity_contract ERC721Base where
     emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord newOwner]
     return true
 
+  /-
+  @notice Renounces ownership and leaves the token without an owner.
+  @return True on success.
+  -/
   function renounceOwnership () : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
@@ -62,26 +83,53 @@ verity_contract ERC721Base where
     emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord zeroAddress]
     return true
 
+  /-
+  @notice Returns the number of tokens owned by an address.
+  @param account Owner address to query.
+  @return Current token balance for `account`.
+  -/
   function view balanceOf (account : Address) : Uint256 := do
     require (account != zeroAddress) "Invalid owner"
     let currentBalance ← getMapping balances account
     return currentBalance
 
+  /-
+  @notice Returns the owner of a token.
+  @param tokenId Token ID to query.
+  @return Address that owns `tokenId`.
+  -/
   function view ownerOf (tokenId : Uint256) : Address := do
     let ownerWord ← getMappingUint tokenOwners tokenId
     require (ownerWord != 0) "Token does not exist"
     return wordToAddress ownerWord
 
+  /-
+  @notice Returns the approved spender for a token.
+  @param tokenId Token ID to query.
+  @return Address approved for `tokenId`.
+  -/
   function view getApproved (tokenId : Uint256) : Address := do
     let ownerWord ← getMappingUint tokenOwners tokenId
     require (ownerWord != 0) "Token does not exist"
     let approvedAddr ← getMappingUintAddr tokenApprovals tokenId
     return approvedAddr
 
+  /-
+  @notice Returns whether an operator is approved for all of an owner's tokens.
+  @param ownerAddr Token owner address.
+  @param operator Operator address to query.
+  @return True if `operator` is approved for all tokens owned by `ownerAddr`.
+  -/
   function view isApprovedForAll (ownerAddr : Address, operator : Address) : Bool := do
     let flag ← getMapping2 operatorApprovals ownerAddr operator
     return flag != 0
 
+  /-
+  @notice Approves an address to transfer a token.
+  @param approved Address approved for the token.
+  @param tokenId Token ID whose approval is updated.
+  @return True on success.
+  -/
   function approve (approved : Address, tokenId : Uint256) : Bool := do
     let sender ← msgSender
     let ownerWord ← getMappingUint tokenOwners tokenId
@@ -93,12 +141,23 @@ verity_contract ERC721Base where
     emit "Approval" [addressToWord tokenOwner, addressToWord approved, tokenId]
     return true
 
+  /-
+  @notice Sets or clears an operator approval for all caller-owned tokens.
+  @param operator Operator address.
+  @param approved Whether the operator is approved.
+  @return True on success.
+  -/
   function setApprovalForAll (operator : Address, approved : Bool) : Bool := do
     let sender ← msgSender
     setMapping2 operatorApprovals sender operator (boolToWord approved)
     emit "ApprovalForAll" [addressToWord sender, addressToWord operator, boolToWord approved]
     return true
 
+  /-
+  @notice Mints the next sequential token ID to an address.
+  @param toAddr Address that receives the minted token.
+  @return Minted token ID.
+  -/
   function mint (toAddr : Address) : Uint256 := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
@@ -121,6 +180,13 @@ verity_contract ERC721Base where
     emit "Transfer" [addressToWord zeroAddress, addressToWord toAddr, tokenId]
     return tokenId
 
+  /-
+  @notice Transfers a token between addresses.
+  @param fromAddr Current token owner.
+  @param toAddr Recipient address.
+  @param tokenId Token ID to transfer.
+  @return True on success.
+  -/
   function transferFrom (fromAddr : Address, toAddr : Address, tokenId : Uint256) : Bool := do
     let sender ← msgSender
     require (toAddr != zeroAddress) "Invalid recipient"

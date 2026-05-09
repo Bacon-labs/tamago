@@ -91,24 +91,50 @@ verity_contract WETHBase where
   constants
     maxUint256 : Uint256 := (sub 0 1)
 
+  /-
+  @notice Initializes wrapped token supply to zero.
+  -/
   constructor () := do
     setStorage tokenSupply 0
 
+  /-
+  @notice Returns the token decimal precision.
+  @return Fixed decimal precision of 18.
+  -/
   function view decimals () : Uint256 := do
     return 18
 
+  /-
+  @notice Returns the total wrapped token supply.
+  @return Current total supply.
+  -/
   function view totalSupply () : Uint256 := do
     let currentSupply ← getStorage tokenSupply
     return currentSupply
 
+  /-
+  @notice Returns an account's wrapped ETH balance.
+  @param account Address whose balance is queried.
+  @return Current wrapped token balance for `account`.
+  -/
   function view balanceOf (account : Address) : Uint256 := do
     let currentBalance ← getMapping balances account
     return currentBalance
 
+  /-
+  @notice Returns the allowance from an owner to a spender.
+  @param ownerAddr Token owner address.
+  @param spender Address allowed to spend from `ownerAddr`.
+  @return Remaining allowance.
+  -/
   function view allowance (ownerAddr : Address, spender : Address) : Uint256 := do
     let currentAllowance ← getMapping2 allowances ownerAddr spender
     return currentAllowance
 
+  /-
+  @notice Wraps the caller's attached ETH into WETH.
+  @return True on success.
+  -/
   function payable deposit () : Bool := do
     let sender ← msgSender
     let value ← msgValue
@@ -122,12 +148,24 @@ verity_contract WETHBase where
     emit "Deposit" [addressToWord sender, value]
     return true
 
+  /-
+  @notice Sets the caller's allowance for a spender.
+  @param spender Address allowed to spend the caller's WETH.
+  @param amount Allowance amount to set.
+  @return True on success.
+  -/
   function approve (spender : Address, amount : Uint256) : Bool := do
     let sender ← msgSender
     setMapping2 allowances sender spender amount
     emit "Approval" [addressToWord sender, addressToWord spender, amount]
     return true
 
+  /-
+  @notice Transfers WETH from the caller to another address.
+  @param toAddr Recipient address.
+  @param amount WETH amount to transfer.
+  @return True on success.
+  -/
   function transfer (toAddr : Address, amount : Uint256) : Bool := do
     let sender ← msgSender
     let senderBalance ← getMapping balances sender
@@ -142,6 +180,13 @@ verity_contract WETHBase where
     emit "Transfer" [addressToWord sender, addressToWord toAddr, amount]
     return true
 
+  /-
+  @notice Transfers WETH from an approved owner to another address.
+  @param fromAddr Address whose WETH balance is debited.
+  @param toAddr Recipient address.
+  @param amount WETH amount to transfer.
+  @return True on success.
+  -/
   function transferFrom (fromAddr : Address, toAddr : Address, amount : Uint256) : Bool := do
     let spender ← msgSender
     let currentAllowance ← getMapping2 allowances fromAddr spender
@@ -164,6 +209,11 @@ verity_contract WETHBase where
     emit "Transfer" [addressToWord fromAddr, addressToWord toAddr, amount]
     return true
 
+  /-
+  @notice Unwraps WETH and transfers native ETH to the caller.
+  @param amount WETH amount to burn and withdraw.
+  @return True on success.
+  -/
   function withdraw (amount : Uint256) : Bool := do
     let sender ← msgSender
     let currentBalance ← getMapping balances sender

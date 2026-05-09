@@ -20,7 +20,8 @@ attribute [local simp] Tamago.Tokens.ERC20Base.tokenSupply Tamago.Tokens.ERC20Ba
   Tamago.Tokens.ERC20Base.allowances Tamago.Tokens.ERC20Base.maxUint256 Tamago.Tokens.ERC20Base.decimals
   Tamago.Tokens.ERC20Base.totalSupply Tamago.Tokens.ERC20Base.balanceOf Tamago.Tokens.ERC20Base.allowance
   Tamago.Tokens.ERC20Base.approve Tamago.Tokens.ERC20Base.transfer Tamago.Tokens.ERC20Base.transferFrom
-attribute [local simp] Tamago.Tokens.ERC4626Base.assetToken Tamago.Tokens.ERC4626Base.tokenSupply
+attribute [local simp] Tamago.Tokens.ERC4626Base.__verity_immutable_slot_assetToken
+  Tamago.Tokens.ERC4626Base.tokenSupply
   Tamago.Tokens.ERC4626Base.balances Tamago.Tokens.ERC4626Base.allowances Tamago.Tokens.ERC4626Base.managedAssets
   Tamago.Tokens.ERC4626Base.maxUint256 Tamago.Tokens.ERC4626Base.decimals Tamago.Tokens.ERC4626Base.totalSupply
   Tamago.Tokens.ERC4626Base.balanceOf Tamago.Tokens.ERC4626Base.allowance Tamago.Tokens.ERC4626Base.approve
@@ -198,70 +199,77 @@ theorem transferFrom_spends_finite_allowance
 -- tama: discharges=erc4626_asset_spec
 theorem asset_returns_storage_asset (s : ContractState) :
   erc4626_asset_spec ((asset).run s).fst s := by
-  simp [erc4626_asset_spec, asset, assetToken, Bind.bind, Pure.pure]
+  simp [erc4626_asset_spec, asset, assetToken, getStorageAddr, Contract.run,
+    ContractResult.fst, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_totalAssets_spec
 theorem totalAssets_returns_managed_assets (s : ContractState) :
   erc4626_totalAssets_spec ((totalAssets).run s).fst s := by
-  simp [erc4626_totalAssets_spec, totalAssets, managedAssets, Bind.bind, Pure.pure]
+  simp [erc4626_totalAssets_spec, totalAssets, managedAssets, getStorageAddr,
+    getStorage, Contract.run, ContractResult.fst, Verity.bind, Verity.pure,
+    Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_convertToShares_spec
 theorem convertToShares_uses_virtual_share_formula (assets : Uint256) (s : ContractState) :
   erc4626_convertToShares_spec assets ((convertToShares assets).run s).fst s := by
   simp [erc4626_convertToShares_spec, convertToShares, managedAssets, tokenSupply,
-    getStorage, Contract.run, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
+    getStorageAddr, getStorage, Contract.run, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_convertToAssets_spec
 theorem convertToAssets_uses_virtual_share_formula (shares : Uint256) (s : ContractState) :
   erc4626_convertToAssets_spec shares ((convertToAssets shares).run s).fst s := by
   simp [erc4626_convertToAssets_spec, convertToAssets, managedAssets, tokenSupply,
-    getStorage, Contract.run, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
+    getStorageAddr, getStorage, Contract.run, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_maxDeposit_spec
 theorem maxDeposit_returns_max_uint256 (receiver : Address) (s : ContractState) :
   erc4626_maxDeposit_spec receiver ((maxDeposit receiver).run s).fst := by
-  simp [erc4626_maxDeposit_spec, maxDeposit, maxUint256, Bind.bind, Pure.pure]
+  simp [erc4626_maxDeposit_spec, maxDeposit, maxUint256, getStorageAddr, Contract.run,
+    ContractResult.fst, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_maxMint_spec
 theorem maxMint_returns_max_uint256 (receiver : Address) (s : ContractState) :
   erc4626_maxMint_spec receiver ((maxMint receiver).run s).fst := by
-  simp [erc4626_maxMint_spec, maxMint, maxUint256, Bind.bind, Pure.pure]
+  simp [erc4626_maxMint_spec, maxMint, maxUint256, getStorageAddr, Contract.run,
+    ContractResult.fst, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_maxWithdraw_spec
 theorem maxWithdraw_returns_convertible_owner_assets (ownerAddr : Address) (s : ContractState) :
   erc4626_maxWithdraw_spec ownerAddr ((maxWithdraw ownerAddr).run s).fst s := by
   simp [erc4626_maxWithdraw_spec, maxWithdraw, managedAssets, tokenSupply, balances,
-    getMapping, getStorage, Contract.run, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
+    getStorageAddr, getMapping, getStorage, Contract.run, Verity.bind, Verity.pure,
+    Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_maxRedeem_spec
 theorem maxRedeem_returns_owner_shares (ownerAddr : Address) (s : ContractState) :
   erc4626_maxRedeem_spec ownerAddr ((maxRedeem ownerAddr).run s).fst s := by
-  simp [erc4626_maxRedeem_spec, maxRedeem, balances, Bind.bind, Pure.pure]
+  simp [erc4626_maxRedeem_spec, maxRedeem, balances, getStorageAddr, getMapping,
+    Contract.run, ContractResult.fst, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_previewDeposit_spec
 theorem previewDeposit_matches_convertToShares (assets : Uint256) (s : ContractState) :
   erc4626_previewDeposit_spec assets ((previewDeposit assets).run s).fst s := by
   simp [erc4626_previewDeposit_spec, erc4626_convertToShares_spec, previewDeposit,
-    convertToShares, managedAssets, tokenSupply, getStorage, Contract.run, Verity.bind,
+    convertToShares, managedAssets, tokenSupply, getStorageAddr, getStorage, Contract.run, Verity.bind,
     Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_previewMint_spec
 theorem previewMint_rounds_assets_up (shares : Uint256) (s : ContractState) :
   erc4626_previewMint_spec shares ((previewMint shares).run s).fst s := by
-  simp [erc4626_previewMint_spec, previewMint, managedAssets, tokenSupply, getStorage, Contract.run,
-    Verity.bind, Verity.pure, Bind.bind, Pure.pure]
+  simp [erc4626_previewMint_spec, previewMint, managedAssets, tokenSupply, getStorageAddr,
+    getStorage, Contract.run, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_previewWithdraw_spec
 theorem previewWithdraw_rounds_shares_up (assets : Uint256) (s : ContractState) :
   erc4626_previewWithdraw_spec assets ((previewWithdraw assets).run s).fst s := by
-  simp [erc4626_previewWithdraw_spec, previewWithdraw, managedAssets, tokenSupply, getStorage,
-    Contract.run, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
+  simp [erc4626_previewWithdraw_spec, previewWithdraw, managedAssets, tokenSupply, getStorageAddr,
+    getStorage, Contract.run, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_previewRedeem_spec
 theorem previewRedeem_matches_convertToAssets (shares : Uint256) (s : ContractState) :
   erc4626_previewRedeem_spec shares ((previewRedeem shares).run s).fst s := by
   simp [erc4626_previewRedeem_spec, erc4626_convertToAssets_spec, previewRedeem,
-    convertToAssets, managedAssets, tokenSupply, getStorage, Contract.run, Verity.bind,
+    convertToAssets, managedAssets, tokenSupply, getStorageAddr, getStorage, Contract.run, Verity.bind,
     Verity.pure, Bind.bind, Pure.pure]
 
 private theorem deposit_properties_after_run
@@ -1400,7 +1408,7 @@ theorem deposit_returns_at_least_preview
   refine ⟨deposit_succeeds_when_accounting_does_not_overflow assets receiver s
     h_balance h_supply h_assets, ?_⟩
   simp [previewDeposit, convertToShares, depositShares, tokenSupply, managedAssets,
-    getStorage, Contract.run, ContractResult.fst, Verity.bind, Verity.pure,
+    getStorageAddr, getStorage, Contract.run, ContractResult.fst, Verity.bind, Verity.pure,
     Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_mint_pulls_no_more_than_preview
@@ -1411,7 +1419,7 @@ theorem mint_pulls_no_more_than_preview
   intro h_balance h_supply h_assets
   refine ⟨mint_succeeds_when_accounting_does_not_overflow shares receiver s
     h_balance h_supply h_assets, ?_⟩
-  simp [previewMint, mintAssets, tokenSupply, managedAssets, getStorage,
+  simp [previewMint, mintAssets, tokenSupply, managedAssets, getStorageAddr, getStorage,
     Contract.run, ContractResult.fst, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_withdraw_burns_no_more_than_preview
@@ -1422,7 +1430,7 @@ theorem withdraw_burns_no_more_than_preview
   intro h_max h_auth h_balance h_supply h_assets
   refine ⟨withdraw_succeeds_when_accounting_and_allowance_are_enough assets receiver ownerAddr s
     h_max h_auth h_balance h_supply h_assets, ?_⟩
-  simp [previewWithdraw, withdrawShares, tokenSupply, managedAssets, getStorage,
+  simp [previewWithdraw, withdrawShares, tokenSupply, managedAssets, getStorageAddr, getStorage,
     Contract.run, ContractResult.fst, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_redeem_returns_at_least_preview
@@ -1434,7 +1442,7 @@ theorem redeem_returns_at_least_preview
   refine ⟨redeem_succeeds_when_accounting_and_allowance_are_enough shares receiver ownerAddr s
     h_balance h_auth h_supply h_assets, ?_⟩
   simp [previewRedeem, convertToAssets, redeemAssets, tokenSupply, managedAssets,
-    getStorage, Contract.run, ContractResult.fst, Verity.bind, Verity.pure,
+    getStorageAddr, getStorage, Contract.run, ContractResult.fst, Verity.bind, Verity.pure,
     Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_deposit_pulls_assets_from_sender
@@ -1893,7 +1901,7 @@ private theorem approve_keeps_managed_assets_storage
   ((approve spender amount).run s).snd.storage managedAssets.slot =
     s.storage managedAssets.slot := by
   simp [approve, allowances, managedAssets, msgSender, setMapping2, Contract.run,
-    ContractResult.snd, Verity.bind, Bind.bind, Verity.pure, Pure.pure]
+    ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure]
 
 private theorem approve_keeps_token_supply_storage
     (spender : Address) (amount : Uint256) (s : ContractState) :
@@ -1912,21 +1920,21 @@ private theorem transfer_keeps_managed_assets_storage
   · by_cases h_same : s.sender = toAddr
     · subst h_same
       simp [transfer, balances, managedAssets, msgSender, getMapping, Contract.run,
-        ContractResult.snd, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
+        ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
         Verity.require, h_balance]
     · by_cases h_overflow :
         Verity.Stdlib.Math.MAX_UINT256 <
           (s.storageMap 2 toAddr).val + amount.val
       · simp [transfer, balances, managedAssets, msgSender, getMapping, setMapping,
-          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.pure,
+          Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure,
           Pure.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_balance, h_same, h_overflow]
       · simp [transfer, balances, managedAssets, msgSender, getMapping, setMapping,
-          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.pure,
+          Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure,
           Pure.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_balance, h_same, h_overflow]
   · simp [transfer, balances, managedAssets, msgSender, getMapping, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_balance]
+      ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.require, h_balance]
 
 private theorem transfer_keeps_token_supply_storage
     (toAddr : Address) (amount : Uint256) (s : ContractState) :
@@ -1952,18 +1960,18 @@ private theorem transferFrom_keeps_managed_assets_storage
             simpa [h_max] using h_allowance
           simp [transferFrom, allowances, balances, managedAssets, maxUint256,
             msgSender, getMapping2, getMapping, setMapping2, Contract.run,
-            ContractResult.snd, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
+            ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
             Verity.require, h_allowance, h_allowance_max, h_balance, h_max]
         · simp [transferFrom, allowances, balances, managedAssets, maxUint256,
             msgSender, getMapping2, getMapping, setMapping2, Contract.run,
-            ContractResult.snd, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
+            ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
             Verity.require, h_allowance, h_balance, h_max]
       · by_cases h_overflow :
           Verity.Stdlib.Math.MAX_UINT256 <
             (s.storageMap 2 toAddr).val + amount.val
         · simp [transferFrom, allowances, balances, managedAssets, msgSender,
             getMapping2, getMapping, setMapping, Contract.run, ContractResult.snd,
-            Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require,
+            getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require,
             Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
             h_allowance, h_balance, h_same, h_overflow]
         · by_cases h_max :
@@ -1972,21 +1980,21 @@ private theorem transferFrom_keeps_managed_assets_storage
               simpa [h_max] using h_allowance
             simp [transferFrom, allowances, balances, managedAssets, maxUint256,
               msgSender, getMapping2, getMapping, setMapping, setMapping2,
-              Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
+              Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind,
               Verity.pure, Pure.pure, Verity.require,
               Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
               h_allowance, h_allowance_max, h_balance, h_same, h_overflow, h_max]
           · simp [transferFrom, allowances, balances, managedAssets, maxUint256,
               msgSender, getMapping2, getMapping, setMapping, setMapping2,
-              Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
+              Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind,
               Verity.pure, Pure.pure, Verity.require,
               Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
               h_allowance, h_balance, h_same, h_overflow, h_max]
     · simp [transferFrom, allowances, balances, managedAssets, msgSender, getMapping2,
-        getMapping, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
+        getMapping, Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind,
         Verity.require, h_allowance, h_balance]
   · simp [transferFrom, allowances, managedAssets, msgSender, getMapping2, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_allowance]
+      ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.require, h_allowance]
 
 private theorem transferFrom_keeps_token_supply_storage
     (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState) :
