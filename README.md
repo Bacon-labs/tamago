@@ -6,6 +6,8 @@ Tamago uses [Tama](https://tama.tools), a modern toolchain for Verity projects.
 
 All contracts in Tamago are **formally verified** via Lean, meaning they're mathematically proven to adhere to the specs. The specs are also double-checked via Foundry mirror tests.
 
+Tamago claims the **first ever** formally verified EVM implementations of `sqrt()`, `cbrt()`, `log10()`, `log256()`, as well as the full `ERC4626` standard.
+
 ## Components
 
 - `Ownable`: single-owner authorization with ownership transfer and
