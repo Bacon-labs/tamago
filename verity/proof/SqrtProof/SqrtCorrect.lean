@@ -42,8 +42,7 @@ def innerSqrt (x : Nat) : Nat :=
     Matches: z := sub(z, lt(div(x, z), z)) -/
 def floorSqrt (x : Nat) : Nat :=
   let z := innerSqrt x
-  if z = 0 then 0
-  else if x / z < z then z - 1 else z
+  z - if x / z < z then 1 else 0
 
 -- ============================================================================
 -- Part 2: Lower bound (composing Lemma 1)
@@ -212,11 +211,12 @@ theorem innerSqrt_bracket_of_octave
   exact ⟨innerSqrt_lower x m hx hmlo, innerSqrt_upper_of_octave i x m hmlo hmhi hOct⟩
 
 /-- The floor correction is correct.
-    Given z > 0, (z-1)² ≤ x < (z+1)², the correction gives isqrt(x). -/
+    Given z > 0, (z-1)² ≤ x < (z+1)², subtracting the comparison flag
+    `x/z < z` gives isqrt(x). -/
 theorem floor_correction (x z : Nat) (hz : 0 < z)
     (hlo : (z - 1) * (z - 1) ≤ x)
     (hhi : x < (z + 1) * (z + 1)) :
-    let r := if x / z < z then z - 1 else z
+    let r := z - if x / z < z then 1 else 0
     r * r ≤ x ∧ x < (r + 1) * (r + 1) := by
   simp only
   by_cases h_lt : x / z < z

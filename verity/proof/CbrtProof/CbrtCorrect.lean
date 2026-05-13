@@ -77,7 +77,7 @@ def innerCbrt (x : Nat) : Nat :=
     Matches: z := sub(z, lt(div(x, mul(z, z)), z)) -/
 def floorCbrt (x : Nat) : Nat :=
   let z := innerCbrt x
-  if x / (z * z) < z then z - 1 else z
+  z - if x / (z * z) < z then 1 else 0
 
 -- ============================================================================
 -- Part 1b: Reference integer cube root (floor)
@@ -688,13 +688,13 @@ theorem cbrtStep_eq_on_perfect_cube_of_sq_lt
 
 /-- The cbrt floor correction is correct.
     Given z > 0, (z-1)³ ≤ x < (z+1)³, the correction gives icbrt(x).
-    Correction: if x/(z*z) < z then z-1 else z.
-    When x/(z*z) < z: z³ > x, so z is a ceiling → return z-1.
-    When x/(z*z) ≥ z: z³ ≤ x, so z is the floor → return z. -/
+    The correction subtracts the comparison flag `x/(z*z) < z`.
+    When the flag is one, z³ > x, so z is a ceiling. When the flag is zero,
+    z³ ≤ x, so z is the floor. -/
 theorem cbrt_floor_correction (x z : Nat) (hz : 0 < z)
     (hlo : (z - 1) * (z - 1) * (z - 1) ≤ x)
     (hhi : x < (z + 1) * (z + 1) * (z + 1)) :
-    let r := if x / (z * z) < z then z - 1 else z
+    let r := z - if x / (z * z) < z then 1 else 0
     r * r * r ≤ x ∧ x < (r + 1) * (r + 1) * (r + 1) := by
   simp only
   have hzz : 0 < z * z := Nat.mul_pos hz hz
@@ -728,7 +728,8 @@ private theorem floorCbrt_eq_icbrt_of_bounds (x : Nat)
     (hlo : (innerCbrt x - 1) * (innerCbrt x - 1) * (innerCbrt x - 1) ≤ x)
     (hhi : x < (innerCbrt x + 1) * (innerCbrt x + 1) * (innerCbrt x + 1)) :
     floorCbrt x = icbrt x := by
-  let r := if x / (innerCbrt x * innerCbrt x) < innerCbrt x then innerCbrt x - 1 else innerCbrt x
+  let r := innerCbrt x -
+    if x / (innerCbrt x * innerCbrt x) < innerCbrt x then 1 else 0
   have hcorr : r * r * r ≤ x ∧ x < (r + 1) * (r + 1) * (r + 1) := by
     simpa [r] using cbrt_floor_correction x (innerCbrt x) hz hlo hhi
   have hr : floorCbrt x = r := by

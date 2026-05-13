@@ -211,6 +211,18 @@ private theorem sub_small_val (a : Uint256) {b : Nat}
   simpa [HSub.hSub, uintOfNat_val_of_lt hbLt] using
     Verity.Core.Uint256.sub_eq_of_le (a := a) (b := uintOfNat b) hLe
 
+private theorem sub_zero_val (a : Uint256) :
+    (sub a 0).val = a.val := by
+  have hLe : (0 : Uint256).val ≤ a.val := by simp
+  simpa [HSub.hSub] using
+    Verity.Core.Uint256.sub_eq_of_le (a := a) (b := (0 : Uint256)) hLe
+
+private theorem sub_boolToWord_val_eq_if (z : Uint256) (p : Prop) [Decidable p] :
+    (sub z (boolToWord p)).val = (if p then sub z 1 else z).val := by
+  by_cases hp : p
+  · simp [hp, boolToWord]
+  · simp [hp, boolToWord, sub_zero_val]
+
 private theorem bitOr_val (a b : Uint256) :
     (Contracts.bitOr a b).val =
       Nat.lor a.val b.val % Verity.Core.Uint256.modulus := by
@@ -785,8 +797,8 @@ private theorem sqrtStepUint_val
 private theorem sqrtFinishCorrectionUint_val
     (x zU : Uint256) (z : Nat)
     (hZVal : zU.val = z) (hzPos : 0 < z) :
-    (if div x zU < zU then sub zU 1 else zU).val =
-      (if x.val / z < z then z - 1 else z) := by
+    (sub zU (boolToWord (div x zU < zU))).val =
+      z - if x.val / z < z then 1 else 0 := by
   have hzUNe : zU.val ≠ 0 := by omega
   have hDivVal : (div x zU).val = x.val / z := by
     rw [div_val x zU hzUNe, hZVal]
@@ -795,7 +807,7 @@ private theorem sqrtFinishCorrectionUint_val
     rw [hDivVal, hZVal]
   by_cases h : x.val / z < z
   · have hUint := hBranchIff.mpr h
-    rw [if_pos hUint, if_pos h]
+    simp [hUint, h, boolToWord]
     have hOne : (1 : Uint256).val = 1 := by simp
     have hSub : (sub zU 1).val = z - 1 := by
       have hLe : (1 : Uint256).val ≤ zU.val := by
@@ -805,17 +817,10 @@ private theorem sqrtFinishCorrectionUint_val
         Verity.Core.Uint256.sub_eq_of_le (a := zU) (b := (1 : Uint256)) hLe
     exact hSub
   · have hUint : ¬ div x zU < zU := fun hh => h (hBranchIff.mp hh)
-    rw [if_neg hUint, if_neg h]
-    exact hZVal
-
-private theorem sqrtFinishIf_run_eq_uint (x z : Uint256) (s : ContractState) :
-    ((if div x z < z then Verity.pure (sub z 1) else Verity.pure z).run s).fst =
-      if div x z < z then sub z 1 else z := by
-  by_cases h : div x z < z
-  · rw [if_pos h, if_pos h]
-    rfl
-  · rw [if_neg h, if_neg h]
-    rfl
+    have hFlag : boolToWord (div x zU < zU) = (0 : Uint256) := by
+      simp [boolToWord, hUint]
+    rw [hFlag, sub_zero_val]
+    simp [h, hZVal]
 
 private theorem sqrtInnerUint_val (x : Uint256) :
     (let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
@@ -957,14 +962,16 @@ private theorem sqrtInnerUint_val (x : Uint256) :
 private theorem sqrtFloorCorrectionUint_val
     (x z : Uint256)
     (hZVal : z.val = innerSqrt x.val) :
-    (if div x z < z then sub z 1 else z).val = floorSqrt x.val := by
+    (sub z (boolToWord (div x z < z))).val = floorSqrt x.val := by
   by_cases hz0 : innerSqrt x.val = 0
   · have hzValZero : z.val = 0 := by simpa [hz0] using hZVal
     have hNot : ¬ div x z < z := by
       change ¬ (div x z).val < z.val
       omega
-    rw [if_neg hNot]
     unfold floorSqrt
+    have hFlag : boolToWord (div x z < z) = (0 : Uint256) := by
+      simp [boolToWord, hNot]
+    rw [hFlag, sub_zero_val]
     simp [hz0, hzValZero]
   · have hzPos : 0 < innerSqrt x.val := Nat.pos_of_ne_zero hz0
     have h := sqrtFinishCorrectionUint_val x z (innerSqrt x.val) hZVal hzPos
@@ -980,7 +987,7 @@ private theorem sqrtBodyUint_val (x : Uint256) :
      let z := shr 1 (add z (div x z))
      let z := shr 1 (add z (div x z))
      let z := shr 1 (add z (div x z))
-     if div x z < z then sub z 1 else z).val =
+     sub z (boolToWord (div x z < z))).val =
       floorSqrt x.val := by
   let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
   let z1 := shr 1 (sub 256 xClz)
@@ -992,7 +999,7 @@ private theorem sqrtBodyUint_val (x : Uint256) :
   let z7 := shr 1 (add z6 (div x z6))
   have hInner : z7.val = innerSqrt x.val := by
     simpa [xClz, z1, z2, z3, z4, z5, z6, z7] using sqrtInnerUint_val x
-  change (if div x z7 < z7 then sub z7 1 else z7).val = floorSqrt x.val
+  change (sub z7 (boolToWord (div x z7 < z7))).val = floorSqrt x.val
   exact sqrtFloorCorrectionUint_val x z7 hInner
 
 private theorem sqrt_run_eq_floorSqrt (x : Uint256) (s : ContractState) :
@@ -1009,13 +1016,12 @@ private theorem sqrt_run_eq_floorSqrt (x : Uint256) (s : ContractState) :
   let z6 := shr 1 (add z5 (div x z5))
   let z7 := shr 1 (add z6 (div x z6))
   have hBody :
-      (if div x z7 < z7 then sub z7 1 else z7).val = floorSqrt x.val := by
+      (sub z7 (boolToWord (div x z7 < z7))).val = floorSqrt x.val := by
     simpa [xClz, z1, z2, z3, z4, z5, z6, z7] using sqrtBodyUint_val x
   change
-      ((if div x z7 < z7 then Verity.pure (sub z7 1) else Verity.pure z7).run s).fst.val =
+      ((Verity.pure (sub z7 (boolToWord (div x z7 < z7)))).run s).fst.val =
         floorSqrt x.val
-  rw [sqrtFinishIf_run_eq_uint x z7 s]
-  exact hBody
+  simpa [Verity.pure, Pure.pure] using hBody
 
 theorem sqrt_returns_math_floor (x : Uint256) (s : ContractState) :
     sqrt_property x ((sqrt x).run s).fst := by
@@ -1024,15 +1030,6 @@ theorem sqrt_returns_math_floor (x : Uint256) (s : ContractState) :
   have hxLt : x.val < 2 ^ 256 := by
     simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
   exact floorSqrt_correct_u256 x.val hxLt
-
-private theorem cbrtFinishIf_run_eq_uint (x z : Uint256) (s : ContractState) :
-    ((if div x (mul z z) < z then Verity.pure (sub z 1) else Verity.pure z).run s).fst =
-      if div x (mul z z) < z then sub z 1 else z := by
-  by_cases h : div x (mul z z) < z
-  · rw [if_pos h, if_pos h]
-    rfl
-  · rw [if_neg h, if_neg h]
-    rfl
 
 private theorem uint3_val : (3 : Uint256).val = 3 := by
   native_decide
@@ -1271,8 +1268,8 @@ private theorem cbrtFinishCorrectionUint_val
     (x zU : Uint256) (z : Nat)
     (hZVal : zU.val = z) (hzPos : 0 < z)
     (hMulLt : z * z < Verity.Core.Uint256.modulus) :
-    (if div x (mul zU zU) < zU then sub zU 1 else zU).val =
-      if x.val / (z * z) < z then z - 1 else z := by
+    (sub zU (boolToWord (div x (mul zU zU) < zU))).val =
+      z - if x.val / (z * z) < z then 1 else 0 := by
   have hMulLtU : zU.val * zU.val < Verity.Core.Uint256.modulus := by
     simpa [hZVal] using hMulLt
   have hMulVal : (mul zU zU).val = z * z := by
@@ -1287,7 +1284,7 @@ private theorem cbrtFinishCorrectionUint_val
     rw [hDivVal, hZVal]
   by_cases h : x.val / (z * z) < z
   · have hUint := hBranchIff.mpr h
-    rw [if_pos hUint, if_pos h]
+    simp [hUint, h, boolToWord]
     have hOne : (1 : Uint256).val = 1 := by simp
     have hSub : (sub zU 1).val = z - 1 := by
       have hLe : (1 : Uint256).val ≤ zU.val := by
@@ -1297,37 +1294,26 @@ private theorem cbrtFinishCorrectionUint_val
         Verity.Core.Uint256.sub_eq_of_le (a := zU) (b := (1 : Uint256)) hLe
     exact hSub
   · have hUint : ¬ div x (mul zU zU) < zU := fun hh => h (hBranchIff.mp hh)
-    rw [if_neg hUint, if_neg h]
-    exact hZVal
+    have hFlag : boolToWord (div x (mul zU zU) < zU) = (0 : Uint256) := by
+      simp [boolToWord, hUint]
+    rw [hFlag, sub_zero_val]
+    simp [h, hZVal]
+
+private def cbrtVerityRunVal (n : Nat) : Nat :=
+  ((cbrt (uintOfNat n)).run defaultState).fst.val
+
+private theorem cbrt_run_val_eq_cbrtVerityRunVal (n : Nat) (s : ContractState) :
+    ((cbrt (uintOfNat n)).run s).fst.val = cbrtVerityRunVal n := rfl
+
+private theorem cbrtVerityRunVal_small_eq_floorCbrt :
+    ∀ v : Fin 256, v.val ≠ 0 → cbrtVerityRunVal v.val = floorCbrt v.val := by
+  native_decide
 
 private theorem cbrt_run_eq_floorCbrt_small_ne_zero
     (x : Fin 256) (hx0 : x.val ≠ 0) (s : ContractState) :
     ((cbrt (uintOfNat x.val)).run s).fst.val = floorCbrt x.val := by
-  rw [cbrt, Tamago.Utils.FixedPointMathLibBase.cbrt.eq_1]
-  rw [monad_bind_success_run_fst _ _
-    (Tamago.Proof.Utils.ClzProof.clzFormulaUint (uintOfNat x.val)) s s
-    (Tamago.Proof.Utils.ClzProof.clz_apply_eq_success (uintOfNat x.val) s)]
-  let xU := uintOfNat x.val
-  let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint xU
-  let bU := sub 255 xClz
-  let multiplierIndex := add 29 (mod bU 3)
-  let multiplier := byte multiplierIndex 0x90b5e5
-  let z0U := Contracts.bitOr 1 (shr 7 (shl (div bU 3) multiplier))
-  let stepU : Uint256 → Uint256 := fun z =>
-    div (add (add (div xU (mul z z)) z) z) 3
-  let z1U := stepU z0U
-  let z2U := stepU z1U
-  let z3U := stepU z2U
-  let z4U := stepU z3U
-  let z5U := stepU z4U
-  change
-      ((if div xU (mul z5U z5U) < z5U then
-          Verity.pure (sub z5U 1)
-        else
-          Verity.pure z5U).run s).fst.val =
-        floorCbrt x.val
-  rw [cbrtFinishIf_run_eq_uint xU z5U s]
-  fin_cases x <;> first | contradiction | native_decide
+  rw [cbrt_run_val_eq_cbrtVerityRunVal]
+  exact cbrtVerityRunVal_small_eq_floorCbrt x hx0
 
 private theorem cbrt_run_eq_floorCbrt_large
     (x : Uint256) (s : ContractState) (hxLarge : 2 ^ 8 ≤ x.val) :
@@ -1501,13 +1487,13 @@ private theorem cbrt_run_eq_floorCbrt_large
     exact lt_of_le_of_lt hSqLeCube
       (by simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using hCube)
   change
-      ((if div x (mul z5U z5U) < z5U then Verity.pure (sub z5U 1) else Verity.pure z5U).run s).fst.val =
+      ((Verity.pure
+          (sub z5U (boolToWord (div x (mul z5U z5U) < z5U)))).run s).fst.val =
         floorCbrt x.val
-  rw [cbrtFinishIf_run_eq_uint x z5U s]
   have hFinish := cbrtFinishCorrectionUint_val x z5U (innerCbrt x.val)
     hz5ValInner hz5Pos hz5MulLt
   unfold floorCbrt
-  simpa using hFinish
+  simpa [Verity.pure, Pure.pure] using hFinish
 
 private theorem cbrt_run_eq_floorCbrt (x : Uint256) (s : ContractState) :
     ((cbrt x).run s).fst.val = floorCbrt x.val := by
@@ -1534,12 +1520,9 @@ private theorem cbrt_run_eq_floorCbrt (x : Uint256) (s : ContractState) :
     let z4U := stepU z3U
     let z5U := stepU z4U
     change
-        ((if div xU (mul z5U z5U) < z5U then
-            Verity.pure (sub z5U 1)
-          else
-            Verity.pure z5U).run s).fst.val =
+        ((Verity.pure
+            (sub z5U (boolToWord (div xU (mul z5U z5U) < z5U)))).run s).fst.val =
           floorCbrt 0
-    rw [cbrtFinishIf_run_eq_uint xU z5U s]
     have hClzVal : xClz.val = 256 := by
       simpa [xU] using Tamago.Proof.Utils.ClzProof.clzFormulaUint_val (0 : Uint256)
     have hBVal : bU.val = Verity.Core.Uint256.modulus - 1 := by
@@ -1571,7 +1554,7 @@ private theorem cbrt_run_eq_floorCbrt (x : Uint256) (s : ContractState) :
         (by norm_num)
         (by rw [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS]; native_decide)
         (by native_decide)
-      simpa [stepU, z1U, z0U, cbrtStep, xU] using hStep
+      simpa [stepU, z1U, cbrtStep, xU] using hStep
     have hz2Val : z2U.val = 0 := by
       simpa [stepU, z2U, z1U, xU] using cbrtStepUint_zero_of_zero z1U hz1Val
     have hz3Val : z3U.val = 0 := by
@@ -1585,15 +1568,23 @@ private theorem cbrt_run_eq_floorCbrt (x : Uint256) (s : ContractState) :
       rw [hz5Val]
       exact Nat.not_lt_zero _
     have hFloor0 : floorCbrt 0 = 0 := by native_decide
-    rw [if_neg hNot, hFloor0]
-    exact hz5Val
+    rw [hFloor0]
+    have hFlag : boolToWord (div xU (mul z5U z5U) < z5U) = (0 : Uint256) := by
+      simp [boolToWord, hNot]
+    rw [hFlag]
+    have hpure (a : Uint256) : ((Verity.pure a).run s).fst.val = a.val := rfl
+    rw [hpure]
+    rw [sub_zero_val, hz5Val]
   · by_cases hxSmall : x.val < 256
     · have hxEq : x = uintOfNat x.val := by
         apply Verity.Core.Uint256.ext
         simp [uintOfNat_val_of_lt x.isLt]
-      rw [hxEq]
-      simpa [uintOfNat_val_of_lt x.isLt] using
-        cbrt_run_eq_floorCbrt_small_ne_zero ⟨x.val, hxSmall⟩ hx0 s
+      calc
+        ((cbrt x).run s).fst.val =
+            ((cbrt (uintOfNat x.val)).run s).fst.val :=
+              congrArg (fun y : Uint256 => ((cbrt y).run s).fst.val) hxEq
+        _ = floorCbrt x.val :=
+            cbrt_run_eq_floorCbrt_small_ne_zero ⟨x.val, hxSmall⟩ hx0 s
     · have hxLarge : 2 ^ 8 ≤ x.val := by
         norm_num at hxSmall
         omega
