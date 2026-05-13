@@ -125,10 +125,7 @@ verity_contract FixedPointMathLibBase where
     and ⌈√x⌉. Floor it. See:
     https://en.wikipedia.org/wiki/Integer_square_root#Using_only_integer_division
     -/
-    if div x z < z then
-      return (sub z 1)
-    else
-      return z
+    return (sub z (boolToWord (div x z < z)))
 
   /-
   @notice Computes the integer cube root.
@@ -154,10 +151,7 @@ verity_contract FixedPointMathLibBase where
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
     -- Round down.
-    if div x (mul z z) < z then
-      return (sub z 1)
-    else
-      return z
+    return (sub z (boolToWord (div x (mul z z) < z)))
 
   /-
   @notice Computes the base-256 logarithm.
