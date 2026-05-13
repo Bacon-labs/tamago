@@ -18,6 +18,9 @@ verity_contract FixedPointMathLibBase where
 
   constants
     maxUint256 : Uint256 := (sub 0 1)
+    clzDeBruijnMagic : Uint256 := 0x8421084210842108cc6318c6db6d54be
+    clzDeBruijnTable : Uint256 :=
+      0xf8f9f9faf9fdfafbf9fdfcfdfafbfcfef9fafdfafcfcfbfefafafcfbffffffff
 
   /-
   @notice Adds two unsigned integers and saturates on overflow.
@@ -82,38 +85,46 @@ verity_contract FixedPointMathLibBase where
       return (add x (div (sub y x) 2))
 
   /-
+  @notice Counts leading zero bits in a uint256 word.
+  @param x Input value.
+  @return Number of zero bits before the most significant set bit, or 256 for zero.
+  -/
+  function view clz (x : Uint256) : Uint256 := do
+    let mut r := shl 7 (boolToWord (0xffffffffffffffffffffffffffffffff < x))
+    r := bitOr r (shl 6 (boolToWord (0xffffffffffffffff < shr r x)))
+    r := bitOr r (shl 5 (boolToWord (0xffffffff < shr r x)))
+    r := bitOr r (shl 4 (boolToWord (0xffff < shr r x)))
+    r := bitOr r (shl 3 (boolToWord (0xff < shr r x)))
+    let y := shr r x
+    let deBruijnIndex := bitAnd 0x1f (shr y clzDeBruijnMagic)
+    let clzByte := byte deBruijnIndex clzDeBruijnTable
+    return (add (bitXor r clzByte) (boolToWord (x == 0)))
+
+  /-
   @notice Computes the integer square root.
   @param x Input value.
   @return Floor square root of `x`.
   -/
   function view sqrt (x : Uint256) : Uint256 := do
-    let mut z := 181
-    let mut r := 0
-    if 0xffffffffffffffffffffffffffffffffff < x then
-      r := shl 7 1
-    else
-      pure ()
-    if 0xffffffffffffffffff < shr r x then
-      r := bitOr r (shl 6 1)
-    else
-      pure ()
-    if 0xffffffffff < shr r x then
-      r := bitOr r (shl 5 1)
-    else
-      pure ()
-    if 0xffffff < shr r x then
-      r := bitOr r (shl 4 1)
-    else
-      pure ()
-    z := shl (shr 1 r) z
-    z := shr 18 (mul z (add (shr r x) 65536))
+    /-
+    Initial guess z = 2^⌊(n+1)/2⌋ where n = ⌊log₂(x)⌋. This seed gives ε₁ =
+    0.0607 after one Babylonian step for all inputs. With ε_{n+1} ≈ ε²/2, 6
+    steps yield 2⁻¹⁶⁰ relative error (>128 correct bits). We implicitly
+    represent z₀ as log₂(z) so that the first `div` becomes a `shr`.
+    -/
+    let xClz ← clz x
+    let mut z := shr 1 (sub 256 xClz)
+    z := shr 1 (add (shl z 1) (shr z x))
     z := shr 1 (add z (div x z))
     z := shr 1 (add z (div x z))
     z := shr 1 (add z (div x z))
     z := shr 1 (add z (div x z))
     z := shr 1 (add z (div x z))
-    z := shr 1 (add z (div x z))
-    z := shr 1 (add z (div x z))
+    /-
+    If `x+1` is a perfect square, the Babylonian method oscillates between ⌊√x⌋
+    and ⌈√x⌉. Floor it. See:
+    https://en.wikipedia.org/wiki/Integer_square_root#Using_only_integer_division
+    -/
     if div x z < z then
       return (sub z 1)
     else
@@ -125,41 +136,24 @@ verity_contract FixedPointMathLibBase where
   @return Floor cube root of `x`.
   -/
   function view cbrt (x : Uint256) : Uint256 := do
-    let mut r := 0
-    if 0xffffffffffffffffffffffffffffffff < x then
-      r := shl 7 1
-    else
-      pure ()
-    if 0xffffffffffffffff < shr r x then
-      r := bitOr r (shl 6 1)
-    else
-      pure ()
-    if 0xffffffff < shr r x then
-      r := bitOr r (shl 5 1)
-    else
-      pure ()
-    if 0xffff < shr r x then
-      r := bitOr r (shl 4 1)
-    else
-      pure ()
-    if 0xff < shr r x then
-      r := bitOr r (shl 3 1)
-    else
-      pure ()
-
-    let mut seedBase := 15
-    if 0xf < shr r x then
-      seedBase := 30
-    else
-      pure ()
-    let mut z := div (shl (div r 3) seedBase) (bitXor 7 (mod r 3))
+    /-
+    Initial guess z ≈ c · 2𐞥 where b = ⌊log₂(x)⌋, q = ⌊b / 3⌋. The 8-bit
+    fixed-point multipliers `c`: 144/128, 181/128, and 229/128 are selected by
+    `b mod 3` to balance each octave's worst-case final error. This gives >98
+    bits of precision after only 5 Newton-Raphson iterations. The `or(1, ...)`
+    keeps z ≥ 1 when the shifted estimate is 0.
+    -/
+    let xClz ← clz x
+    let b := sub 255 xClz
+    let multiplierIndex := add 29 (mod b 3)
+    let multiplier := byte multiplierIndex 0x90b5e5
+    let mut z := bitOr 1 (shr 7 (shl (div b 3) multiplier))
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
-    z := div (add (add (div x (mul z z)) z) z) 3
-    z := div (add (add (div x (mul z z)) z) z) 3
+    -- Round down.
     if div x (mul z z) < z then
       return (sub z 1)
     else
