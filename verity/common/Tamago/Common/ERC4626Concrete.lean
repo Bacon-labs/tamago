@@ -65,6 +65,27 @@ def assetWorldAfterTransfer
     else
       pre account
 
+def assetWorldAfterEvent (pre : AssetBalances) (event : Event) : AssetBalances :=
+  match event.name, event.args, event.indexedArgs with
+  | "ERC4626AssetSafeTransferFrom", [_asset, fromWord, toWord, amount], [] =>
+      assetWorldAfterTransfer pre (wordToAddress fromWord) (wordToAddress toWord) amount
+  | "ERC4626AssetSafeTransfer", [_asset, fromWord, toWord, amount], [] =>
+      assetWorldAfterTransfer pre (wordToAddress fromWord) (wordToAddress toWord) amount
+  | _, _, _ => pre
+
+def assetWorldAfterEvents : AssetBalances → List Event → AssetBalances
+  | pre, [] => pre
+  | pre, event :: events => assetWorldAfterEvents (assetWorldAfterEvent pre event) events
+
+def emittedEventsAfterCall {α : Type}
+    (s : ContractState) (result : ContractResult α) : List Event :=
+  result.snd.events.drop s.events.length
+
+def assetWorldAfterCall {α : Type}
+    (pre : AssetBalances) (s : ContractState) (result : ContractResult α) :
+    AssetBalances :=
+  assetWorldAfterEvents pre (emittedEventsAfterCall s result)
+
 /-!
 ## Local Arithmetic Helpers
 
