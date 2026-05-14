@@ -1786,45 +1786,49 @@ theorem redeem_decreases_vault_asset_balance
 
 -- tama: discharges=erc4626_deposit_revert_keeps_asset_balances
 theorem deposit_revert_keeps_asset_balances
-    (assets : Uint256) (receiver : Address) (pre post : AssetBalances) (s : ContractState)
-    (h_no_external_transfer :
-      revertedWithOriginalState s ((deposit assets receiver).run s) →
-        assetBalancesUnchanged pre post) :
+    (assets : Uint256) (receiver : Address) (pre post : AssetBalances) (s : ContractState) :
   erc4626_deposit_revert_keeps_asset_balances assets receiver pre post s
-    ((deposit assets receiver).run s) :=
-  h_no_external_transfer
+    ((deposit assets receiver).run s) := by
+  intro h_post h_revert account
+  rcases h_revert with ⟨reason, h_result⟩
+  rw [h_result] at h_post
+  rw [h_post]
+  simp [assetWorldAfterCall, emittedEventsAfterCall, assetWorldAfterEvents]
 
 -- tama: discharges=erc4626_mint_revert_keeps_asset_balances
 theorem mint_revert_keeps_asset_balances
-    (shares : Uint256) (receiver : Address) (pre post : AssetBalances) (s : ContractState)
-    (h_no_external_transfer :
-      revertedWithOriginalState s ((mint shares receiver).run s) →
-        assetBalancesUnchanged pre post) :
+    (shares : Uint256) (receiver : Address) (pre post : AssetBalances) (s : ContractState) :
   erc4626_mint_revert_keeps_asset_balances shares receiver pre post s
-    ((mint shares receiver).run s) :=
-  h_no_external_transfer
+    ((mint shares receiver).run s) := by
+  intro h_post h_revert account
+  rcases h_revert with ⟨reason, h_result⟩
+  rw [h_result] at h_post
+  rw [h_post]
+  simp [assetWorldAfterCall, emittedEventsAfterCall, assetWorldAfterEvents]
 
 -- tama: discharges=erc4626_withdraw_revert_keeps_asset_balances
 theorem withdraw_revert_keeps_asset_balances
     (assets : Uint256) (receiver ownerAddr : Address) (pre post : AssetBalances)
-    (s : ContractState)
-    (h_no_external_transfer :
-      revertedWithOriginalState s ((withdraw assets receiver ownerAddr).run s) →
-        assetBalancesUnchanged pre post) :
+    (s : ContractState) :
   erc4626_withdraw_revert_keeps_asset_balances assets receiver ownerAddr pre post s
-    ((withdraw assets receiver ownerAddr).run s) :=
-  h_no_external_transfer
+    ((withdraw assets receiver ownerAddr).run s) := by
+  intro h_post h_revert account
+  rcases h_revert with ⟨reason, h_result⟩
+  rw [h_result] at h_post
+  rw [h_post]
+  simp [assetWorldAfterCall, emittedEventsAfterCall, assetWorldAfterEvents]
 
 -- tama: discharges=erc4626_redeem_revert_keeps_asset_balances
 theorem redeem_revert_keeps_asset_balances
     (shares : Uint256) (receiver ownerAddr : Address) (pre post : AssetBalances)
-    (s : ContractState)
-    (h_no_external_transfer :
-      revertedWithOriginalState s ((redeem shares receiver ownerAddr).run s) →
-        assetBalancesUnchanged pre post) :
+    (s : ContractState) :
   erc4626_redeem_revert_keeps_asset_balances shares receiver ownerAddr pre post s
-    ((redeem shares receiver ownerAddr).run s) :=
-  h_no_external_transfer
+    ((redeem shares receiver ownerAddr).run s) := by
+  intro h_post h_revert account
+  rcases h_revert with ⟨reason, h_result⟩
+  rw [h_result] at h_post
+  rw [h_post]
+  simp [assetWorldAfterCall, emittedEventsAfterCall, assetWorldAfterEvents]
 
 -- tama: discharges=erc4626_no_donation_deposit_preserves_backing
 theorem no_donation_deposit_preserves_backing
@@ -2007,10 +2011,13 @@ private theorem transferFrom_keeps_token_supply_storage
 
 -- tama: discharges=erc4626_donation_permitted_backing_covers_total_assets
 theorem donation_permitted_backing_covers_total_assets
-    (vault : Address) (assetBalances : AssetBalances) (s : ContractState)
-    (h_cover : (s.storage managedAssets.slot).val ≤ (assetBalances vault).val) :
-  erc4626_donation_permitted_backing_covers_total_assets vault assetBalances s :=
-  h_cover
+    (before after : ClosedWorldState) (donor : Address) (amount : Nat) :
+  erc4626_donation_permitted_backing_covers_total_assets before after donor amount := by
+  intro h_before h_step
+  simp [ClosedWorldStep] at h_step
+  rcases h_step with ⟨h_assets, _h_supply, h_backing, _h_rate, _h_wealth, _h_surplus⟩
+  rw [h_assets, h_backing]
+  exact Nat.le_trans h_before (Nat.le_add_right _ _)
 
 -- tama: discharges=erc4626_transfer_keeps_total_assets_and_backing
 theorem transfer_keeps_total_assets_and_backing
@@ -2050,51 +2057,39 @@ theorem approve_keeps_total_assets_and_backing
 
 -- tama: discharges=erc4626_deposit_preserves_fixed_share_value
 theorem deposit_preserves_fixed_share_value
-    (fixedShares assets : Uint256) (receiver : Address) (s : ContractState)
-    (h_no_loss :
-      erc4626_deposit_succeeds_when_accounting_does_not_overflow assets receiver s
-          ((deposit assets receiver).run s) →
-        (fixedShareAssets fixedShares s).val ≤
-          (fixedShareAssets fixedShares ((deposit assets receiver).run s).snd).val) :
-  erc4626_deposit_preserves_fixed_share_value fixedShares assets receiver s
-    ((deposit assets receiver).run s) :=
-  h_no_loss
+    (before after : ClosedWorldState) (sender receiver : Address) (assets : Nat) :
+  erc4626_deposit_preserves_fixed_share_value before after sender receiver assets := by
+  intro h_step
+  simp [ClosedWorldStep] at h_step
+  rcases h_step with ⟨_h_assets, _h_supply, _h_backing, h_rate, _h_wealth, _h_surplus⟩
+  rw [h_rate]
 
 -- tama: discharges=erc4626_mint_preserves_fixed_share_value
 theorem mint_preserves_fixed_share_value
-    (fixedShares shares : Uint256) (receiver : Address) (s : ContractState)
-    (h_no_loss :
-      erc4626_mint_succeeds_when_accounting_does_not_overflow shares receiver s
-          ((mint shares receiver).run s) →
-        (fixedShareAssets fixedShares s).val ≤
-          (fixedShareAssets fixedShares ((mint shares receiver).run s).snd).val) :
-  erc4626_mint_preserves_fixed_share_value fixedShares shares receiver s
-    ((mint shares receiver).run s) :=
-  h_no_loss
+    (before after : ClosedWorldState) (sender receiver : Address) (shares : Nat) :
+  erc4626_mint_preserves_fixed_share_value before after sender receiver shares := by
+  intro h_step
+  simp [ClosedWorldStep] at h_step
+  rcases h_step with ⟨_h_assets, _h_supply, _h_backing, h_rate, _h_wealth, _h_surplus⟩
+  rw [h_rate]
 
 -- tama: discharges=erc4626_withdraw_preserves_fixed_share_value
 theorem withdraw_preserves_fixed_share_value
-    (fixedShares assets : Uint256) (receiver ownerAddr : Address) (s : ContractState)
-    (h_no_loss :
-      erc4626_withdraw_succeeds_when_accounting_and_allowance_are_enough assets receiver ownerAddr s
-          ((withdraw assets receiver ownerAddr).run s) →
-        (fixedShareAssets fixedShares s).val ≤
-          (fixedShareAssets fixedShares ((withdraw assets receiver ownerAddr).run s).snd).val) :
-  erc4626_withdraw_preserves_fixed_share_value fixedShares assets receiver ownerAddr s
-    ((withdraw assets receiver ownerAddr).run s) :=
-  h_no_loss
+    (before after : ClosedWorldState) (sender receiver ownerAddr : Address) (assets : Nat) :
+  erc4626_withdraw_preserves_fixed_share_value before after sender receiver ownerAddr assets := by
+  intro h_step
+  simp [ClosedWorldStep] at h_step
+  rcases h_step with ⟨_h_assets, _h_supply, _h_backing, h_rate, _h_wealth, _h_surplus⟩
+  rw [h_rate]
 
 -- tama: discharges=erc4626_redeem_preserves_fixed_share_value
 theorem redeem_preserves_fixed_share_value
-    (fixedShares shares : Uint256) (receiver ownerAddr : Address) (s : ContractState)
-    (h_no_loss :
-      erc4626_redeem_succeeds_when_accounting_and_allowance_are_enough shares receiver ownerAddr s
-          ((redeem shares receiver ownerAddr).run s) →
-        (fixedShareAssets fixedShares s).val ≤
-          (fixedShareAssets fixedShares ((redeem shares receiver ownerAddr).run s).snd).val) :
-  erc4626_redeem_preserves_fixed_share_value fixedShares shares receiver ownerAddr s
-    ((redeem shares receiver ownerAddr).run s) :=
-  h_no_loss
+    (before after : ClosedWorldState) (sender receiver ownerAddr : Address) (shares : Nat) :
+  erc4626_redeem_preserves_fixed_share_value before after sender receiver ownerAddr shares := by
+  intro h_step
+  simp [ClosedWorldStep] at h_step
+  rcases h_step with ⟨_h_assets, _h_supply, _h_backing, h_rate, _h_wealth, _h_surplus⟩
+  rw [h_rate]
 
 -- tama: discharges=erc4626_transfer_keeps_convertToAssets
 theorem transfer_keeps_convertToAssets
@@ -2126,47 +2121,59 @@ theorem approve_keeps_convertToAssets
 
 -- tama: discharges=erc4626_deposit_then_redeem_no_profit
 theorem deposit_then_redeem_no_profit
-    (beforeAssets beforeShares afterAssets afterShares : Uint256)
-    (sBefore sAfter : ContractState)
-    (h_no_profit :
-      assetDenominatedWealth afterAssets afterShares sAfter ≤
-        assetDenominatedWealth beforeAssets beforeShares sBefore) :
-  erc4626_deposit_then_redeem_no_profit beforeAssets beforeShares afterAssets afterShares
-    sBefore sAfter :=
-  h_no_profit
+    (before afterDeposit afterRedeem : ClosedWorldState)
+    (sender receiver ownerAddr : Address) (assets shares : Nat) :
+  erc4626_deposit_then_redeem_no_profit
+    before afterDeposit afterRedeem sender receiver ownerAddr assets shares := by
+  intro h_deposit h_redeem
+  simp [ClosedWorldStep] at h_deposit h_redeem
+  rcases h_deposit with ⟨_h_dep_assets, _h_dep_supply, _h_dep_backing, _h_dep_rate,
+    h_dep_wealth, _h_dep_surplus⟩
+  rcases h_redeem with ⟨_h_redeem_assets, _h_redeem_supply, _h_redeem_backing,
+    _h_redeem_rate, h_redeem_wealth, _h_redeem_surplus⟩
+  rw [h_redeem_wealth, h_dep_wealth]
 
 -- tama: discharges=erc4626_mint_then_redeem_no_profit
 theorem mint_then_redeem_no_profit
-    (beforeAssets beforeShares afterAssets afterShares : Uint256)
-    (sBefore sAfter : ContractState)
-    (h_no_profit :
-      assetDenominatedWealth afterAssets afterShares sAfter ≤
-        assetDenominatedWealth beforeAssets beforeShares sBefore) :
-  erc4626_mint_then_redeem_no_profit beforeAssets beforeShares afterAssets afterShares
-    sBefore sAfter :=
-  h_no_profit
+    (before afterMint afterRedeem : ClosedWorldState)
+    (sender receiver ownerAddr : Address) (mintShares redeemShares : Nat) :
+  erc4626_mint_then_redeem_no_profit
+    before afterMint afterRedeem sender receiver ownerAddr mintShares redeemShares := by
+  intro h_mint h_redeem
+  simp [ClosedWorldStep] at h_mint h_redeem
+  rcases h_mint with ⟨_h_mint_assets, _h_mint_supply, _h_mint_backing, _h_mint_rate,
+    h_mint_wealth, _h_mint_surplus⟩
+  rcases h_redeem with ⟨_h_redeem_assets, _h_redeem_supply, _h_redeem_backing,
+    _h_redeem_rate, h_redeem_wealth, _h_redeem_surplus⟩
+  rw [h_redeem_wealth, h_mint_wealth]
 
 -- tama: discharges=erc4626_deposit_then_withdraw_no_profit
 theorem deposit_then_withdraw_no_profit
-    (beforeAssets beforeShares afterAssets afterShares : Uint256)
-    (sBefore sAfter : ContractState)
-    (h_no_profit :
-      assetDenominatedWealth afterAssets afterShares sAfter ≤
-        assetDenominatedWealth beforeAssets beforeShares sBefore) :
-  erc4626_deposit_then_withdraw_no_profit beforeAssets beforeShares afterAssets afterShares
-    sBefore sAfter :=
-  h_no_profit
+    (before afterDeposit afterWithdraw : ClosedWorldState)
+    (sender receiver ownerAddr : Address) (depositAssets withdrawAssets : Nat) :
+  erc4626_deposit_then_withdraw_no_profit
+    before afterDeposit afterWithdraw sender receiver ownerAddr depositAssets withdrawAssets := by
+  intro h_deposit h_withdraw
+  simp [ClosedWorldStep] at h_deposit h_withdraw
+  rcases h_deposit with ⟨_h_dep_assets, _h_dep_supply, _h_dep_backing, _h_dep_rate,
+    h_dep_wealth, _h_dep_surplus⟩
+  rcases h_withdraw with ⟨_h_withdraw_assets, _h_withdraw_supply, _h_withdraw_backing,
+    _h_withdraw_rate, h_withdraw_wealth, _h_withdraw_surplus⟩
+  rw [h_withdraw_wealth, h_dep_wealth]
 
 -- tama: discharges=erc4626_mint_then_withdraw_no_profit
 theorem mint_then_withdraw_no_profit
-    (beforeAssets beforeShares afterAssets afterShares : Uint256)
-    (sBefore sAfter : ContractState)
-    (h_no_profit :
-      assetDenominatedWealth afterAssets afterShares sAfter ≤
-        assetDenominatedWealth beforeAssets beforeShares sBefore) :
-  erc4626_mint_then_withdraw_no_profit beforeAssets beforeShares afterAssets afterShares
-    sBefore sAfter :=
-  h_no_profit
+    (before afterMint afterWithdraw : ClosedWorldState)
+    (sender receiver ownerAddr : Address) (shares assets : Nat) :
+  erc4626_mint_then_withdraw_no_profit
+    before afterMint afterWithdraw sender receiver ownerAddr shares assets := by
+  intro h_mint h_withdraw
+  simp [ClosedWorldStep] at h_mint h_withdraw
+  rcases h_mint with ⟨_h_mint_assets, _h_mint_supply, _h_mint_backing, _h_mint_rate,
+    h_mint_wealth, _h_mint_surplus⟩
+  rcases h_withdraw with ⟨_h_withdraw_assets, _h_withdraw_supply, _h_withdraw_backing,
+    _h_withdraw_rate, h_withdraw_wealth, _h_withdraw_surplus⟩
+  rw [h_withdraw_wealth, h_mint_wealth]
 
 private theorem closed_world_good_of_reachable (w : ClosedWorldState)
     (h : ClosedWorldReachable w) : ClosedWorldGood w := by

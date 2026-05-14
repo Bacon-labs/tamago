@@ -1067,22 +1067,30 @@ Security conclusions:
 def erc4626_deposit_revert_keeps_asset_balances
     (_assets : Uint256) (_receiver : Address) (pre post : AssetBalances)
     (s : ContractState) (result : ContractResult Uint256) : Prop :=
-  revertedWithOriginalState s result → assetBalancesUnchanged pre post
+  post = assetWorldAfterCall pre s result →
+    revertedWithOriginalState s result →
+      assetBalancesUnchanged pre post
 
 def erc4626_mint_revert_keeps_asset_balances
     (_shares : Uint256) (_receiver : Address) (pre post : AssetBalances)
     (s : ContractState) (result : ContractResult Uint256) : Prop :=
-  revertedWithOriginalState s result → assetBalancesUnchanged pre post
+  post = assetWorldAfterCall pre s result →
+    revertedWithOriginalState s result →
+      assetBalancesUnchanged pre post
 
 def erc4626_withdraw_revert_keeps_asset_balances
     (_assets : Uint256) (_receiver _ownerAddr : Address) (pre post : AssetBalances)
     (s : ContractState) (result : ContractResult Uint256) : Prop :=
-  revertedWithOriginalState s result → assetBalancesUnchanged pre post
+  post = assetWorldAfterCall pre s result →
+    revertedWithOriginalState s result →
+      assetBalancesUnchanged pre post
 
 def erc4626_redeem_revert_keeps_asset_balances
     (_shares : Uint256) (_receiver _ownerAddr : Address) (pre post : AssetBalances)
     (s : ContractState) (result : ContractResult Uint256) : Prop :=
-  revertedWithOriginalState s result → assetBalancesUnchanged pre post
+  post = assetWorldAfterCall pre s result →
+    revertedWithOriginalState s result →
+      assetBalancesUnchanged pre post
 
 /-!
 ## 3. Backing and Donation-Resistance Specs
@@ -1175,8 +1183,10 @@ def erc4626_no_donation_redeem_preserves_backing
                     result.snd.storage managedAssets.slot
 
 def erc4626_donation_permitted_backing_covers_total_assets
-    (vault : Address) (assetBalances : AssetBalances) (s : ContractState) : Prop :=
-  (s.storage managedAssets.slot).val ≤ (assetBalances vault).val
+    (before after : ClosedWorldState) (donor : Address) (amount : Nat) : Prop :=
+  before.managedAssets ≤ before.vaultAssetBalance →
+    ClosedWorldStep (ClosedWorldAction.donate donor amount) before after →
+      after.managedAssets ≤ after.vaultAssetBalance
 
 def erc4626_transfer_keeps_total_assets_and_backing
     (_toAddr : Address) (_amount : Uint256) (vault : Address) (assetBalances : AssetBalances)
@@ -1219,28 +1229,24 @@ Security conclusions:
 -/
 
 def erc4626_deposit_preserves_fixed_share_value
-    (fixedShares assets : Uint256) (receiver : Address)
-    (s : ContractState) (result : ContractResult Uint256) : Prop :=
-  erc4626_deposit_succeeds_when_accounting_does_not_overflow assets receiver s result →
-    (fixedShareAssets fixedShares s).val ≤ (fixedShareAssets fixedShares result.snd).val
+    (before after : ClosedWorldState) (sender receiver : Address) (assets : Nat) : Prop :=
+  ClosedWorldStep (ClosedWorldAction.deposit sender receiver assets) before after →
+    before.fixedShareValueFloor ≤ after.fixedShareValueFloor
 
 def erc4626_mint_preserves_fixed_share_value
-    (fixedShares shares : Uint256) (receiver : Address)
-    (s : ContractState) (result : ContractResult Uint256) : Prop :=
-  erc4626_mint_succeeds_when_accounting_does_not_overflow shares receiver s result →
-    (fixedShareAssets fixedShares s).val ≤ (fixedShareAssets fixedShares result.snd).val
+    (before after : ClosedWorldState) (sender receiver : Address) (shares : Nat) : Prop :=
+  ClosedWorldStep (ClosedWorldAction.mint sender receiver shares) before after →
+    before.fixedShareValueFloor ≤ after.fixedShareValueFloor
 
 def erc4626_withdraw_preserves_fixed_share_value
-    (fixedShares assets : Uint256) (receiver ownerAddr : Address)
-    (s : ContractState) (result : ContractResult Uint256) : Prop :=
-  erc4626_withdraw_succeeds_when_accounting_and_allowance_are_enough assets receiver ownerAddr s result →
-    (fixedShareAssets fixedShares s).val ≤ (fixedShareAssets fixedShares result.snd).val
+    (before after : ClosedWorldState) (sender receiver ownerAddr : Address) (assets : Nat) : Prop :=
+  ClosedWorldStep (ClosedWorldAction.withdraw sender receiver ownerAddr assets) before after →
+    before.fixedShareValueFloor ≤ after.fixedShareValueFloor
 
 def erc4626_redeem_preserves_fixed_share_value
-    (fixedShares shares : Uint256) (receiver ownerAddr : Address)
-    (s : ContractState) (result : ContractResult Uint256) : Prop :=
-  erc4626_redeem_succeeds_when_accounting_and_allowance_are_enough shares receiver ownerAddr s result →
-    (fixedShareAssets fixedShares s).val ≤ (fixedShareAssets fixedShares result.snd).val
+    (before after : ClosedWorldState) (sender receiver ownerAddr : Address) (shares : Nat) : Prop :=
+  ClosedWorldStep (ClosedWorldAction.redeem sender receiver ownerAddr shares) before after →
+    before.fixedShareValueFloor ≤ after.fixedShareValueFloor
 
 def erc4626_transfer_keeps_convertToAssets
     (fixedShares : Uint256) (_toAddr : Address) (_amount : Uint256)
@@ -1258,28 +1264,32 @@ def erc4626_approve_keeps_convertToAssets
   fixedShareAssets fixedShares result.snd = fixedShareAssets fixedShares s
 
 def erc4626_deposit_then_redeem_no_profit
-    (beforeAssets beforeShares afterAssets afterShares : Uint256)
-    (sBefore sAfter : ContractState) : Prop :=
-  assetDenominatedWealth afterAssets afterShares sAfter ≤
-    assetDenominatedWealth beforeAssets beforeShares sBefore
+    (before afterDeposit afterRedeem : ClosedWorldState)
+    (sender receiver ownerAddr : Address) (assets shares : Nat) : Prop :=
+  ClosedWorldStep (ClosedWorldAction.deposit sender receiver assets) before afterDeposit →
+    ClosedWorldStep (ClosedWorldAction.redeem sender receiver ownerAddr shares) afterDeposit afterRedeem →
+      afterRedeem.callerWealthBound ≤ before.callerWealthBound
 
 def erc4626_mint_then_redeem_no_profit
-    (beforeAssets beforeShares afterAssets afterShares : Uint256)
-    (sBefore sAfter : ContractState) : Prop :=
-  assetDenominatedWealth afterAssets afterShares sAfter ≤
-    assetDenominatedWealth beforeAssets beforeShares sBefore
+    (before afterMint afterRedeem : ClosedWorldState)
+    (sender receiver ownerAddr : Address) (mintShares redeemShares : Nat) : Prop :=
+  ClosedWorldStep (ClosedWorldAction.mint sender receiver mintShares) before afterMint →
+    ClosedWorldStep (ClosedWorldAction.redeem sender receiver ownerAddr redeemShares) afterMint afterRedeem →
+      afterRedeem.callerWealthBound ≤ before.callerWealthBound
 
 def erc4626_deposit_then_withdraw_no_profit
-    (beforeAssets beforeShares afterAssets afterShares : Uint256)
-    (sBefore sAfter : ContractState) : Prop :=
-  assetDenominatedWealth afterAssets afterShares sAfter ≤
-    assetDenominatedWealth beforeAssets beforeShares sBefore
+    (before afterDeposit afterWithdraw : ClosedWorldState)
+    (sender receiver ownerAddr : Address) (depositAssets withdrawAssets : Nat) : Prop :=
+  ClosedWorldStep (ClosedWorldAction.deposit sender receiver depositAssets) before afterDeposit →
+    ClosedWorldStep (ClosedWorldAction.withdraw sender receiver ownerAddr withdrawAssets) afterDeposit afterWithdraw →
+      afterWithdraw.callerWealthBound ≤ before.callerWealthBound
 
 def erc4626_mint_then_withdraw_no_profit
-    (beforeAssets beforeShares afterAssets afterShares : Uint256)
-    (sBefore sAfter : ContractState) : Prop :=
-  assetDenominatedWealth afterAssets afterShares sAfter ≤
-    assetDenominatedWealth beforeAssets beforeShares sBefore
+    (before afterMint afterWithdraw : ClosedWorldState)
+    (sender receiver ownerAddr : Address) (shares assets : Nat) : Prop :=
+  ClosedWorldStep (ClosedWorldAction.mint sender receiver shares) before afterMint →
+    ClosedWorldStep (ClosedWorldAction.withdraw sender receiver ownerAddr assets) afterMint afterWithdraw →
+      afterWithdraw.callerWealthBound ≤ before.callerWealthBound
 
 /-!
 ## 5. Closed-World Invariant Specs
