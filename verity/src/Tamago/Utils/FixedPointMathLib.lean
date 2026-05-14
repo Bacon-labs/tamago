@@ -139,9 +139,9 @@ verity_contract FixedPointMathLibBase where
     /-
     Initial guess z ≈ c · 2𐞥 where b = ⌊log₂(x)⌋, q = ⌊b / 3⌋. The 8-bit
     fixed-point multipliers `c`: 144/128, 181/128, and 229/128 are selected by
-    `b mod 3` to balance each octave's worst-case final error. This gives >98
-    bits of precision after only 5 Newton-Raphson iterations. The `or(1, ...)`
-    keeps z ≥ 1 when the shifted estimate is 0.
+    `b % 3` to balance each octave's worst-case final error. This gives >98 bits
+    of precision after only 5 Newton-Raphson iterations. The `bitOr 1 ...` keeps
+    z ≥ 1 when the shifted estimate is 0.
     -/
     let xClz ← clz x
     let b := sub 255 xClz
