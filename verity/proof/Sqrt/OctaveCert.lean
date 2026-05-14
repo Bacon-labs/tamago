@@ -600,4 +600,3 @@ theorem pow2_succ_le_hi_succ_sq :
   decide
 
 end Sqrt.OctaveCert
-

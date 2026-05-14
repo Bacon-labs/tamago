@@ -10,8 +10,6 @@ import Cbrt.OctaveCert
 import Cbrt.ErrorChain
 import Cbrt.Wiring
 
-set_option exponentiation.threshold 300
-
 namespace Cbrt.OverflowSafety
 
 open Cbrt.OctaveCert

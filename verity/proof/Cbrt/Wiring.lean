@@ -4,7 +4,6 @@
   - Lower bound: m ≤ innerCbrt x for any m with m³ ≤ x
   - Upper bound: innerCbrt x ≤ icbrt x + 1 via the finite certificate
   - Octave-to-certificate mapping
-  - Universal uint256 correctness for floorCbrt
 -/
 import Mathlib.Data.Nat.Log
 import Mathlib.Tactic.IntervalCases
