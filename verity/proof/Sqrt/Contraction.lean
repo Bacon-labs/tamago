@@ -1,7 +1,20 @@
-import Init
-import SqrtProof.FloorBound
+/-
+  Error contraction recurrence for the Babylonian square-root iteration.
 
-namespace SqrtBridge
+  One step contracts the overestimate error quadratically:
+    if z = m + d with d ≤ m, then sqrtStep x z - m ≤ d²/(2m) + 1.
+-/
+import Init
+import Sqrt.FloorBound
+
+namespace Sqrt.Contraction
+
+open Sqrt.Model
+open Sqrt.FloorBound
+
+-- ============================================================================
+-- Error Contraction Recurrence
+-- ============================================================================
 
 private theorem hmul2 (a b : Nat) : a * (2 * b) = 2 * (a * b) := by
   calc
@@ -63,15 +76,14 @@ private theorem rhs_eq_rev (s m : Nat) (hs : m ≤ s) :
   rw [hpre]
   omega
 
-/-- One-step error contraction for `z = m + d` with `d ≤ m`.
-    This is the recurrence used by the finite-certificate bridge. -/
+/-- One-step error contraction for `z = m + d` with `d ≤ m`. -/
 theorem step_error_bound
     (m d x : Nat)
     (hm : 0 < m)
     (hmd : d ≤ m)
     (hxhi : x < (m + 1) * (m + 1)) :
-    bstep x (m + d) - m ≤ d * d / (2 * m) + 1 := by
-  unfold bstep
+    sqrtStep x (m + d) - m ≤ d * d / (2 * m) + 1 := by
+  unfold sqrtStep
   have hxhi' : x < m * m + (m + m) + 1 := by
     simpa [Nat.add_mul, Nat.mul_add, Nat.mul_one, Nat.one_mul,
       Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using hxhi
@@ -106,7 +118,11 @@ theorem step_error_bound
     Nat.le_trans hsub hhalf2
   exact Nat.le_trans hbound (by simp [hmain])
 
-/-- Upper bound for the first post-seed error `d₁ = bstep x s - m`, using only
+-- ============================================================================
+-- First-Step Error Bound
+-- ============================================================================
+
+/-- Upper bound for the first post-seed error `d₁ = sqrtStep x s - m`, using only
     `m ∈ [lo, hi]` and the interval constraint `m² ≤ x < (m+1)²`. -/
 theorem d1_bound
     (x m s lo hi : Nat)
@@ -116,10 +132,10 @@ theorem d1_bound
     (hlo : lo ≤ m)
     (hhi : m ≤ hi) :
     let maxAbs := max (s - lo) (hi - s)
-    bstep x s - m ≤ (maxAbs * maxAbs + 2 * hi) / (2 * s) := by
-  unfold bstep
+    sqrtStep x s - m ≤ (maxAbs * maxAbs + 2 * hi) / (2 * s) := by
+  unfold sqrtStep
   simp only
-  have hmstep : m ≤ (s + x / s) / 2 := babylon_step_floor_bound x s m hs hmlo
+  have hmstep : m ≤ (s + x / s) / 2 := sqrt_step_floor_bound x s m hs hmlo
   have hmulsub : 2 * s * ((s + x / s) / 2 - m) = 2 * s * ((s + x / s) / 2) - 2 * s * m := by
     rw [Nat.mul_sub]
   have h2z : 2 * ((s + x / s) / 2) ≤ s + x / s := Nat.mul_div_le (s + x / s) 2
@@ -172,4 +188,4 @@ theorem d1_bound
       exact Nat.le_trans hnum (Nat.add_le_add (Nat.le_trans hsq hsq') h2m)
     exact (Nat.le_div_iff_mul_le hs2).2 (by simpa [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm] using hfin)
 
-end SqrtBridge
+end Sqrt.Contraction

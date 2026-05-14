@@ -13,13 +13,17 @@
     Steps 2-5: each step contracts via cbrtStep_upper_of_le + relaxation to lo
 -/
 import Init
-import CbrtProof.FloorBound
-import CbrtProof.CbrtCorrect
-import CbrtProof.FiniteCert
+import Cbrt.Model
+import Cbrt.FloorBound
+import Cbrt.Contraction
+import Cbrt.OctaveCert
 
-namespace CbrtCertified
+namespace Cbrt.ErrorChain
 
-open CbrtCert
+open Cbrt.OctaveCert
+open Cbrt.Model
+open Cbrt.FloorBound
+open Cbrt.Contraction
 
 -- ============================================================================
 -- Pure polynomial identities (no subtraction)
@@ -360,4 +364,4 @@ theorem run5_le_m_plus_one
   rw [run5_eq_step_run4]
   omega
 
-end CbrtCertified
+end Cbrt.ErrorChain

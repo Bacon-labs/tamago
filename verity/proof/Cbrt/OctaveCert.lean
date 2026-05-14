@@ -14,7 +14,7 @@ import Mathlib.Tactic.FinCases
   All 248 octaves verified: d5 <= 1 and 2*dk <= lo for k=1..4.
 -/
 
-namespace CbrtCert
+namespace Cbrt.OctaveCert
 
 set_option maxRecDepth 1000000
 
@@ -1353,4 +1353,4 @@ theorem seed_eq : ∀ i : Fin 248,
 theorem d4_sq_lt_lo : ∀ i : Fin 248, d4Of i * d4Of i < loOf i := by
   intro i
   fin_cases i <;> decide
-end CbrtCert
+end Cbrt.OctaveCert

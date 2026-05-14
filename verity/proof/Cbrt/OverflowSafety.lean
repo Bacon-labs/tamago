@@ -5,18 +5,21 @@
     For all x < 2^256, innerCbrt(x) * (innerCbrt(x) * innerCbrt(x)) < 2^256.
 -/
 import Init
-import CbrtProof.CbrtCorrect
-import CbrtProof.FiniteCert
-import CbrtProof.CertifiedChain
-import CbrtProof.Wiring
+import Cbrt.Correctness
+import Cbrt.OctaveCert
+import Cbrt.ErrorChain
+import Cbrt.Wiring
 
 set_option exponentiation.threshold 300
 
-namespace CbrtOverflow
+namespace Cbrt.OverflowSafety
 
-open CbrtCert
-open CbrtCertified
-open CbrtWiring
+open Cbrt.OctaveCert
+open Cbrt.ErrorChain
+open Cbrt.FloorBound
+open Cbrt.Wiring
+open Cbrt.Model
+open Cbrt.Correctness
 
 -- ============================================================================
 -- Constants
@@ -285,7 +288,7 @@ theorem innerCbrt_cube_lt_word (x : Nat) (hx : 0 < x) (hx256 : x < 2 ^ 256) :
       have ⟨hmz4, hz4⟩ := run4_hi_bound x hx256 hx hmlo hmhi
       -- innerCbrt = cbrtStep(x, z4)
       have hseed : cbrtSeed x = seedOf ⟨247, by omega⟩ :=
-        cbrtSeed_eq_certSeed _ x ⟨Nat.le_trans pow255_le_rmax_cube hmlo, hx256⟩
+        cbrtSeed_eq_octaveSeed _ x ⟨Nat.le_trans pow255_le_rmax_cube hmlo, hx256⟩
       have hinner_eq : innerCbrt x = cbrtStep x (run4From x (seedOf ⟨247, by omega⟩)) := by
         rw [innerCbrt_eq_step_run4_seed, hseed]
       -- cbrtStep(x, z4) ≤ R_MAX
@@ -298,4 +301,4 @@ theorem innerCbrt_cube_lt_word (x : Nat) (hx : 0 < x) (hx256 : x < 2 ^ 256) :
       have : icbrt x = R_MAX := hm_eq
       omega
 
-end CbrtOverflow
+end Cbrt.OverflowSafety

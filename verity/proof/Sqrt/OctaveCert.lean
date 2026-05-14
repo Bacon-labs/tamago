@@ -16,7 +16,7 @@ set_option maxRecDepth 1000000
   All 256 octaves verified: d6 <= 1 and dk <= lo for k=1..5.
 -/
 
-namespace SqrtCert
+namespace Sqrt.OctaveCert
 
 /-- Lower bounds on isqrt(x) for octaves 0..255. -/
 def loTable : Array Nat := #[
@@ -599,54 +599,5 @@ theorem pow2_succ_le_hi_succ_sq :
     ∀ i : Fin 256, 2 ^ (i.val + 1) ≤ (hiOf i + 1) * (hiOf i + 1) := by
   decide
 
-end SqrtCert
+end Sqrt.OctaveCert
 
--- ============================================================================
--- Sqrt512Cert: fixed-seed certificates for octaves 254/255.
--- ============================================================================
-
-namespace Sqrt512Cert
-
-open SqrtCert
-
-/-- The fixed Newton seed used by 512-bit sqrt: isqrt(2^255).
-    Equals hiOf(254) = loOf(255) in the finite certificate tables. -/
-def FIXED_SEED : Nat := 240615969168004511545033772477625056927
-
-def lo254 : Nat := loOf ⟨254, by omega⟩
-def hi254 : Nat := hiOf ⟨254, by omega⟩
-def maxAbs254 : Nat := max (FIXED_SEED - lo254) (hi254 - FIXED_SEED)
-def fd1_254 : Nat := (maxAbs254 * maxAbs254 + 2 * hi254) / (2 * FIXED_SEED)
-def fd2_254 : Nat := nextD lo254 fd1_254
-def fd3_254 : Nat := nextD lo254 fd2_254
-def fd4_254 : Nat := nextD lo254 fd3_254
-def fd5_254 : Nat := nextD lo254 fd4_254
-def fd6_254 : Nat := nextD lo254 fd5_254
-
-theorem fd6_254_le_one : fd6_254 ≤ 1 := by decide
-theorem fd1_254_le_lo : fd1_254 ≤ lo254 := by decide
-theorem fd2_254_le_lo : fd2_254 ≤ lo254 := by decide
-theorem fd3_254_le_lo : fd3_254 ≤ lo254 := by decide
-theorem fd4_254_le_lo : fd4_254 ≤ lo254 := by decide
-theorem fd5_254_le_lo : fd5_254 ≤ lo254 := by decide
-theorem lo254_pos : 0 < lo254 := lo_pos ⟨254, by omega⟩
-
-def lo255 : Nat := loOf ⟨255, by omega⟩
-def hi255 : Nat := hiOf ⟨255, by omega⟩
-def maxAbs255 : Nat := max (FIXED_SEED - lo255) (hi255 - FIXED_SEED)
-def fd1_255 : Nat := (maxAbs255 * maxAbs255 + 2 * hi255) / (2 * FIXED_SEED)
-def fd2_255 : Nat := nextD lo255 fd1_255
-def fd3_255 : Nat := nextD lo255 fd2_255
-def fd4_255 : Nat := nextD lo255 fd3_255
-def fd5_255 : Nat := nextD lo255 fd4_255
-def fd6_255 : Nat := nextD lo255 fd5_255
-
-theorem fd6_255_le_one : fd6_255 ≤ 1 := by decide
-theorem fd1_255_le_lo : fd1_255 ≤ lo255 := by decide
-theorem fd2_255_le_lo : fd2_255 ≤ lo255 := by decide
-theorem fd3_255_le_lo : fd3_255 ≤ lo255 := by decide
-theorem fd4_255_le_lo : fd4_255 ≤ lo255 := by decide
-theorem fd5_255_le_lo : fd5_255 ≤ lo255 := by decide
-theorem lo255_pos : 0 < lo255 := lo_pos ⟨255, by omega⟩
-
-end Sqrt512Cert

@@ -1,15 +1,18 @@
 /-
-  Lemma 1 (Floor Bound) for _sqrt convergence — Mathlib-free.
-  For any m with m² ≤ x, and z > 0:  m ≤ (z + x / z) / 2
--/
-import Init
+  Floor bound for the Babylonian (Heron) square-root step.
 
-/-- One Babylonian step: ⌊(z + ⌊x/z⌋) / 2⌋.
-    Canonical definition used across the entire proof suite. -/
-def bstep (x z : Nat) : Nat := (z + x / z) / 2
+  For any m with m² ≤ x, and z > 0:  m ≤ sqrtStep x z.
+
+  A single truncated Babylonian step never undershoots any m with m² ≤ x.
+-/
+import Sqrt.Model
+
+namespace Sqrt.FloorBound
+
+open Sqrt.Model
 
 -- ============================================================================
--- Algebraic helpers
+-- Algebraic Helpers
 -- ============================================================================
 
 /-- (a+b)² = b*(2a+b) + a² -/
@@ -26,15 +29,12 @@ private theorem sq_decomp_2 (a b : Nat) (h : b ≤ a) :
   have hrecon : a - b + b = a := Nat.sub_add_cancel h
   rw [Nat.mul_comm (a + b) (a - b)]
   rw [Nat.mul_add (a - b) a b]
-  -- ((a-b)*a + (a-b)*b) + b*b = a*a
   rw [Nat.add_assoc]
-  -- (a-b)*a + ((a-b)*b + b*b) = a*a
   rw [← Nat.add_mul (a - b) b b, hrecon]
-  -- (a-b)*a + a*b = a*a
   rw [Nat.mul_comm (a - b) a, ← Nat.mul_add a (a - b) b, hrecon]
 
 -- ============================================================================
--- Core inequality: z * (2*m - z) ≤ m * m
+-- Core Inequality
 -- ============================================================================
 
 theorem sq_identity_le (z m : Nat) (h : z ≤ m) :
@@ -59,7 +59,7 @@ theorem mul_two_sub_le_sq (z m : Nat) : z * (2 * m - z) ≤ m * m := by
       simp [Nat.sub_eq_zero_of_le (Nat.le_of_lt h2)]
 
 -- ============================================================================
--- Division bound
+-- Division Bound
 -- ============================================================================
 
 theorem two_mul_le_add_div_sq (m z : Nat) (hz : 0 < z) :
@@ -69,26 +69,27 @@ theorem two_mul_le_add_div_sq (m z : Nat) (hz : 0 < z) :
   exact mul_two_sub_le_sq z m
 
 -- ============================================================================
--- MAIN THEOREM: Lemma 1 (Floor Bound)
+-- Floor Bound
 -- ============================================================================
 
 /--
-**Lemma 1 (Floor Bound).**
+**Floor Bound.**
 
 For any `m` with `m * m ≤ x`, and `z > 0`:
-    m ≤ (z + x / z) / 2
+    m ≤ sqrtStep x z
 
 A single truncated Babylonian step never undershoots any `m` with `m² ≤ x`.
 -/
-theorem babylon_step_floor_bound (x z m : Nat) (hz : 0 < z) (hm : m * m ≤ x) :
-    m ≤ (z + x / z) / 2 := by
+theorem sqrt_step_floor_bound (x z m : Nat) (hz : 0 < z) (hm : m * m ≤ x) :
+    m ≤ sqrtStep x z := by
+  unfold sqrtStep
   rw [Nat.le_div_iff_mul_le (by omega : (0 : Nat) < 2)]
   have h_mono : m * m / z ≤ x / z := Nat.div_le_div_right hm
   have h_core := two_mul_le_add_div_sq m z hz
   omega
 
 -- ============================================================================
--- Lemma 2: Absorbing set {m, m+1}
+-- Absorbing Set
 -- ============================================================================
 
 /-- (m+1)² = m² + 2m + 1 -/
@@ -99,37 +100,31 @@ private theorem succ_sq (m : Nat) :
 /-- (m-1)*(m+1) + 1 = m*m -/
 private theorem pred_succ_sq (m : Nat) (hm : 0 < m) :
     (m - 1) * (m + 1) + 1 = m * m := by
-  -- sq_decomp_2 m 1: (m+1)*(m-1) + 1*1 = m*m
   have key := sq_decomp_2 m 1 (by omega)
   rw [Nat.mul_comm (m + 1) (m - 1), Nat.mul_one] at key
-  -- key: (m-1)*(m+1) + 1 = m*m
   exact key
 
 /-- From z = m+1, one step gives m. -/
-theorem babylon_from_ceil (x m : Nat) (hm : 0 < m)
+theorem sqrtStep_from_ceil (x m : Nat) (hm : 0 < m)
     (hlo : m * m ≤ x) (hhi : x < (m + 1) * (m + 1)) :
     (m + 1 + x / (m + 1)) / 2 = m := by
   have hmp : 0 < m + 1 := by omega
-  -- x/(m+1) ≤ m: since x < (m+1)², x/(m+1) < m+1, so x/(m+1) ≤ m
   have hd_hi : x / (m + 1) ≤ m := by
     have : x / (m + 1) < m + 1 := Nat.div_lt_of_lt_mul hhi
     omega
-  -- x/(m+1) ≥ m-1
   have hd_lo : m - 1 ≤ x / (m + 1) := by
     rw [Nat.le_div_iff_mul_le hmp]
     have := pred_succ_sq m hm; omega
   omega
 
 /-- From z = m, one step gives m or m+1. -/
-theorem babylon_from_floor (x m : Nat) (hm : 0 < m)
+theorem sqrtStep_from_floor (x m : Nat) (hm : 0 < m)
     (hlo : m * m ≤ x) (hhi : x < (m + 1) * (m + 1)) :
     let z' := (m + x / m) / 2
     z' = m ∨ z' = m + 1 := by
   simp only
-  -- x/m ≥ m
   have hd_lo : m ≤ x / m := by
     rw [Nat.le_div_iff_mul_le hm]; exact hlo
-  -- x/m ≤ m+2: x < (m+1)² = m²+2m+1, so x ≤ m²+2m = (m+2)*m
   have hd_hi : x / m ≤ m + 2 := by
     have hsq := succ_sq m
     have hx_le : x ≤ m * m + 2 * m := by omega
@@ -138,3 +133,5 @@ theorem babylon_from_floor (x m : Nat) (hm : 0 < m)
       _ = (m + 2) * m / m := by rw [Nat.add_mul]
       _ = m + 2 := Nat.mul_div_cancel (m + 2) hm
   omega
+
+end Sqrt.FloorBound

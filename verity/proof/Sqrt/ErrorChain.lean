@@ -1,20 +1,23 @@
+import Sqrt.Model
 import Init
-import SqrtProof.FloorBound
-import SqrtProof.BridgeLemmas
-import SqrtProof.FiniteCert
+import Sqrt.FloorBound
+import Sqrt.Contraction
+import Sqrt.OctaveCert
 
-namespace SqrtCertified
+namespace Sqrt.ErrorChain
 
-open SqrtBridge
-open SqrtCert
+open Sqrt.Model
+open Sqrt.FloorBound
+open Sqrt.Contraction
+open Sqrt.OctaveCert
 
 def run6From (x z : Nat) : Nat :=
-  let z := bstep x z
-  let z := bstep x z
-  let z := bstep x z
-  let z := bstep x z
-  let z := bstep x z
-  let z := bstep x z
+  let z := sqrtStep x z
+  let z := sqrtStep x z
+  let z := sqrtStep x z
+  let z := sqrtStep x z
+  let z := sqrtStep x z
+  let z := sqrtStep x z
   z
 
 theorem step_from_bound
@@ -26,11 +29,11 @@ theorem step_from_bound
     (hmz : m ≤ z)
     (hzD : z - m ≤ D)
     (hDle : D ≤ m) :
-    bstep x z - m ≤ nextD lo D := by
+    sqrtStep x z - m ≤ nextD lo D := by
   have hz' : m + (z - m) = z := by omega
   have hdle : z - m ≤ m := Nat.le_trans hzD hDle
-  have hstep := SqrtBridge.step_error_bound m (z - m) x hm hdle hxhi
-  have hstep' : bstep x z - m ≤ (z - m) * (z - m) / (2 * m) + 1 := by
+  have hstep := step_error_bound m (z - m) x hm hdle hxhi
+  have hstep' : sqrtStep x z - m ≤ (z - m) * (z - m) / (2 * m) + 1 := by
     simpa only [hz'] using hstep
   have hsq : (z - m) * (z - m) ≤ D * D := Nat.mul_le_mul hzD hzD
   have hdiv1 : (z - m) * (z - m) / (2 * m) ≤ D * D / (2 * m) :=
@@ -50,21 +53,21 @@ theorem run5_error_bounds
     (hmhi : x < (m + 1) * (m + 1))
     (hlo : loOf i ≤ m)
     (hhi : m ≤ hiOf i) :
-    let z1 := bstep x (seedOf i)
-    let z2 := bstep x z1
-    let z3 := bstep x z2
-    let z4 := bstep x z3
-    let z5 := bstep x z4
+    let z1 := sqrtStep x (seedOf i)
+    let z2 := sqrtStep x z1
+    let z3 := sqrtStep x z2
+    let z4 := sqrtStep x z3
+    let z5 := sqrtStep x z4
     z1 - m ≤ d1 i ∧
       z2 - m ≤ d2 i ∧
       z3 - m ≤ d3 i ∧
       z4 - m ≤ d4 i ∧
       z5 - m ≤ d5 i := by
-  let z1 := bstep x (seedOf i)
-  let z2 := bstep x z1
-  let z3 := bstep x z2
-  let z4 := bstep x z3
-  let z5 := bstep x z4
+  let z1 := sqrtStep x (seedOf i)
+  let z2 := sqrtStep x z1
+  let z3 := sqrtStep x z2
+  let z4 := sqrtStep x z3
+  let z5 := sqrtStep x z4
 
   have hs : 0 < seedOf i := by
     have hpow : 0 < (2 : Nat) ^ ((i.val + 1) / 2) := Nat.pow_pos (by decide : 0 < (2 : Nat))
@@ -72,16 +75,16 @@ theorem run5_error_bounds
 
   have hmz1 : m ≤ z1 := by
     dsimp [z1]
-    exact babylon_step_floor_bound x (seedOf i) m hs hmlo
+    exact sqrt_step_floor_bound x (seedOf i) m hs hmlo
   have hz1Pos : 0 < z1 := Nat.lt_of_lt_of_le hm hmz1
   have hd1 : z1 - m ≤ d1 i := by
-    have h := SqrtBridge.d1_bound x m (seedOf i) (loOf i) (hiOf i) hs hmlo hmhi hlo hhi
+    have h := d1_bound x m (seedOf i) (loOf i) (hiOf i) hs hmlo hmhi hlo hhi
     simpa [z1, d1, maxAbs] using h
   have hd1m : d1 i ≤ m := Nat.le_trans (d1_le_lo i) hlo
 
   have hmz2 : m ≤ z2 := by
     dsimp [z2]
-    exact babylon_step_floor_bound x z1 m hz1Pos hmlo
+    exact sqrt_step_floor_bound x z1 m hz1Pos hmlo
   have hz2Pos : 0 < z2 := Nat.lt_of_lt_of_le hm hmz2
   have hd2 : z2 - m ≤ d2 i := by
     have h := step_from_bound x m (loOf i) z1 (d1 i) hm (lo_pos i) hlo hmhi hmz1 hd1 hd1m
@@ -90,7 +93,7 @@ theorem run5_error_bounds
 
   have hmz3 : m ≤ z3 := by
     dsimp [z3]
-    exact babylon_step_floor_bound x z2 m hz2Pos hmlo
+    exact sqrt_step_floor_bound x z2 m hz2Pos hmlo
   have hz3Pos : 0 < z3 := Nat.lt_of_lt_of_le hm hmz3
   have hd3 : z3 - m ≤ d3 i := by
     have h := step_from_bound x m (loOf i) z2 (d2 i) hm (lo_pos i) hlo hmhi hmz2 hd2 hd2m
@@ -99,7 +102,7 @@ theorem run5_error_bounds
 
   have hmz4 : m ≤ z4 := by
     dsimp [z4]
-    exact babylon_step_floor_bound x z3 m hz3Pos hmlo
+    exact sqrt_step_floor_bound x z3 m hz3Pos hmlo
   have hz4Pos : 0 < z4 := Nat.lt_of_lt_of_le hm hmz4
   have hd4 : z4 - m ≤ d4 i := by
     have h := step_from_bound x m (loOf i) z3 (d3 i) hm (lo_pos i) hlo hmhi hmz3 hd3 hd3m
@@ -108,7 +111,7 @@ theorem run5_error_bounds
 
   have hmz5 : m ≤ z5 := by
     dsimp [z5]
-    exact babylon_step_floor_bound x z4 m hz4Pos hmlo
+    exact sqrt_step_floor_bound x z4 m hz4Pos hmlo
   have hd5 : z5 - m ≤ d5 i := by
     have h := step_from_bound x m (loOf i) z4 (d4 i) hm (lo_pos i) hlo hmhi hmz4 hd4 hd4m
     simpa [z5, d5, nextD] using h
@@ -129,12 +132,12 @@ theorem run6_error_le_cert
     (hlo : loOf i ≤ m)
     (hhi : m ≤ hiOf i) :
     run6From x (seedOf i) - m ≤ d6 i := by
-  let z1 := bstep x (seedOf i)
-  let z2 := bstep x z1
-  let z3 := bstep x z2
-  let z4 := bstep x z3
-  let z5 := bstep x z4
-  let z6 := bstep x z5
+  let z1 := sqrtStep x (seedOf i)
+  let z2 := sqrtStep x z1
+  let z3 := sqrtStep x z2
+  let z4 := sqrtStep x z3
+  let z5 := sqrtStep x z4
+  let z6 := sqrtStep x z5
 
   have hs : 0 < seedOf i := by
     have hpow : 0 < (2 : Nat) ^ ((i.val + 1) / 2) := Nat.pow_pos (by decide : 0 < (2 : Nat))
@@ -142,16 +145,16 @@ theorem run6_error_le_cert
 
   have hmz1 : m ≤ z1 := by
     dsimp [z1]
-    exact babylon_step_floor_bound x (seedOf i) m hs hmlo
+    exact sqrt_step_floor_bound x (seedOf i) m hs hmlo
   have hz1Pos : 0 < z1 := Nat.lt_of_lt_of_le hm hmz1
   have hd1 : z1 - m ≤ d1 i := by
-    have h := SqrtBridge.d1_bound x m (seedOf i) (loOf i) (hiOf i) hs hmlo hmhi hlo hhi
+    have h := d1_bound x m (seedOf i) (loOf i) (hiOf i) hs hmlo hmhi hlo hhi
     simpa [z1, d1, maxAbs] using h
   have hd1m : d1 i ≤ m := Nat.le_trans (d1_le_lo i) hlo
 
   have hmz2 : m ≤ z2 := by
     dsimp [z2]
-    exact babylon_step_floor_bound x z1 m hz1Pos hmlo
+    exact sqrt_step_floor_bound x z1 m hz1Pos hmlo
   have hz2Pos : 0 < z2 := Nat.lt_of_lt_of_le hm hmz2
   have hd2 : z2 - m ≤ d2 i := by
     have h := step_from_bound x m (loOf i) z1 (d1 i) hm (lo_pos i) hlo hmhi hmz1 hd1 hd1m
@@ -160,7 +163,7 @@ theorem run6_error_le_cert
 
   have hmz3 : m ≤ z3 := by
     dsimp [z3]
-    exact babylon_step_floor_bound x z2 m hz2Pos hmlo
+    exact sqrt_step_floor_bound x z2 m hz2Pos hmlo
   have hz3Pos : 0 < z3 := Nat.lt_of_lt_of_le hm hmz3
   have hd3 : z3 - m ≤ d3 i := by
     have h := step_from_bound x m (loOf i) z2 (d2 i) hm (lo_pos i) hlo hmhi hmz2 hd2 hd2m
@@ -169,7 +172,7 @@ theorem run6_error_le_cert
 
   have hmz4 : m ≤ z4 := by
     dsimp [z4]
-    exact babylon_step_floor_bound x z3 m hz3Pos hmlo
+    exact sqrt_step_floor_bound x z3 m hz3Pos hmlo
   have hz4Pos : 0 < z4 := Nat.lt_of_lt_of_le hm hmz4
   have hd4 : z4 - m ≤ d4 i := by
     have h := step_from_bound x m (loOf i) z3 (d3 i) hm (lo_pos i) hlo hmhi hmz3 hd3 hd3m
@@ -178,7 +181,7 @@ theorem run6_error_le_cert
 
   have hmz5 : m ≤ z5 := by
     dsimp [z5]
-    exact babylon_step_floor_bound x z4 m hz4Pos hmlo
+    exact sqrt_step_floor_bound x z4 m hz4Pos hmlo
   have hz5Pos : 0 < z5 := Nat.lt_of_lt_of_le hm hmz5
   have hd5 : z5 - m ≤ d5 i := by
     have h := step_from_bound x m (loOf i) z4 (d4 i) hm (lo_pos i) hlo hmhi hmz4 hd4 hd4m
@@ -187,7 +190,7 @@ theorem run6_error_le_cert
 
   have hmz6 : m ≤ z6 := by
     dsimp [z6]
-    exact babylon_step_floor_bound x z5 m hz5Pos hmlo
+    exact sqrt_step_floor_bound x z5 m hz5Pos hmlo
   have hd6 : z6 - m ≤ d6 i := by
     have h := step_from_bound x m (loOf i) z5 (d5 i) hm (lo_pos i) hlo hmhi hmz5 hd5 hd5m
     simpa [z6, d6, nextD] using h
@@ -208,4 +211,4 @@ theorem run6_le_m_plus_one
   have hzle : run6From x (seedOf i) ≤ 1 + m := (Nat.sub_le_iff_le_add).1 hsub
   omega
 
-end SqrtCertified
+end Sqrt.ErrorChain

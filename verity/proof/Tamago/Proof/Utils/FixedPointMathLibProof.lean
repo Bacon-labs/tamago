@@ -1,8 +1,8 @@
 import Mathlib.Data.Nat.Bitwise
 import Mathlib.Data.Nat.Log
 import Mathlib.Data.Nat.Sqrt
-import CbrtProof.OverflowSafety
-import SqrtProof.SqrtCorrect
+import Sqrt
+import Cbrt.OverflowSafety
 import Tamago.Proof.Utils.ClzProof
 import Tamago.Spec.Utils.FixedPointMathLibSpec
 import Verity.Proofs.Stdlib.Automation
@@ -17,6 +17,20 @@ open Verity.EVM.Uint256
 open Tamago.Utils
 open Tamago.Spec.Utils.FixedPointMathLibSpec
 open Tamago.Utils.FixedPointMathLib
+open Sqrt.Model
+open Sqrt.FloorBound
+open Sqrt.OctaveCert
+open Sqrt.ErrorChain
+open Sqrt.Wiring
+open Sqrt.Correctness
+open Cbrt.Model
+open Cbrt.FloorBound
+open Cbrt.Contraction
+open Cbrt.OctaveCert
+open Cbrt.ErrorChain
+open Cbrt.Wiring
+open Cbrt.Correctness
+open Cbrt.OverflowSafety
 
 attribute [local simp] maxUint256 saturatingAdd saturatingMul saturatingSub
   Tamago.Utils.FixedPointMathLib.dist sqrt clamp
@@ -420,12 +434,12 @@ private theorem sqrt_sum_lt_uint256_of_cert
 private theorem sqrtSeed_sum_lt_uint256
     (i : Fin 256) (x : Nat)
     (hOct : 2 ^ i.val ≤ x ∧ x < 2 ^ (i.val + 1)) :
-    SqrtCert.seedOf i + x / SqrtCert.seedOf i < Verity.Core.Uint256.modulus := by
-  have hsPos : 0 < SqrtCert.seedOf i := by
-    simp [SqrtCert.seedOf, Nat.shiftLeft_eq]
+    Sqrt.OctaveCert.seedOf i + x / Sqrt.OctaveCert.seedOf i < Verity.Core.Uint256.modulus := by
+  have hsPos : 0 < Sqrt.OctaveCert.seedOf i := by
+    simp [Sqrt.OctaveCert.seedOf, Nat.shiftLeft_eq]
   have hk_le : (i.val + 1) / 2 ≤ 128 := by omega
-  have hz_le : SqrtCert.seedOf i ≤ 2 ^ 128 := by
-    unfold SqrtCert.seedOf
+  have hz_le : Sqrt.OctaveCert.seedOf i ≤ 2 ^ 128 := by
+    unfold Sqrt.OctaveCert.seedOf
     rw [Nat.shiftLeft_eq, Nat.one_mul]
     exact Nat.pow_le_pow_right (by decide : (2 : Nat) > 0) hk_le
   have hExp : i.val + 1 ≤ 2 * ((i.val + 1) / 2) + 1 := by omega
@@ -433,25 +447,25 @@ private theorem sqrtSeed_sum_lt_uint256
     Nat.pow_le_pow_right (by decide : (2 : Nat) > 0) hExp
   have hPowMul :
       2 ^ (2 * ((i.val + 1) / 2) + 1) =
-        2 * SqrtCert.seedOf i * SqrtCert.seedOf i := by
+        2 * Sqrt.OctaveCert.seedOf i * Sqrt.OctaveCert.seedOf i := by
     calc
       2 ^ (2 * ((i.val + 1) / 2) + 1) =
           2 ^ (2 * ((i.val + 1) / 2)) * 2 := by rw [Nat.pow_add]
       _ = (2 ^ ((i.val + 1) / 2) * 2 ^ ((i.val + 1) / 2)) * 2 := by
             rw [show 2 * ((i.val + 1) / 2) =
               ((i.val + 1) / 2) + ((i.val + 1) / 2) by omega, Nat.pow_add]
-      _ = 2 * SqrtCert.seedOf i * SqrtCert.seedOf i := by
-            unfold SqrtCert.seedOf
+      _ = 2 * Sqrt.OctaveCert.seedOf i * Sqrt.OctaveCert.seedOf i := by
+            unfold Sqrt.OctaveCert.seedOf
             simp [Nat.shiftLeft_eq, Nat.mul_comm, Nat.mul_left_comm]
-  have hxmul : x < 2 * SqrtCert.seedOf i * SqrtCert.seedOf i :=
+  have hxmul : x < 2 * Sqrt.OctaveCert.seedOf i * Sqrt.OctaveCert.seedOf i :=
     Nat.lt_of_lt_of_le hOct.2 (by simpa [hPowMul] using hPowLe)
-  have hdiv : x / SqrtCert.seedOf i < 2 * SqrtCert.seedOf i := by
+  have hdiv : x / Sqrt.OctaveCert.seedOf i < 2 * Sqrt.OctaveCert.seedOf i := by
     exact (Nat.div_lt_iff_lt_mul hsPos).2
       (by simpa [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm] using hxmul)
   have hsum_lt :
-      SqrtCert.seedOf i + x / SqrtCert.seedOf i <
-        SqrtCert.seedOf i + 2 * SqrtCert.seedOf i := by omega
-  have hsum_le : SqrtCert.seedOf i + 2 * SqrtCert.seedOf i ≤ 3 * (2 ^ 128) := by
+      Sqrt.OctaveCert.seedOf i + x / Sqrt.OctaveCert.seedOf i <
+        Sqrt.OctaveCert.seedOf i + 2 * Sqrt.OctaveCert.seedOf i := by omega
+  have hsum_le : Sqrt.OctaveCert.seedOf i + 2 * Sqrt.OctaveCert.seedOf i ≤ 3 * (2 ^ 128) := by
     omega
   have hconst : 3 * (2 ^ 128) < Verity.Core.Uint256.modulus := by
     native_decide
@@ -460,7 +474,7 @@ private theorem sqrtSeed_sum_lt_uint256
 private theorem sqrtFirstStepUint_val (x : Uint256) (hx0 : x.val ≠ 0) :
     (let q := shr 1 (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x))
      shr 1 (add (shl q 1) (shr q x))).val =
-      bstep x.val (sqrtSeed x.val) := by
+      sqrtStep x.val (sqrtSeed x.val) := by
   let q := shr 1 (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x))
   have hQ : q.val = (Nat.log2 x.val + 1) / 2 := by
     simpa [q, hx0] using sqrtExponentUint_val x
@@ -481,8 +495,8 @@ private theorem sqrtFirstStepUint_val (x : Uint256) (hx0 : x.val ≠ 0) :
       · simpa [Nat.log2_eq_log_two, Nat.succ_eq_add_one] using
           Nat.lt_pow_succ_log_self (by decide : 1 < 2) x.val
     simpa [i] using hlog
-  have hSeedEq : sqrtSeed x.val = SqrtCert.seedOf i :=
-    sqrtSeed_eq_seedOf_of_octave i x.val hOct
+  have hSeedEq : sqrtSeed x.val = Sqrt.OctaveCert.seedOf i :=
+    sqrtSeed_eq_octaveSeed i x.val hOct
   have hAddLt :
       (shl q 1).val + (shr q x).val < Verity.Core.Uint256.modulus := by
     rw [hSeedVal, hShrVal, hSeedEq]
@@ -490,9 +504,9 @@ private theorem sqrtFirstStepUint_val (x : Uint256) (hx0 : x.val ≠ 0) :
   have hAddVal :
       (add (shl q 1) (shr q x)).val = sqrtSeed x.val + x.val / sqrtSeed x.val := by
     rw [add_val_of_lt _ _ hAddLt, hSeedVal, hShrVal]
-  change (shr 1 (add (shl q 1) (shr q x))).val = bstep x.val (sqrtSeed x.val)
+  change (shr 1 (add (shl q 1) (shr q x))).val = sqrtStep x.val (sqrtSeed x.val)
   rw [shr_val, hAddVal]
-  simp [bstep]
+  simp [sqrtStep]
 
 private theorem if_pure_run_fst {α : Type} [Inhabited α] (c : Prop) [Decidable c]
     (a b : α) (s : ContractState) :
@@ -782,7 +796,7 @@ private theorem sqrtStepUint_val
     (x zU : Uint256) (z : Nat)
     (hzVal : zU.val = z) (hzPos : 0 < z)
     (hAddLt : z + x.val / z < Verity.Core.Uint256.modulus) :
-    (shr 1 (add zU (div x zU))).val = bstep x.val z := by
+    (shr 1 (add zU (div x zU))).val = sqrtStep x.val z := by
   have hzUNe : zU.val ≠ 0 := by omega
   have hDivVal : (div x zU).val = x.val / z := by
     rw [div_val x zU hzUNe, hzVal]
@@ -790,7 +804,7 @@ private theorem sqrtStepUint_val
     simpa [hzVal, hDivVal] using hAddLt
   have hAddVal : (add zU (div x zU)).val = z + x.val / z := by
     rw [add_val_of_lt _ _ hAddLtU, hzVal, hDivVal]
-  unfold bstep
+  unfold sqrtStep
   rw [shr_val, hAddVal]
   norm_num
 
@@ -862,10 +876,10 @@ private theorem sqrtInnerUint_val (x : Uint256) :
           simpa using this
         exact False.elim ((Nat.not_lt_of_ge hx1) hlt1)
       · exact Nat.pos_of_ne_zero hm0
-    have hinterval : SqrtCert.loOf i ≤ m ∧ m ≤ SqrtCert.hiOf i :=
+    have hinterval : Sqrt.OctaveCert.loOf i ≤ m ∧ m ≤ Sqrt.OctaveCert.hiOf i :=
       m_within_cert_interval i x.val m hmlo hmhi hOct
-    have hSeedEq : sqrtSeed x.val = SqrtCert.seedOf i :=
-      sqrtSeed_eq_seedOf_of_octave i x.val hOct
+    have hSeedEq : sqrtSeed x.val = Sqrt.OctaveCert.seedOf i :=
+      sqrtSeed_eq_octaveSeed i x.val hOct
     let qU := shr 1 (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x))
     let z1U := shr 1 (add (shl qU 1) (shr qU x))
     let z2U := shr 1 (add z1U (div x z1U))
@@ -873,86 +887,86 @@ private theorem sqrtInnerUint_val (x : Uint256) :
     let z4U := shr 1 (add z3U (div x z3U))
     let z5U := shr 1 (add z4U (div x z4U))
     let z6U := shr 1 (add z5U (div x z5U))
-    let z0 := SqrtCert.seedOf i
-    let z1 := bstep x.val z0
-    let z2 := bstep x.val z1
-    let z3 := bstep x.val z2
-    let z4 := bstep x.val z3
-    let z5 := bstep x.val z4
-    let z6 := bstep x.val z5
+    let z0 := Sqrt.OctaveCert.seedOf i
+    let z1 := sqrtStep x.val z0
+    let z2 := sqrtStep x.val z1
+    let z3 := sqrtStep x.val z2
+    let z4 := sqrtStep x.val z3
+    let z5 := sqrtStep x.val z4
+    let z6 := sqrtStep x.val z5
     have hz1Val : z1U.val = z1 := by
       have h := sqrtFirstStepUint_val x hx0
       simpa [qU, z1U, z0, z1, hSeedEq] using h
     have hz0Pos : 0 < z0 := by
-      simp [z0, SqrtCert.seedOf, Nat.shiftLeft_eq]
+      simp [z0, Sqrt.OctaveCert.seedOf, Nat.shiftLeft_eq]
     have hmz1 : m ≤ z1 := by
       dsimp [z1, z0]
-      exact babylon_step_floor_bound x.val (SqrtCert.seedOf i) m hz0Pos hmlo
+      exact sqrt_step_floor_bound x.val (Sqrt.OctaveCert.seedOf i) m hz0Pos hmlo
     have hz1Pos : 0 < z1 := Nat.lt_of_lt_of_le hm hmz1
     have hmz2 : m ≤ z2 := by
       dsimp [z2]
-      exact babylon_step_floor_bound x.val z1 m hz1Pos hmlo
+      exact sqrt_step_floor_bound x.val z1 m hz1Pos hmlo
     have hz2Pos : 0 < z2 := Nat.lt_of_lt_of_le hm hmz2
     have hmz3 : m ≤ z3 := by
       dsimp [z3]
-      exact babylon_step_floor_bound x.val z2 m hz2Pos hmlo
+      exact sqrt_step_floor_bound x.val z2 m hz2Pos hmlo
     have hz3Pos : 0 < z3 := Nat.lt_of_lt_of_le hm hmz3
     have hmz4 : m ≤ z4 := by
       dsimp [z4]
-      exact babylon_step_floor_bound x.val z3 m hz3Pos hmlo
+      exact sqrt_step_floor_bound x.val z3 m hz3Pos hmlo
     have hz4Pos : 0 < z4 := Nat.lt_of_lt_of_le hm hmz4
     have hmz5 : m ≤ z5 := by
       dsimp [z5]
-      exact babylon_step_floor_bound x.val z4 m hz4Pos hmlo
+      exact sqrt_step_floor_bound x.val z4 m hz4Pos hmlo
     have hz5Pos : 0 < z5 := Nat.lt_of_lt_of_le hm hmz5
-    have hrun5 := SqrtCertified.run5_error_bounds i x.val m hm hmlo hmhi
+    have hrun5 := Sqrt.ErrorChain.run5_error_bounds i x.val m hm hmlo hmhi
       hinterval.1 hinterval.2
-    have hd1 : z1 - m ≤ SqrtCert.d1 i := by
+    have hd1 : z1 - m ≤ Sqrt.OctaveCert.d1 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.1
-    have hd2 : z2 - m ≤ SqrtCert.d2 i := by
+    have hd2 : z2 - m ≤ Sqrt.OctaveCert.d2 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.1
-    have hd3 : z3 - m ≤ SqrtCert.d3 i := by
+    have hd3 : z3 - m ≤ Sqrt.OctaveCert.d3 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.2.1
-    have hd4 : z4 - m ≤ SqrtCert.d4 i := by
+    have hd4 : z4 - m ≤ Sqrt.OctaveCert.d4 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.2.2.1
-    have hd5 : z5 - m ≤ SqrtCert.d5 i := by
+    have hd5 : z5 - m ≤ Sqrt.OctaveCert.d5 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.2.2.2
-    have hd1m : SqrtCert.d1 i ≤ m := Nat.le_trans (SqrtCert.d1_le_lo i) hinterval.1
-    have hd2m : SqrtCert.d2 i ≤ m := Nat.le_trans (SqrtCert.d2_le_lo i) hinterval.1
-    have hd3m : SqrtCert.d3 i ≤ m := Nat.le_trans (SqrtCert.d3_le_lo i) hinterval.1
-    have hd4m : SqrtCert.d4 i ≤ m := Nat.le_trans (SqrtCert.d4_le_lo i) hinterval.1
-    have hd5m : SqrtCert.d5 i ≤ m := Nat.le_trans (SqrtCert.d5_le_lo i) hinterval.1
+    have hd1m : Sqrt.OctaveCert.d1 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d1_le_lo i) hinterval.1
+    have hd2m : Sqrt.OctaveCert.d2 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d2_le_lo i) hinterval.1
+    have hd3m : Sqrt.OctaveCert.d3 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d3_le_lo i) hinterval.1
+    have hd4m : Sqrt.OctaveCert.d4 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d4_le_lo i) hinterval.1
+    have hd5m : Sqrt.OctaveCert.d5 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d5_le_lo i) hinterval.1
     have hxMod : x.val < Verity.Core.Uint256.modulus := x.isLt
     have hsum1 : z1 + x.val / z1 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z1 (SqrtCert.d1 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z1 (Sqrt.OctaveCert.d1 i)
         hxMod hm hmlo hmhi hmz1 hd1 hd1m
     have hsum2 : z2 + x.val / z2 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z2 (SqrtCert.d2 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z2 (Sqrt.OctaveCert.d2 i)
         hxMod hm hmlo hmhi hmz2 hd2 hd2m
     have hsum3 : z3 + x.val / z3 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z3 (SqrtCert.d3 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z3 (Sqrt.OctaveCert.d3 i)
         hxMod hm hmlo hmhi hmz3 hd3 hd3m
     have hsum4 : z4 + x.val / z4 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z4 (SqrtCert.d4 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z4 (Sqrt.OctaveCert.d4 i)
         hxMod hm hmlo hmhi hmz4 hd4 hd4m
     have hsum5 : z5 + x.val / z5 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z5 (SqrtCert.d5 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z5 (Sqrt.OctaveCert.d5 i)
         hxMod hm hmlo hmhi hmz5 hd5 hd5m
     have hz2Val : z2U.val = z2 := by
       have h := sqrtStepUint_val x z1U z1 hz1Val hz1Pos hsum1
-      simpa [z2U, z2, bstep] using h
+      simpa [z2U, z2, sqrtStep] using h
     have hz3Val : z3U.val = z3 := by
       have h := sqrtStepUint_val x z2U z2 hz2Val hz2Pos hsum2
-      simpa [z3U, z3, bstep] using h
+      simpa [z3U, z3, sqrtStep] using h
     have hz4Val : z4U.val = z4 := by
       have h := sqrtStepUint_val x z3U z3 hz3Val hz3Pos hsum3
-      simpa [z4U, z4, bstep] using h
+      simpa [z4U, z4, sqrtStep] using h
     have hz5Val : z5U.val = z5 := by
       have h := sqrtStepUint_val x z4U z4 hz4Val hz4Pos hsum4
-      simpa [z5U, z5, bstep] using h
+      simpa [z5U, z5, sqrtStep] using h
     have hz6Val : z6U.val = z6 := by
       have h := sqrtStepUint_val x z5U z5 hz5Val hz5Pos hsum5
-      simpa [z6U, z6, bstep] using h
+      simpa [z6U, z6, sqrtStep] using h
     have hInner : innerSqrt x.val = z6 := by
       unfold innerSqrt
       simp [Nat.ne_of_gt hxPos, hSeedEq, z0, z1, z2, z3, z4, z5, z6]
@@ -1190,18 +1204,18 @@ private theorem cbrtSeedUint_val_of_ne (x : Uint256) (hx0 : x.val ≠ 0) :
   rfl
 
 private theorem cbrtSeed_square_lt_word_cert (i : Fin 248) :
-    CbrtCert.seedOf i * CbrtCert.seedOf i < Verity.Core.Uint256.modulus := by
+    Cbrt.OctaveCert.seedOf i * Cbrt.OctaveCert.seedOf i < Verity.Core.Uint256.modulus := by
   fin_cases i <;> native_decide
 
 private theorem cbrtSeed_step_add_lt_word_cert (i : Fin 248) :
-    2 ^ (i.val + CbrtCert.certOffset + 1) /
-          (CbrtCert.seedOf i * CbrtCert.seedOf i) +
-        CbrtCert.seedOf i + CbrtCert.seedOf i <
+    2 ^ (i.val + Cbrt.OctaveCert.certOffset + 1) /
+          (Cbrt.OctaveCert.seedOf i * Cbrt.OctaveCert.seedOf i) +
+        Cbrt.OctaveCert.seedOf i + Cbrt.OctaveCert.seedOf i <
       Verity.Core.Uint256.modulus := by
   fin_cases i <;> native_decide
 
 private theorem cbrtD1_upper_three_pow86_cert (i : Fin 248) :
-    CbrtCert.hiOf i + CbrtCert.d1Of i ≤ 3 * 2 ^ 86 := by
+    Cbrt.OctaveCert.hiOf i + Cbrt.OctaveCert.d1Of i ≤ 3 * 2 ^ 86 := by
   fin_cases i <;> native_decide
 
 private theorem icbrt_lt_pow86 {x : Nat} (hxLt : x < 2 ^ 256) :
@@ -1335,15 +1349,15 @@ private theorem cbrt_run_eq_floorCbrt_large
       omega
   have hLogLt : Nat.log2 x.val < 256 :=
     (Nat.log2_lt (Nat.ne_of_gt hxPos)).2 hxLt
-  let i : Fin 248 := ⟨Nat.log2 x.val - CbrtCert.certOffset, by
-    dsimp [CbrtCert.certOffset]
+  let i : Fin 248 := ⟨Nat.log2 x.val - Cbrt.OctaveCert.certOffset, by
+    dsimp [Cbrt.OctaveCert.certOffset]
     omega⟩
-  have hIdx : i.val + CbrtCert.certOffset = Nat.log2 x.val := by
-    dsimp [i, CbrtCert.certOffset]
+  have hIdx : i.val + Cbrt.OctaveCert.certOffset = Nat.log2 x.val := by
+    dsimp [i, Cbrt.OctaveCert.certOffset]
     omega
   have hOct :
-      2 ^ (i.val + CbrtCert.certOffset) ≤ x.val ∧
-        x.val < 2 ^ (i.val + CbrtCert.certOffset + 1) := by
+      2 ^ (i.val + Cbrt.OctaveCert.certOffset) ≤ x.val ∧
+        x.val < 2 ^ (i.val + Cbrt.OctaveCert.certOffset + 1) := by
     rw [hIdx]
     constructor
     · simpa [Nat.log2_eq_log_two] using
@@ -1355,11 +1369,11 @@ private theorem cbrt_run_eq_floorCbrt_large
     simpa [m] using icbrt_cube_le x.val
   have hmhi : x.val < (m + 1) * (m + 1) * (m + 1) := by
     simpa [m] using icbrt_lt_succ_cube x.val
-  have hInterval := CbrtWiring.m_within_cert_interval i x.val m hmlo hmhi hOct
-  have hmPos : 0 < m := lt_of_lt_of_le (CbrtCert.lo_pos i) hInterval.1
-  have hm2 : 2 ≤ m := Nat.le_trans (CbrtCert.lo_ge_two i) hInterval.1
-  have hSeedEq : cbrtSeed x.val = CbrtCert.seedOf i :=
-    CbrtWiring.cbrtSeed_eq_certSeed i x.val hOct
+  have hInterval := Cbrt.Wiring.m_within_cert_interval i x.val m hmlo hmhi hOct
+  have hmPos : 0 < m := lt_of_lt_of_le (Cbrt.OctaveCert.lo_pos i) hInterval.1
+  have hm2 : 2 ≤ m := Nat.le_trans (Cbrt.OctaveCert.lo_ge_two i) hInterval.1
+  have hSeedEq : cbrtSeed x.val = Cbrt.OctaveCert.seedOf i :=
+    Cbrt.Wiring.cbrtSeed_eq_octaveSeed i x.val hOct
   rw [cbrt, Tamago.Utils.FixedPointMathLibBase.cbrt.eq_1]
   rw [monad_bind_success_run_fst _ _ (Tamago.Proof.Utils.ClzProof.clzFormulaUint x) s s
     (Tamago.Proof.Utils.ClzProof.clz_apply_eq_success x s)]
@@ -1392,9 +1406,9 @@ private theorem cbrt_run_eq_floorCbrt_large
       Verity.Core.Uint256.modulus := by
     have hDivLe :
         x.val / (z0 * z0) ≤
-          2 ^ (i.val + CbrtCert.certOffset + 1) /
-            (CbrtCert.seedOf i * CbrtCert.seedOf i) := by
-      have hxLe : x.val ≤ 2 ^ (i.val + CbrtCert.certOffset + 1) :=
+          2 ^ (i.val + Cbrt.OctaveCert.certOffset + 1) /
+            (Cbrt.OctaveCert.seedOf i * Cbrt.OctaveCert.seedOf i) := by
+      have hxLe : x.val ≤ 2 ^ (i.val + Cbrt.OctaveCert.certOffset + 1) :=
         Nat.le_of_lt hOct.2
       simpa [z0, hSeedEq] using Nat.div_le_div_right hxLe
     have hCert := cbrtSeed_step_add_lt_word_cert i
@@ -1405,18 +1419,18 @@ private theorem cbrt_run_eq_floorCbrt_large
   have hz1Floor : m ≤ z1 := by
     simpa [m, z0, z1] using
       cbrt_step_floor_bound x.val z0 m hz0Pos hmlo
-  have hz1D : z1 - m ≤ CbrtCert.d1Of i := by
-    have h := CbrtCertified.cbrt_d1_bound x.val m (CbrtCert.seedOf i)
-      (CbrtCert.loOf i) (CbrtCert.hiOf i)
-      (CbrtCert.seed_pos i) hmlo hmhi hInterval.1 hInterval.2
+  have hz1D : z1 - m ≤ Cbrt.OctaveCert.d1Of i := by
+    have h := Cbrt.ErrorChain.cbrt_d1_bound x.val m (Cbrt.OctaveCert.seedOf i)
+      (Cbrt.OctaveCert.loOf i) (Cbrt.OctaveCert.hiOf i)
+      (Cbrt.OctaveCert.seed_pos i) hmlo hmhi hInterval.1 hInterval.2
     simp only at h
-    have hd1eq := CbrtCert.d1_eq i
-    have hmaxeq := CbrtCert.maxabs_eq i
+    have hd1eq := Cbrt.OctaveCert.d1_eq i
+    have hmaxeq := Cbrt.OctaveCert.maxabs_eq i
     rw [hmaxeq] at hd1eq
     rw [← hd1eq] at h
     simpa [z1, z0, hSeedEq] using h
   have hz1Upper : z1 ≤ 3 * 2 ^ 86 := by
-    have hle : z1 ≤ m + CbrtCert.d1Of i := (Nat.sub_le_iff_le_add').1 hz1D
+    have hle : z1 ≤ m + Cbrt.OctaveCert.d1Of i := (Nat.sub_le_iff_le_add').1 hz1D
     have hCert := cbrtD1_upper_three_pow86_cert i
     omega
   have hicbrtPos : 0 < icbrt x.val := by simpa [m] using hmPos
@@ -1474,7 +1488,7 @@ private theorem cbrt_run_eq_floorCbrt_large
     rw [hz5Val, ← hInner]
   have hz5Pos : 0 < innerCbrt x.val := innerCbrt_pos x.val hxPos
   have hz5MulLt : innerCbrt x.val * innerCbrt x.val < Verity.Core.Uint256.modulus := by
-    have hCube := CbrtOverflow.innerCbrt_cube_lt_word x.val hxPos hxLt
+    have hCube := Cbrt.OverflowSafety.innerCbrt_cube_lt_word x.val hxPos hxLt
     have hOne : 1 ≤ innerCbrt x.val := Nat.succ_le_of_lt hz5Pos
     have hSqLeCube :
         innerCbrt x.val * innerCbrt x.val ≤
@@ -1596,7 +1610,7 @@ theorem cbrt_returns_math_floor (x : Uint256) (s : ContractState) :
   rw [cbrt_run_eq_floorCbrt x s]
   have hxLt : x.val < 2 ^ 256 := by
     simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
-  exact CbrtWiring.floorCbrt_correct_u256_all x.val hxLt
+  exact Cbrt.Correctness.floorCbrt_correct_u256_all x.val hxLt
 
 private def log2Search : Nat → Nat → Nat → Nat
   | 0, r, value => if 1 < value then r + 1 else r
