@@ -1,3 +1,4 @@
+import Mathlib.Data.Nat.Log
 import Tamago.Utils.FixedPointMathLib
 
 namespace Tamago.Spec.Utils.FixedPointMathLibSpec
@@ -160,6 +161,25 @@ def fixedPointMathLib_cbrt_cube_le_input (x result : Uint256) : Prop :=
 
 def fixedPointMathLib_cbrt_input_lt_next_cube (x result : Uint256) : Prop :=
   x.val < (result.val + 1) * (result.val + 1) * (result.val + 1)
+
+/-
+clz(x)
+
+Properties specified:
+- Zero returns 256.
+- Nonzero inputs return the number of leading zero bits.
+
+Security conclusions:
+- The helper exposes the exact leading-zero count used by bit-width and log
+  style arithmetic.
+- The zero sentinel is explicit instead of relying on an underflowing formula.
+-/
+def fixedPointMathLib_clz_zero_returns_256 (x result : Uint256) : Prop :=
+  x.val = 0 → result.val = 256
+
+def fixedPointMathLib_clz_nonzero_returns_leading_zero_count
+    (x result : Uint256) : Prop :=
+  x.val ≠ 0 → result.val = 255 - Nat.log2 x.val
 
 /-
 log2/log10/log256, rounded down

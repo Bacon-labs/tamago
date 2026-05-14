@@ -5,13 +5,13 @@
   wiring to prove: for every x < 2^256, floorCbrt(x) returns the
   integer cube root.
 -/
-import Cbrt.Wiring
+import Tamago.Proof.Utils.Cbrt.Wiring
 
-namespace Cbrt.Correctness
+namespace Tamago.Proof.Utils.Cbrt.Correctness
 
-open Cbrt.Model
-open Cbrt.FloorBound
-open Cbrt.Wiring
+open Tamago.Proof.Utils.Cbrt.Model
+open Tamago.Proof.Utils.Cbrt.FloorBound
+open Tamago.Proof.Utils.Cbrt.Wiring
 
 -- ============================================================================
 -- Conditional Correctness
@@ -130,4 +130,4 @@ theorem floorCbrt_correct_u256_all (x : Nat) (hx256 : x < 2 ^ 256) :
     rw [heq]
     exact ⟨icbrt_cube_le x, icbrt_lt_succ_cube x⟩
 
-end Cbrt.Correctness
+end Tamago.Proof.Utils.Cbrt.Correctness

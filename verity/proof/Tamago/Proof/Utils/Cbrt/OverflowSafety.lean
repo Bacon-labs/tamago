@@ -5,19 +5,19 @@
     For all x < 2^256, innerCbrt(x) * (innerCbrt(x) * innerCbrt(x)) < 2^256.
 -/
 import Init
-import Cbrt.Correctness
-import Cbrt.OctaveCert
-import Cbrt.ErrorChain
-import Cbrt.Wiring
+import Tamago.Proof.Utils.Cbrt.Correctness
+import Tamago.Proof.Utils.Cbrt.OctaveCert
+import Tamago.Proof.Utils.Cbrt.ErrorChain
+import Tamago.Proof.Utils.Cbrt.Wiring
 
-namespace Cbrt.OverflowSafety
+namespace Tamago.Proof.Utils.Cbrt.OverflowSafety
 
-open Cbrt.OctaveCert
-open Cbrt.ErrorChain
-open Cbrt.FloorBound
-open Cbrt.Wiring
-open Cbrt.Model
-open Cbrt.Correctness
+open Tamago.Proof.Utils.Cbrt.OctaveCert
+open Tamago.Proof.Utils.Cbrt.ErrorChain
+open Tamago.Proof.Utils.Cbrt.FloorBound
+open Tamago.Proof.Utils.Cbrt.Wiring
+open Tamago.Proof.Utils.Cbrt.Model
+open Tamago.Proof.Utils.Cbrt.Correctness
 
 -- ============================================================================
 -- Constants
@@ -299,4 +299,4 @@ theorem innerCbrt_cube_lt_word (x : Nat) (hx : 0 < x) (hx256 : x < 2 ^ 256) :
       have : icbrt x = R_MAX := hm_eq
       omega
 
-end Cbrt.OverflowSafety
+end Tamago.Proof.Utils.Cbrt.OverflowSafety

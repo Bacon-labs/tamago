@@ -7,19 +7,19 @@
 -/
 import Mathlib.Data.Nat.Log
 import Mathlib.Tactic.IntervalCases
-import Cbrt.Model
-import Cbrt.FloorBound
-import Cbrt.Contraction
-import Cbrt.OctaveCert
-import Cbrt.ErrorChain
+import Tamago.Proof.Utils.Cbrt.Model
+import Tamago.Proof.Utils.Cbrt.FloorBound
+import Tamago.Proof.Utils.Cbrt.Contraction
+import Tamago.Proof.Utils.Cbrt.OctaveCert
+import Tamago.Proof.Utils.Cbrt.ErrorChain
 
-namespace Cbrt.Wiring
+namespace Tamago.Proof.Utils.Cbrt.Wiring
 
-open Cbrt.Model
-open Cbrt.FloorBound
-open Cbrt.Contraction
-open Cbrt.OctaveCert
-open Cbrt.ErrorChain
+open Tamago.Proof.Utils.Cbrt.Model
+open Tamago.Proof.Utils.Cbrt.FloorBound
+open Tamago.Proof.Utils.Cbrt.Contraction
+open Tamago.Proof.Utils.Cbrt.OctaveCert
+open Tamago.Proof.Utils.Cbrt.ErrorChain
 
 -- ============================================================================
 -- Small Range
@@ -168,4 +168,4 @@ theorem innerCbrt_upper_u256 (x : Nat) (hx : 0 < x) (hx256 : x < 2 ^ 256) :
     have hmhi : x < (m + 1) * (m + 1) * (m + 1) := icbrt_lt_succ_cube x
     exact innerCbrt_upper_of_octave idx x m hmlo hmhi hOct
 
-end Cbrt.Wiring
+end Tamago.Proof.Utils.Cbrt.Wiring

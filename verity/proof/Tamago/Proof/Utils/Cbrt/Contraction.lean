@@ -5,13 +5,13 @@
   the error: cbrtStep x z ≤ m + d²/m + 1.
 -/
 import Init
-import Cbrt.Model
-import Cbrt.FloorBound
+import Tamago.Proof.Utils.Cbrt.Model
+import Tamago.Proof.Utils.Cbrt.FloorBound
 
-namespace Cbrt.Contraction
+namespace Tamago.Proof.Utils.Cbrt.Contraction
 
-open Cbrt.Model
-open Cbrt.FloorBound
+open Tamago.Proof.Utils.Cbrt.Model
+open Tamago.Proof.Utils.Cbrt.FloorBound
 
 -- ============================================================================
 -- Seed and Step Positivity
@@ -346,4 +346,4 @@ theorem cbrtStep_upper_of_le
   exact Nat.le_trans hstep' hmono
 
 
-end Cbrt.Contraction
+end Tamago.Proof.Utils.Cbrt.Contraction

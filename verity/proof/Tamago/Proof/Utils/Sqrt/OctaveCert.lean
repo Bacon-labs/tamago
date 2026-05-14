@@ -16,7 +16,7 @@ set_option maxRecDepth 1000000
   All 256 octaves verified: d6 <= 1 and dk <= lo for k=1..5.
 -/
 
-namespace Sqrt.OctaveCert
+namespace Tamago.Proof.Utils.Sqrt.OctaveCert
 
 /-- Lower bounds on isqrt(x) for octaves 0..255. -/
 def loTable : Array Nat := #[
@@ -599,4 +599,4 @@ theorem pow2_succ_le_hi_succ_sq :
     ∀ i : Fin 256, 2 ^ (i.val + 1) ≤ (hiOf i + 1) * (hiOf i + 1) := by
   decide
 
-end Sqrt.OctaveCert
+end Tamago.Proof.Utils.Sqrt.OctaveCert

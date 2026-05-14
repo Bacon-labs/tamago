@@ -1,15 +1,15 @@
-import Sqrt.Model
+import Tamago.Proof.Utils.Sqrt.Model
 import Init
-import Sqrt.FloorBound
-import Sqrt.Contraction
-import Sqrt.OctaveCert
+import Tamago.Proof.Utils.Sqrt.FloorBound
+import Tamago.Proof.Utils.Sqrt.Contraction
+import Tamago.Proof.Utils.Sqrt.OctaveCert
 
-namespace Sqrt.ErrorChain
+namespace Tamago.Proof.Utils.Sqrt.ErrorChain
 
-open Sqrt.Model
-open Sqrt.FloorBound
-open Sqrt.Contraction
-open Sqrt.OctaveCert
+open Tamago.Proof.Utils.Sqrt.Model
+open Tamago.Proof.Utils.Sqrt.FloorBound
+open Tamago.Proof.Utils.Sqrt.Contraction
+open Tamago.Proof.Utils.Sqrt.OctaveCert
 
 def run6From (x z : Nat) : Nat :=
   let z := sqrtStep x z
@@ -211,4 +211,4 @@ theorem run6_le_m_plus_one
   have hzle : run6From x (seedOf i) ≤ 1 + m := (Nat.sub_le_iff_le_add).1 hsub
   omega
 
-end Sqrt.ErrorChain
+end Tamago.Proof.Utils.Sqrt.ErrorChain

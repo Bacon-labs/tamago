@@ -1,8 +1,8 @@
 import Mathlib.Data.Nat.Bitwise
 import Mathlib.Data.Nat.Log
 import Mathlib.Data.Nat.Sqrt
-import Sqrt
-import Cbrt.OverflowSafety
+import Tamago.Proof.Utils.Sqrt
+import Tamago.Proof.Utils.Cbrt.OverflowSafety
 import Tamago.Proof.Utils.ClzProof
 import Tamago.Spec.Utils.FixedPointMathLibSpec
 import Verity.Proofs.Stdlib.Automation
@@ -17,23 +17,23 @@ open Verity.EVM.Uint256
 open Tamago.Utils
 open Tamago.Spec.Utils.FixedPointMathLibSpec
 open Tamago.Utils.FixedPointMathLib
-open Sqrt.Model
-open Sqrt.FloorBound
-open Sqrt.OctaveCert
-open Sqrt.ErrorChain
-open Sqrt.Wiring
-open Sqrt.Correctness
-open Cbrt.Model
-open Cbrt.FloorBound
-open Cbrt.Contraction
-open Cbrt.OctaveCert
-open Cbrt.ErrorChain
-open Cbrt.Wiring
-open Cbrt.Correctness
-open Cbrt.OverflowSafety
+open Tamago.Proof.Utils.Sqrt.Model
+open Tamago.Proof.Utils.Sqrt.FloorBound
+open Tamago.Proof.Utils.Sqrt.OctaveCert
+open Tamago.Proof.Utils.Sqrt.ErrorChain
+open Tamago.Proof.Utils.Sqrt.Wiring
+open Tamago.Proof.Utils.Sqrt.Correctness
+open Tamago.Proof.Utils.Cbrt.Model
+open Tamago.Proof.Utils.Cbrt.FloorBound
+open Tamago.Proof.Utils.Cbrt.Contraction
+open Tamago.Proof.Utils.Cbrt.OctaveCert
+open Tamago.Proof.Utils.Cbrt.ErrorChain
+open Tamago.Proof.Utils.Cbrt.Wiring
+open Tamago.Proof.Utils.Cbrt.Correctness
+open Tamago.Proof.Utils.Cbrt.OverflowSafety
 
 attribute [local simp] maxUint256 saturatingAdd saturatingMul saturatingSub
-  Tamago.Utils.FixedPointMathLib.dist sqrt clamp
+  Tamago.Utils.FixedPointMathLib.dist clz sqrt clamp
 attribute [local simp] Tamago.Utils.FixedPointMathLibBase.maxUint256
   Tamago.Utils.FixedPointMathLibBase.saturatingAdd
   Tamago.Utils.FixedPointMathLibBase.saturatingMul
@@ -434,12 +434,12 @@ private theorem sqrt_sum_lt_uint256_of_cert
 private theorem sqrtSeed_sum_lt_uint256
     (i : Fin 256) (x : Nat)
     (hOct : 2 ^ i.val ≤ x ∧ x < 2 ^ (i.val + 1)) :
-    Sqrt.OctaveCert.seedOf i + x / Sqrt.OctaveCert.seedOf i < Verity.Core.Uint256.modulus := by
-  have hsPos : 0 < Sqrt.OctaveCert.seedOf i := by
-    simp [Sqrt.OctaveCert.seedOf, Nat.shiftLeft_eq]
+    Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i + x / Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i < Verity.Core.Uint256.modulus := by
+  have hsPos : 0 < Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by
+    simp [Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf, Nat.shiftLeft_eq]
   have hk_le : (i.val + 1) / 2 ≤ 128 := by omega
-  have hz_le : Sqrt.OctaveCert.seedOf i ≤ 2 ^ 128 := by
-    unfold Sqrt.OctaveCert.seedOf
+  have hz_le : Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i ≤ 2 ^ 128 := by
+    unfold Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf
     rw [Nat.shiftLeft_eq, Nat.one_mul]
     exact Nat.pow_le_pow_right (by decide : (2 : Nat) > 0) hk_le
   have hExp : i.val + 1 ≤ 2 * ((i.val + 1) / 2) + 1 := by omega
@@ -447,25 +447,25 @@ private theorem sqrtSeed_sum_lt_uint256
     Nat.pow_le_pow_right (by decide : (2 : Nat) > 0) hExp
   have hPowMul :
       2 ^ (2 * ((i.val + 1) / 2) + 1) =
-        2 * Sqrt.OctaveCert.seedOf i * Sqrt.OctaveCert.seedOf i := by
+        2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by
     calc
       2 ^ (2 * ((i.val + 1) / 2) + 1) =
           2 ^ (2 * ((i.val + 1) / 2)) * 2 := by rw [Nat.pow_add]
       _ = (2 ^ ((i.val + 1) / 2) * 2 ^ ((i.val + 1) / 2)) * 2 := by
             rw [show 2 * ((i.val + 1) / 2) =
               ((i.val + 1) / 2) + ((i.val + 1) / 2) by omega, Nat.pow_add]
-      _ = 2 * Sqrt.OctaveCert.seedOf i * Sqrt.OctaveCert.seedOf i := by
-            unfold Sqrt.OctaveCert.seedOf
+      _ = 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by
+            unfold Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf
             simp [Nat.shiftLeft_eq, Nat.mul_comm, Nat.mul_left_comm]
-  have hxmul : x < 2 * Sqrt.OctaveCert.seedOf i * Sqrt.OctaveCert.seedOf i :=
+  have hxmul : x < 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i :=
     Nat.lt_of_lt_of_le hOct.2 (by simpa [hPowMul] using hPowLe)
-  have hdiv : x / Sqrt.OctaveCert.seedOf i < 2 * Sqrt.OctaveCert.seedOf i := by
+  have hdiv : x / Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i < 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by
     exact (Nat.div_lt_iff_lt_mul hsPos).2
       (by simpa [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm] using hxmul)
   have hsum_lt :
-      Sqrt.OctaveCert.seedOf i + x / Sqrt.OctaveCert.seedOf i <
-        Sqrt.OctaveCert.seedOf i + 2 * Sqrt.OctaveCert.seedOf i := by omega
-  have hsum_le : Sqrt.OctaveCert.seedOf i + 2 * Sqrt.OctaveCert.seedOf i ≤ 3 * (2 ^ 128) := by
+      Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i + x / Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i <
+        Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i + 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by omega
+  have hsum_le : Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i + 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i ≤ 3 * (2 ^ 128) := by
     omega
   have hconst : 3 * (2 ^ 128) < Verity.Core.Uint256.modulus := by
     native_decide
@@ -495,7 +495,7 @@ private theorem sqrtFirstStepUint_val (x : Uint256) (hx0 : x.val ≠ 0) :
       · simpa [Nat.log2_eq_log_two, Nat.succ_eq_add_one] using
           Nat.lt_pow_succ_log_self (by decide : 1 < 2) x.val
     simpa [i] using hlog
-  have hSeedEq : sqrtSeed x.val = Sqrt.OctaveCert.seedOf i :=
+  have hSeedEq : sqrtSeed x.val = Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i :=
     sqrtSeed_eq_octaveSeed i x.val hOct
   have hAddLt :
       (shl q 1).val + (shr q x).val < Verity.Core.Uint256.modulus := by
@@ -876,9 +876,9 @@ private theorem sqrtInnerUint_val (x : Uint256) :
           simpa using this
         exact False.elim ((Nat.not_lt_of_ge hx1) hlt1)
       · exact Nat.pos_of_ne_zero hm0
-    have hinterval : Sqrt.OctaveCert.loOf i ≤ m ∧ m ≤ Sqrt.OctaveCert.hiOf i :=
+    have hinterval : Tamago.Proof.Utils.Sqrt.OctaveCert.loOf i ≤ m ∧ m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.hiOf i :=
       m_within_cert_interval i x.val m hmlo hmhi hOct
-    have hSeedEq : sqrtSeed x.val = Sqrt.OctaveCert.seedOf i :=
+    have hSeedEq : sqrtSeed x.val = Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i :=
       sqrtSeed_eq_octaveSeed i x.val hOct
     let qU := shr 1 (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x))
     let z1U := shr 1 (add (shl qU 1) (shr qU x))
@@ -887,7 +887,7 @@ private theorem sqrtInnerUint_val (x : Uint256) :
     let z4U := shr 1 (add z3U (div x z3U))
     let z5U := shr 1 (add z4U (div x z4U))
     let z6U := shr 1 (add z5U (div x z5U))
-    let z0 := Sqrt.OctaveCert.seedOf i
+    let z0 := Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i
     let z1 := sqrtStep x.val z0
     let z2 := sqrtStep x.val z1
     let z3 := sqrtStep x.val z2
@@ -898,10 +898,10 @@ private theorem sqrtInnerUint_val (x : Uint256) :
       have h := sqrtFirstStepUint_val x hx0
       simpa [qU, z1U, z0, z1, hSeedEq] using h
     have hz0Pos : 0 < z0 := by
-      simp [z0, Sqrt.OctaveCert.seedOf, Nat.shiftLeft_eq]
+      simp [z0, Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf, Nat.shiftLeft_eq]
     have hmz1 : m ≤ z1 := by
       dsimp [z1, z0]
-      exact sqrt_step_floor_bound x.val (Sqrt.OctaveCert.seedOf i) m hz0Pos hmlo
+      exact sqrt_step_floor_bound x.val (Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i) m hz0Pos hmlo
     have hz1Pos : 0 < z1 := Nat.lt_of_lt_of_le hm hmz1
     have hmz2 : m ≤ z2 := by
       dsimp [z2]
@@ -919,38 +919,38 @@ private theorem sqrtInnerUint_val (x : Uint256) :
       dsimp [z5]
       exact sqrt_step_floor_bound x.val z4 m hz4Pos hmlo
     have hz5Pos : 0 < z5 := Nat.lt_of_lt_of_le hm hmz5
-    have hrun5 := Sqrt.ErrorChain.run5_error_bounds i x.val m hm hmlo hmhi
+    have hrun5 := Tamago.Proof.Utils.Sqrt.ErrorChain.run5_error_bounds i x.val m hm hmlo hmhi
       hinterval.1 hinterval.2
-    have hd1 : z1 - m ≤ Sqrt.OctaveCert.d1 i := by
+    have hd1 : z1 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d1 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.1
-    have hd2 : z2 - m ≤ Sqrt.OctaveCert.d2 i := by
+    have hd2 : z2 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d2 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.1
-    have hd3 : z3 - m ≤ Sqrt.OctaveCert.d3 i := by
+    have hd3 : z3 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d3 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.2.1
-    have hd4 : z4 - m ≤ Sqrt.OctaveCert.d4 i := by
+    have hd4 : z4 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d4 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.2.2.1
-    have hd5 : z5 - m ≤ Sqrt.OctaveCert.d5 i := by
+    have hd5 : z5 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d5 i := by
       simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.2.2.2
-    have hd1m : Sqrt.OctaveCert.d1 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d1_le_lo i) hinterval.1
-    have hd2m : Sqrt.OctaveCert.d2 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d2_le_lo i) hinterval.1
-    have hd3m : Sqrt.OctaveCert.d3 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d3_le_lo i) hinterval.1
-    have hd4m : Sqrt.OctaveCert.d4 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d4_le_lo i) hinterval.1
-    have hd5m : Sqrt.OctaveCert.d5 i ≤ m := Nat.le_trans (Sqrt.OctaveCert.d5_le_lo i) hinterval.1
+    have hd1m : Tamago.Proof.Utils.Sqrt.OctaveCert.d1 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d1_le_lo i) hinterval.1
+    have hd2m : Tamago.Proof.Utils.Sqrt.OctaveCert.d2 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d2_le_lo i) hinterval.1
+    have hd3m : Tamago.Proof.Utils.Sqrt.OctaveCert.d3 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d3_le_lo i) hinterval.1
+    have hd4m : Tamago.Proof.Utils.Sqrt.OctaveCert.d4 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d4_le_lo i) hinterval.1
+    have hd5m : Tamago.Proof.Utils.Sqrt.OctaveCert.d5 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d5_le_lo i) hinterval.1
     have hxMod : x.val < Verity.Core.Uint256.modulus := x.isLt
     have hsum1 : z1 + x.val / z1 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z1 (Sqrt.OctaveCert.d1 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z1 (Tamago.Proof.Utils.Sqrt.OctaveCert.d1 i)
         hxMod hm hmlo hmhi hmz1 hd1 hd1m
     have hsum2 : z2 + x.val / z2 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z2 (Sqrt.OctaveCert.d2 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z2 (Tamago.Proof.Utils.Sqrt.OctaveCert.d2 i)
         hxMod hm hmlo hmhi hmz2 hd2 hd2m
     have hsum3 : z3 + x.val / z3 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z3 (Sqrt.OctaveCert.d3 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z3 (Tamago.Proof.Utils.Sqrt.OctaveCert.d3 i)
         hxMod hm hmlo hmhi hmz3 hd3 hd3m
     have hsum4 : z4 + x.val / z4 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z4 (Sqrt.OctaveCert.d4 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z4 (Tamago.Proof.Utils.Sqrt.OctaveCert.d4 i)
         hxMod hm hmlo hmhi hmz4 hd4 hd4m
     have hsum5 : z5 + x.val / z5 < Verity.Core.Uint256.modulus :=
-      sqrt_sum_lt_uint256_of_cert x.val m z5 (Sqrt.OctaveCert.d5 i)
+      sqrt_sum_lt_uint256_of_cert x.val m z5 (Tamago.Proof.Utils.Sqrt.OctaveCert.d5 i)
         hxMod hm hmlo hmhi hmz5 hd5 hd5m
     have hz2Val : z2U.val = z2 := by
       have h := sqrtStepUint_val x z1U z1 hz1Val hz1Pos hsum1
@@ -1204,18 +1204,18 @@ private theorem cbrtSeedUint_val_of_ne (x : Uint256) (hx0 : x.val ≠ 0) :
   rfl
 
 private theorem cbrtSeed_square_lt_word_cert (i : Fin 248) :
-    Cbrt.OctaveCert.seedOf i * Cbrt.OctaveCert.seedOf i < Verity.Core.Uint256.modulus := by
+    Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i < Verity.Core.Uint256.modulus := by
   fin_cases i <;> native_decide
 
 private theorem cbrtSeed_step_add_lt_word_cert (i : Fin 248) :
-    2 ^ (i.val + Cbrt.OctaveCert.certOffset + 1) /
-          (Cbrt.OctaveCert.seedOf i * Cbrt.OctaveCert.seedOf i) +
-        Cbrt.OctaveCert.seedOf i + Cbrt.OctaveCert.seedOf i <
+    2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset + 1) /
+          (Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i) +
+        Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i + Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i <
       Verity.Core.Uint256.modulus := by
   fin_cases i <;> native_decide
 
 private theorem cbrtD1_upper_three_pow86_cert (i : Fin 248) :
-    Cbrt.OctaveCert.hiOf i + Cbrt.OctaveCert.d1Of i ≤ 3 * 2 ^ 86 := by
+    Tamago.Proof.Utils.Cbrt.OctaveCert.hiOf i + Tamago.Proof.Utils.Cbrt.OctaveCert.d1Of i ≤ 3 * 2 ^ 86 := by
   fin_cases i <;> native_decide
 
 private theorem icbrt_lt_pow86 {x : Nat} (hxLt : x < 2 ^ 256) :
@@ -1349,15 +1349,15 @@ private theorem cbrt_run_eq_floorCbrt_large
       omega
   have hLogLt : Nat.log2 x.val < 256 :=
     (Nat.log2_lt (Nat.ne_of_gt hxPos)).2 hxLt
-  let i : Fin 248 := ⟨Nat.log2 x.val - Cbrt.OctaveCert.certOffset, by
-    dsimp [Cbrt.OctaveCert.certOffset]
+  let i : Fin 248 := ⟨Nat.log2 x.val - Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset, by
+    dsimp [Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset]
     omega⟩
-  have hIdx : i.val + Cbrt.OctaveCert.certOffset = Nat.log2 x.val := by
-    dsimp [i, Cbrt.OctaveCert.certOffset]
+  have hIdx : i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset = Nat.log2 x.val := by
+    dsimp [i, Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset]
     omega
   have hOct :
-      2 ^ (i.val + Cbrt.OctaveCert.certOffset) ≤ x.val ∧
-        x.val < 2 ^ (i.val + Cbrt.OctaveCert.certOffset + 1) := by
+      2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset) ≤ x.val ∧
+        x.val < 2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset + 1) := by
     rw [hIdx]
     constructor
     · simpa [Nat.log2_eq_log_two] using
@@ -1369,11 +1369,11 @@ private theorem cbrt_run_eq_floorCbrt_large
     simpa [m] using icbrt_cube_le x.val
   have hmhi : x.val < (m + 1) * (m + 1) * (m + 1) := by
     simpa [m] using icbrt_lt_succ_cube x.val
-  have hInterval := Cbrt.Wiring.m_within_cert_interval i x.val m hmlo hmhi hOct
-  have hmPos : 0 < m := lt_of_lt_of_le (Cbrt.OctaveCert.lo_pos i) hInterval.1
-  have hm2 : 2 ≤ m := Nat.le_trans (Cbrt.OctaveCert.lo_ge_two i) hInterval.1
-  have hSeedEq : cbrtSeed x.val = Cbrt.OctaveCert.seedOf i :=
-    Cbrt.Wiring.cbrtSeed_eq_octaveSeed i x.val hOct
+  have hInterval := Tamago.Proof.Utils.Cbrt.Wiring.m_within_cert_interval i x.val m hmlo hmhi hOct
+  have hmPos : 0 < m := lt_of_lt_of_le (Tamago.Proof.Utils.Cbrt.OctaveCert.lo_pos i) hInterval.1
+  have hm2 : 2 ≤ m := Nat.le_trans (Tamago.Proof.Utils.Cbrt.OctaveCert.lo_ge_two i) hInterval.1
+  have hSeedEq : cbrtSeed x.val = Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i :=
+    Tamago.Proof.Utils.Cbrt.Wiring.cbrtSeed_eq_octaveSeed i x.val hOct
   rw [cbrt, Tamago.Utils.FixedPointMathLibBase.cbrt.eq_1]
   rw [monad_bind_success_run_fst _ _ (Tamago.Proof.Utils.ClzProof.clzFormulaUint x) s s
     (Tamago.Proof.Utils.ClzProof.clz_apply_eq_success x s)]
@@ -1406,9 +1406,9 @@ private theorem cbrt_run_eq_floorCbrt_large
       Verity.Core.Uint256.modulus := by
     have hDivLe :
         x.val / (z0 * z0) ≤
-          2 ^ (i.val + Cbrt.OctaveCert.certOffset + 1) /
-            (Cbrt.OctaveCert.seedOf i * Cbrt.OctaveCert.seedOf i) := by
-      have hxLe : x.val ≤ 2 ^ (i.val + Cbrt.OctaveCert.certOffset + 1) :=
+          2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset + 1) /
+            (Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i) := by
+      have hxLe : x.val ≤ 2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset + 1) :=
         Nat.le_of_lt hOct.2
       simpa [z0, hSeedEq] using Nat.div_le_div_right hxLe
     have hCert := cbrtSeed_step_add_lt_word_cert i
@@ -1419,18 +1419,18 @@ private theorem cbrt_run_eq_floorCbrt_large
   have hz1Floor : m ≤ z1 := by
     simpa [m, z0, z1] using
       cbrt_step_floor_bound x.val z0 m hz0Pos hmlo
-  have hz1D : z1 - m ≤ Cbrt.OctaveCert.d1Of i := by
-    have h := Cbrt.ErrorChain.cbrt_d1_bound x.val m (Cbrt.OctaveCert.seedOf i)
-      (Cbrt.OctaveCert.loOf i) (Cbrt.OctaveCert.hiOf i)
-      (Cbrt.OctaveCert.seed_pos i) hmlo hmhi hInterval.1 hInterval.2
+  have hz1D : z1 - m ≤ Tamago.Proof.Utils.Cbrt.OctaveCert.d1Of i := by
+    have h := Tamago.Proof.Utils.Cbrt.ErrorChain.cbrt_d1_bound x.val m (Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i)
+      (Tamago.Proof.Utils.Cbrt.OctaveCert.loOf i) (Tamago.Proof.Utils.Cbrt.OctaveCert.hiOf i)
+      (Tamago.Proof.Utils.Cbrt.OctaveCert.seed_pos i) hmlo hmhi hInterval.1 hInterval.2
     simp only at h
-    have hd1eq := Cbrt.OctaveCert.d1_eq i
-    have hmaxeq := Cbrt.OctaveCert.maxabs_eq i
+    have hd1eq := Tamago.Proof.Utils.Cbrt.OctaveCert.d1_eq i
+    have hmaxeq := Tamago.Proof.Utils.Cbrt.OctaveCert.maxabs_eq i
     rw [hmaxeq] at hd1eq
     rw [← hd1eq] at h
     simpa [z1, z0, hSeedEq] using h
   have hz1Upper : z1 ≤ 3 * 2 ^ 86 := by
-    have hle : z1 ≤ m + Cbrt.OctaveCert.d1Of i := (Nat.sub_le_iff_le_add').1 hz1D
+    have hle : z1 ≤ m + Tamago.Proof.Utils.Cbrt.OctaveCert.d1Of i := (Nat.sub_le_iff_le_add').1 hz1D
     have hCert := cbrtD1_upper_three_pow86_cert i
     omega
   have hicbrtPos : 0 < icbrt x.val := by simpa [m] using hmPos
@@ -1488,7 +1488,7 @@ private theorem cbrt_run_eq_floorCbrt_large
     rw [hz5Val, ← hInner]
   have hz5Pos : 0 < innerCbrt x.val := innerCbrt_pos x.val hxPos
   have hz5MulLt : innerCbrt x.val * innerCbrt x.val < Verity.Core.Uint256.modulus := by
-    have hCube := Cbrt.OverflowSafety.innerCbrt_cube_lt_word x.val hxPos hxLt
+    have hCube := Tamago.Proof.Utils.Cbrt.OverflowSafety.innerCbrt_cube_lt_word x.val hxPos hxLt
     have hOne : 1 ≤ innerCbrt x.val := Nat.succ_le_of_lt hz5Pos
     have hSqLeCube :
         innerCbrt x.val * innerCbrt x.val ≤
@@ -1610,7 +1610,7 @@ theorem cbrt_returns_math_floor (x : Uint256) (s : ContractState) :
   rw [cbrt_run_eq_floorCbrt x s]
   have hxLt : x.val < 2 ^ 256 := by
     simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
-  exact Cbrt.Correctness.floorCbrt_correct_u256_all x.val hxLt
+  exact Tamago.Proof.Utils.Cbrt.Correctness.floorCbrt_correct_u256_all x.val hxLt
 
 private def log2Search : Nat → Nat → Nat → Nat
   | 0, r, value => if 1 < value then r + 1 else r
@@ -3740,6 +3740,21 @@ theorem fixedPointMathLib_cbrt_input_lt_next_cube_holds (x : Uint256) (s : Contr
     fixedPointMathLib_cbrt_input_lt_next_cube x ((cbrt x).run s).fst := by
   simpa [fixedPointMathLib_cbrt_input_lt_next_cube, cbrt_property] using
     (cbrt_returns_math_floor x s).2
+
+-- tama: discharges=fixedPointMathLib_clz_zero_returns_256
+theorem fixedPointMathLib_clz_zero_returns_256_holds (x : Uint256) (s : ContractState) :
+    fixedPointMathLib_clz_zero_returns_256 x ((clz x).run s).fst := by
+  intro hZero
+  rw [Tamago.Proof.Utils.ClzProof.clz_run_val x s]
+  simp [hZero]
+
+-- tama: discharges=fixedPointMathLib_clz_nonzero_returns_leading_zero_count
+theorem fixedPointMathLib_clz_nonzero_returns_leading_zero_count_holds
+    (x : Uint256) (s : ContractState) :
+    fixedPointMathLib_clz_nonzero_returns_leading_zero_count x ((clz x).run s).fst := by
+  intro hNonzero
+  rw [Tamago.Proof.Utils.ClzProof.clz_run_val x s]
+  simp [hNonzero]
 
 -- tama: discharges=fixedPointMathLib_log2_zero_returns_zero
 theorem fixedPointMathLib_log2_zero_returns_zero_holds (x : Uint256) (s : ContractState) :

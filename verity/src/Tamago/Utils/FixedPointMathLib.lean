@@ -436,6 +436,7 @@ abbrev saturatingMul := FixedPointMathLibBase.saturatingMul
 abbrev saturatingSub := FixedPointMathLibBase.saturatingSub
 abbrev dist := FixedPointMathLibBase.dist
 abbrev avg := FixedPointMathLibBase.avg
+abbrev clz := FixedPointMathLibBase.clz
 abbrev sqrt := FixedPointMathLibBase.sqrt
 abbrev cbrt := FixedPointMathLibBase.cbrt
 abbrev log2 := FixedPointMathLibBase.log2

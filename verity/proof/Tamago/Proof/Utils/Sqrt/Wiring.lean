@@ -8,16 +8,16 @@
 -/
 import Mathlib.Data.Nat.Log
 import Mathlib.Data.Nat.Sqrt
-import Sqrt.Model
-import Sqrt.FloorBound
-import Sqrt.ErrorChain
+import Tamago.Proof.Utils.Sqrt.Model
+import Tamago.Proof.Utils.Sqrt.FloorBound
+import Tamago.Proof.Utils.Sqrt.ErrorChain
 
-namespace Sqrt.Wiring
+namespace Tamago.Proof.Utils.Sqrt.Wiring
 
-open Sqrt.Model
-open Sqrt.FloorBound
-open Sqrt.OctaveCert
-open Sqrt.ErrorChain
+open Tamago.Proof.Utils.Sqrt.Model
+open Tamago.Proof.Utils.Sqrt.FloorBound
+open Tamago.Proof.Utils.Sqrt.OctaveCert
+open Tamago.Proof.Utils.Sqrt.ErrorChain
 
 -- ============================================================================
 -- Seed and Step Positivity
@@ -158,4 +158,4 @@ theorem innerSqrt_upper_of_octave
     m_within_cert_interval i x m hmlo hmhi hOct
   exact innerSqrt_upper_cert i x m hx hm hmlo hmhi hseed hinterval.1 hinterval.2
 
-end Sqrt.Wiring
+end Tamago.Proof.Utils.Sqrt.Wiring

@@ -17,6 +17,17 @@ contract FixedPointMathLibTest is Test {
         }
     }
 
+    function clzReference(uint256 x) internal pure returns (uint256 result) {
+        if (x == 0) {
+            return 256;
+        }
+
+        while ((x & (uint256(1) << 255)) == 0) {
+            ++result;
+            x <<= 1;
+        }
+    }
+
     // tama: mirrors=fixedPointMathLib_saturatingAdd_returns_exact_sum_when_no_overflow
     function testFuzzSaturatingAddReturnsExactSumWhenNoOverflow(uint256 x, uint256 y) public {
         FixedPointMathLibIface lib_ = deployLib();
@@ -156,6 +167,26 @@ contract FixedPointMathLibTest is Test {
         assertEq(result, expected);
         if (x <= type(uint256).max - y && result < type(uint256).max / 2) {
             assertLt(x + y, 2 * (result + 1));
+        }
+    }
+
+    // tama: mirrors=fixedPointMathLib_clz_zero_returns_256
+    function testFuzzClzZeroReturns256(uint256 x) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        uint256 result = lib_.clz(x);
+
+        if (x == 0) {
+            assertEq(result, 256);
+        }
+    }
+
+    // tama: mirrors=fixedPointMathLib_clz_nonzero_returns_leading_zero_count
+    function testFuzzClzNonzeroReturnsLeadingZeroCount(uint256 x) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        uint256 result = lib_.clz(x);
+
+        if (x != 0) {
+            assertEq(result, clzReference(x));
         }
     }
 

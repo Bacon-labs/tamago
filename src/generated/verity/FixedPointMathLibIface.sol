@@ -8,6 +8,7 @@ interface FixedPointMathLibIface {
     function saturatingSub(uint256 x, uint256 y) external view returns (uint256);
     function dist(uint256 x, uint256 y) external view returns (uint256);
     function avg(uint256 x, uint256 y) external view returns (uint256);
+    function clz(uint256 x) external view returns (uint256);
     function sqrt(uint256 x) external view returns (uint256);
     function cbrt(uint256 x) external view returns (uint256);
     function log256(uint256 x) external view returns (uint256);

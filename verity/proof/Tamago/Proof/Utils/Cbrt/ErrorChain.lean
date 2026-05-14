@@ -13,17 +13,17 @@
     Steps 2-5: each step contracts via cbrtStep_upper_of_le + relaxation to lo
 -/
 import Init
-import Cbrt.Model
-import Cbrt.FloorBound
-import Cbrt.Contraction
-import Cbrt.OctaveCert
+import Tamago.Proof.Utils.Cbrt.Model
+import Tamago.Proof.Utils.Cbrt.FloorBound
+import Tamago.Proof.Utils.Cbrt.Contraction
+import Tamago.Proof.Utils.Cbrt.OctaveCert
 
-namespace Cbrt.ErrorChain
+namespace Tamago.Proof.Utils.Cbrt.ErrorChain
 
-open Cbrt.OctaveCert
-open Cbrt.Model
-open Cbrt.FloorBound
-open Cbrt.Contraction
+open Tamago.Proof.Utils.Cbrt.OctaveCert
+open Tamago.Proof.Utils.Cbrt.Model
+open Tamago.Proof.Utils.Cbrt.FloorBound
+open Tamago.Proof.Utils.Cbrt.Contraction
 
 -- ============================================================================
 -- Pure polynomial identities (no subtraction)
@@ -364,4 +364,4 @@ theorem run5_le_m_plus_one
   rw [run5_eq_step_run4]
   omega
 
-end Cbrt.ErrorChain
+end Tamago.Proof.Utils.Cbrt.ErrorChain

@@ -6,7 +6,7 @@
 -/
 import Init
 
-namespace Sqrt.Model
+namespace Tamago.Proof.Utils.Sqrt.Model
 
 -- ============================================================================
 -- Definitions
@@ -40,4 +40,4 @@ def floorSqrt (x : Nat) : Nat :=
   let z := innerSqrt x
   z - if x / z < z then 1 else 0
 
-end Sqrt.Model
+end Tamago.Proof.Utils.Sqrt.Model

@@ -4,7 +4,7 @@
 -/
 import Init
 
-namespace Cbrt.Model
+namespace Tamago.Proof.Utils.Cbrt.Model
 
 -- ============================================================================
 -- Definitions
@@ -186,4 +186,4 @@ theorem icbrt_eq_of_bounds (x r : Nat)
       exact False.elim (Nat.not_le_of_lt hhi this)
   exact Nat.le_antisymm h1 h2
 
-end Cbrt.Model
+end Tamago.Proof.Utils.Cbrt.Model

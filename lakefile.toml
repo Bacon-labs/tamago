@@ -21,14 +21,6 @@ name = "Tamago.Spec"
 srcDir = "verity/spec"
 
 [[lean_lib]]
-name = "Sqrt"
-srcDir = "verity/proof"
-
-[[lean_lib]]
-name = "Cbrt"
-srcDir = "verity/proof"
-
-[[lean_lib]]
 name = "Tamago.Proof"
 srcDir = "verity/proof"
 

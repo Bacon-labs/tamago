@@ -5,11 +5,11 @@
 
   A single truncated Babylonian step never undershoots any m with m² ≤ x.
 -/
-import Sqrt.Model
+import Tamago.Proof.Utils.Sqrt.Model
 
-namespace Sqrt.FloorBound
+namespace Tamago.Proof.Utils.Sqrt.FloorBound
 
-open Sqrt.Model
+open Tamago.Proof.Utils.Sqrt.Model
 
 -- ============================================================================
 -- Algebraic Helpers
@@ -134,4 +134,4 @@ theorem sqrtStep_from_floor (x m : Nat) (hm : 0 < m)
       _ = m + 2 := Nat.mul_div_cancel (m + 2) hm
   omega
 
-end Sqrt.FloorBound
+end Tamago.Proof.Utils.Sqrt.FloorBound

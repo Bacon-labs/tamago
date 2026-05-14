@@ -6,14 +6,14 @@
 -/
 import Mathlib.Data.Nat.Log
 import Mathlib.Data.Nat.Sqrt
-import Sqrt.Wiring
+import Tamago.Proof.Utils.Sqrt.Wiring
 
-namespace Sqrt.Correctness
+namespace Tamago.Proof.Utils.Sqrt.Correctness
 
-open Sqrt.Model
-open Sqrt.FloorBound
-open Sqrt.OctaveCert
-open Sqrt.Wiring
+open Tamago.Proof.Utils.Sqrt.Model
+open Tamago.Proof.Utils.Sqrt.FloorBound
+open Tamago.Proof.Utils.Sqrt.OctaveCert
+open Tamago.Proof.Utils.Sqrt.Wiring
 
 -- ============================================================================
 -- Floor Correction
@@ -131,4 +131,4 @@ theorem floorSqrt_correct_u256
       simpa [i]
     exact floorSqrt_correct_of_octave i x m hmlo hmhi hOct
 
-end Sqrt.Correctness
+end Tamago.Proof.Utils.Sqrt.Correctness

@@ -8,7 +8,7 @@
 -/
 import Init
 
-namespace Cbrt.FloorBound
+namespace Tamago.Proof.Utils.Cbrt.FloorBound
 
 -- ============================================================================
 -- Algebraic Helpers
@@ -98,4 +98,4 @@ theorem cbrt_step_floor_bound (x z m : Nat) (hz : 0 < z) (hm : m * m * m ≤ x) 
       ≤ m * m * m := cubic_am_gm z m
     _ ≤ x := hm
 
-end Cbrt.FloorBound
+end Tamago.Proof.Utils.Cbrt.FloorBound

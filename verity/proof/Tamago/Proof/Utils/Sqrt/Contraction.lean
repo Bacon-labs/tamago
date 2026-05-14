@@ -5,12 +5,12 @@
     if z = m + d with d ≤ m, then sqrtStep x z - m ≤ d²/(2m) + 1.
 -/
 import Init
-import Sqrt.FloorBound
+import Tamago.Proof.Utils.Sqrt.FloorBound
 
-namespace Sqrt.Contraction
+namespace Tamago.Proof.Utils.Sqrt.Contraction
 
-open Sqrt.Model
-open Sqrt.FloorBound
+open Tamago.Proof.Utils.Sqrt.Model
+open Tamago.Proof.Utils.Sqrt.FloorBound
 
 -- ============================================================================
 -- Error Contraction Recurrence
@@ -188,4 +188,4 @@ theorem d1_bound
       exact Nat.le_trans hnum (Nat.add_le_add (Nat.le_trans hsq hsq') h2m)
     exact (Nat.le_div_iff_mul_le hs2).2 (by simpa [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm] using hfin)
 
-end Sqrt.Contraction
+end Tamago.Proof.Utils.Sqrt.Contraction
