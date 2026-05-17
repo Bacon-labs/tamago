@@ -112,7 +112,8 @@ verity_contract FixedPointMathLibBase where
     steps yield 2⁻¹⁶⁰ relative error (>128 correct bits). We implicitly
     represent z₀ as log₂(z) so that the first `div` becomes a `shr`.
     -/
-    let mut z := shr 1 (sub 256 (clz x))
+    let xClz ← clz x
+    let mut z := shr 1 (sub 256 xClz)
     z := shr 1 (add (shl z 1) (shr z x))
     z := shr 1 (add z (div x z))
     z := shr 1 (add z (div x z))
@@ -138,7 +139,8 @@ verity_contract FixedPointMathLibBase where
     % 3` to balance each octave's worst-case final error. This gives >91 bits of
     precision after only 5 Newton-Raphson iterations.
     -/
-    let b := sub 257 (clz x)
+    let xClz ← clz x
+    let b := sub 257 xClz
     let mut z := shr 7 (shl (div b 3) (add 89 (mul 26 (mod b 3))))
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3

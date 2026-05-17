@@ -17,12 +17,16 @@ open Tamago.Proof.Utils.Cbrt.FloorBound
 -- Seed and Step Positivity
 -- ============================================================================
 
-/-- The cbrt seed is always positive (due to the low-bit OR). -/
+/-- The cbrt seed is always positive. -/
 theorem cbrtSeed_pos (x : Nat) : 0 < cbrtSeed x := by
   unfold cbrtSeed
-  have h : 1 ≤ 1 ||| ((cbrtSeedMultiplier (Nat.log2 x) <<< (Nat.log2 x / 3)) >>> 7) :=
-    Nat.left_le_or
-  omega
+  rw [Nat.shiftLeft_eq, Nat.shiftRight_eq_div_pow]
+  unfold cbrtSeedMultiplier
+  have hCases : Nat.log2 x % 3 = 0 ∨ Nat.log2 x % 3 = 1 ∨ Nat.log2 x % 3 = 2 := by
+    omega
+  rcases hCases with h | h | h <;> simp [h] <;>
+    have hpow : 1 ≤ 2 ^ (Nat.log2 x / 3) := Nat.succ_le_of_lt (Nat.two_pow_pos _) <;>
+    omega
 
 /-- cbrtStep preserves positivity when x > 0 and z > 0. -/
 theorem cbrtStep_pos (x z : Nat) (hx : 0 < x) (hz : 0 < z) : 0 < cbrtStep x z := by

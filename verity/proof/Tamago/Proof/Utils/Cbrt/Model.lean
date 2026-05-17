@@ -16,13 +16,13 @@ def cbrtStep (x z : Nat) : Nat := (x / (z * z) + 2 * z) / 3
 
 /-- Fixed-point multiplier selected by `log2(x) % 3`. -/
 def cbrtSeedMultiplier (y : Nat) : Nat :=
-  #[0x95, 0xb1, 0xe9][y % 3]!
+  #[0x8d, 0xb2, 0xe6][y % 3]!
 
 /-- The cbrt seed:
-    z = (⌊c * 2^q / 128⌋ | 1) where y = log2(x), q = ⌊y / 3⌋, and
-    c is selected from [0x95, 0xb1, 0xe9] by y % 3. -/
+    z = ⌊c * 2^q / 128⌋ where y = log2(x), q = ⌊y / 3⌋, and
+    c is selected from [0x8d, 0xb2, 0xe6] by y % 3. -/
 def cbrtSeed (x : Nat) : Nat :=
-  1 ||| ((cbrtSeedMultiplier (Nat.log2 x) <<< (Nat.log2 x / 3)) >>> 7)
+  (cbrtSeedMultiplier (Nat.log2 x) <<< (Nat.log2 x / 3)) >>> 7
 
 /-- innerCbrt: seed + 5 Newton-Raphson steps. -/
 def innerCbrt (x : Nat) : Nat :=
