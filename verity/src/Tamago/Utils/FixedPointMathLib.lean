@@ -133,14 +133,13 @@ verity_contract FixedPointMathLibBase where
   -/
   function view cbrt (x : Uint256) : Uint256 := do
     /-
-    Initial guess z ≈ c · 2𐞥 where b = ⌊log₂(x)⌋, q = ⌊b / 3⌋. The 8-bit
-    fixed-point multipliers `c`: 149/128, 177/128, and 233/128 are selected by
-    `b % 3` to balance each octave's worst-case final error. This gives >88 bits
-    of precision after only 5 Newton-Raphson iterations. The `bitOr 1 ...` keeps
-    z ≥ 1 when the shifted estimate is 0.
+    Initial guess z ≈ c · 2𐞥 where b = ⌊log₂(x)⌋ + 2, q = ⌊b / 3⌋. The 8-bit
+    fixed-point multipliers `c`: 89/128, 115/128, and 141/128 are selected by `b
+    % 3` to balance each octave's worst-case final error. This gives >91 bits of
+    precision after only 5 Newton-Raphson iterations.
     -/
-    let b := sub 255 (clz x)
-    let mut z := bitOr 1 (shr 7 (shl (div b 3) (add 121 (shl (mod b 3) 28))))
+    let b := sub 257 (clz x)
+    let mut z := shr 7 (shl (div b 3) (add 89 (mul 26 (mod b 3))))
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
