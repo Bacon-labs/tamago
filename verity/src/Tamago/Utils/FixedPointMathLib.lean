@@ -4,7 +4,7 @@ namespace Tamago.Utils
 
 open Verity hiding pure bind
 open Contracts
-open Verity.EVM.Uint256
+open Verity.EVM.Uint256 hiding byte
 
 /-
 @title FixedPointMathLib

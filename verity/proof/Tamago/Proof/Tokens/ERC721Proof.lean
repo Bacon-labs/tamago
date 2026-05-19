@@ -1,5 +1,6 @@
 import Tamago.Spec.Tokens.ERC721Spec
 import Tamago.Proof.Auth.OwnableProof
+import Tamago.Proof.EventSimp
 import Verity.Proofs.Stdlib.Automation
 
 namespace Tamago.Proof.Tokens.ERC721Proof

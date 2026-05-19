@@ -400,7 +400,7 @@ private theorem clzScanUint_val (x : Uint256) :
   exact hru5
 
 def deBruijnLookup (y : Uint256) : Uint256 :=
-  byte (Contracts.bitAnd 0x1f (shr y FixedPointMathLibBase.clzDeBruijnMagic))
+  Contracts.byte (Contracts.bitAnd 0x1f (shr y FixedPointMathLibBase.clzDeBruijnMagic))
     FixedPointMathLibBase.clzDeBruijnTable
 
 theorem deBruijnLookup_val_fin (y : Fin 256) (hy : y.val ≠ 0) :
