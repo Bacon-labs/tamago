@@ -281,7 +281,7 @@ private theorem byte_val (index value : Uint256) :
 
 private theorem cbrtSeedExpr_val (bU : Uint256) (b : Nat)
     (hbVal : bU.val = b + 2) (hbLt256 : b < 256) :
-    (shr 7 (shl (div bU 3) (add 89 (mul 26 (mod bU 3))))).val =
+    (shr 7 (shl (div bU 3) (add 90 (mul 26 (mod bU 3))))).val =
       (cbrtSeedMultiplier b * 2 ^ (b / 3)) / 2 ^ 7 := by
   have hThree : (3 : Uint256).val = 3 := by native_decide
   have hDivBVal : (div bU 3).val = (b + 2) / 3 := by
@@ -299,20 +299,20 @@ private theorem cbrtSeedExpr_val (bU : Uint256) (b : Nat)
   have hMulVal : (mul 26 (mod bU 3)).val = 26 * ((b + 2) % 3) := by
     simpa [HMul.hMul, h26, hModBVal] using
       Verity.Core.Uint256.mul_eq_of_lt (a := (26 : Uint256)) (b := mod bU 3) hMulLt
-  have h89 : (89 : Uint256).val = 89 := by native_decide
+  have h90 : (90 : Uint256).val = 90 := by native_decide
   have hAddLt :
-      (89 : Uint256).val + (mul 26 (mod bU 3)).val <
+      (90 : Uint256).val + (mul 26 (mod bU 3)).val <
         Verity.Core.Uint256.modulus := by
-    rw [h89, hMulVal]
-    have hLe : 89 + 26 * ((b + 2) % 3) ≤ 141 := by omega
-    have hBound : 141 < Verity.Core.Uint256.modulus := by native_decide
+    rw [h90, hMulVal]
+    have hLe : 90 + 26 * ((b + 2) % 3) ≤ 142 := by omega
+    have hBound : 142 < Verity.Core.Uint256.modulus := by native_decide
     exact lt_of_le_of_lt hLe hBound
   have hMultiplierVal :
-      (add 89 (mul 26 (mod bU 3))).val = 89 + 26 * ((b + 2) % 3) := by
-    rw [add_val_of_lt _ _ hAddLt, h89, hMulVal]
-  let multiplier := add 89 (mul 26 (mod bU 3))
-  have hMultiplierLe : multiplier.val ≤ 141 := by
-    rw [show multiplier.val = 89 + 26 * ((b + 2) % 3) by simpa [multiplier] using hMultiplierVal]
+      (add 90 (mul 26 (mod bU 3))).val = 90 + 26 * ((b + 2) % 3) := by
+    rw [add_val_of_lt _ _ hAddLt, h90, hMulVal]
+  let multiplier := add 90 (mul 26 (mod bU 3))
+  have hMultiplierLe : multiplier.val ≤ 142 := by
+    rw [show multiplier.val = 90 + 26 * ((b + 2) % 3) by simpa [multiplier] using hMultiplierVal]
     omega
   have hDivLe : (b + 2) / 3 ≤ 85 := by omega
   have hShlLt : multiplier.val * 2 ^ (div bU 3).val <
@@ -320,9 +320,9 @@ private theorem cbrtSeedExpr_val (bU : Uint256) (b : Nat)
     rw [hDivBVal]
     have hPow : 2 ^ ((b + 2) / 3) ≤ 2 ^ 85 :=
       Nat.pow_le_pow_right (by decide : 1 ≤ 2) hDivLe
-    have hMul : multiplier.val * 2 ^ ((b + 2) / 3) ≤ 141 * 2 ^ 85 :=
+    have hMul : multiplier.val * 2 ^ ((b + 2) / 3) ≤ 142 * 2 ^ 85 :=
       Nat.mul_le_mul hMultiplierLe hPow
-    have hBound : 141 * 2 ^ 85 < Verity.Core.Uint256.modulus := by native_decide
+    have hBound : 142 * 2 ^ 85 < Verity.Core.Uint256.modulus := by native_decide
     exact lt_of_le_of_lt hMul hBound
   have hShlVal : (shl (div bU 3) multiplier).val =
       multiplier.val * 2 ^ ((b + 2) / 3) := by
@@ -335,7 +335,7 @@ private theorem cbrtSeedExpr_val (bU : Uint256) (b : Nat)
   have hSeedExpr :
       (multiplier.val * 2 ^ ((b + 2) / 3)) / 2 ^ 7 =
         (cbrtSeedMultiplier b * 2 ^ (b / 3)) / 2 ^ 7 := by
-    rw [show multiplier.val = 89 + 26 * ((b + 2) % 3) by simpa [multiplier] using hMultiplierVal]
+    rw [show multiplier.val = 90 + 26 * ((b + 2) % 3) by simpa [multiplier] using hMultiplierVal]
     unfold cbrtSeedMultiplier
     have hCases : b % 3 = 0 ∨ b % 3 = 1 ∨ b % 3 = 2 := by omega
     rcases hCases with h | h | h
@@ -1159,7 +1159,7 @@ private theorem cbrtStepUint_zero_of_zero (zU : Uint256) (hz : zU.val = 0) :
 private theorem cbrtSeedUint_val_of_ne (x : Uint256) (hx0 : x.val ≠ 0) :
     (let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
      let b := sub 257 xClz
-     let multiplier := add 89 (mul 26 (mod b 3))
+     let multiplier := add 90 (mul 26 (mod b 3))
      shr 7 (shl (div b 3) multiplier)).val =
       cbrtSeed x.val := by
   let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
@@ -1182,7 +1182,7 @@ private theorem cbrtSeedUint_val_of_ne (x : Uint256) (hx0 : x.val ≠ 0) :
     change (sub 257 xClz).val = b + 2
     rw [hRaw, h257, hClzVal]
     omega
-  let multiplier := add 89 (mul 26 (mod bU 3))
+  let multiplier := add 90 (mul 26 (mod bU 3))
   have hSeedVal :
       (shr 7 (shl (div bU 3) multiplier)).val =
         (cbrtSeedMultiplier b * 2 ^ (b / 3)) / 2 ^ 7 := by
@@ -1369,7 +1369,7 @@ private theorem cbrt_run_eq_floorCbrt_large
     (Tamago.Proof.Utils.ClzProof.clz_apply_eq_success x s)]
   let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
   let bU := sub 257 xClz
-  let multiplier := add 89 (mul 26 (mod bU 3))
+  let multiplier := add 90 (mul 26 (mod bU 3))
   let z0U := shr 7 (shl (div bU 3) multiplier)
   let stepU : Uint256 → Uint256 := fun z =>
     div (add (add (div x (mul z z)) z) z) 3
@@ -1512,7 +1512,7 @@ private theorem cbrt_run_eq_floorCbrt (x : Uint256) (s : ContractState) :
     let xU : Uint256 := 0
     let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint xU
     let bU := sub 257 xClz
-    let multiplier := add 89 (mul 26 (mod bU 3))
+    let multiplier := add 90 (mul 26 (mod bU 3))
     let z0U := shr 7 (shl (div bU 3) multiplier)
     let stepU : Uint256 → Uint256 := fun z =>
       div (add (add (div xU (mul z z)) z) z) 3
@@ -1550,19 +1550,19 @@ private theorem cbrt_run_eq_floorCbrt (x : Uint256) (s : ContractState) :
       have h := Verity.Core.Uint256.mul_eq_of_lt
         (a := (26 : Uint256)) (b := mod bU 3) hMulLt
       simpa [HMul.hMul, h26, hModBVal] using h
-    have h89 : (89 : Uint256).val = 89 := by native_decide
+    have h90 : (90 : Uint256).val = 90 := by native_decide
     have hAddLt :
-        (89 : Uint256).val + (mul 26 (mod bU 3)).val <
+        (90 : Uint256).val + (mul 26 (mod bU 3)).val <
           Verity.Core.Uint256.modulus := by
-      rw [h89, hMulVal]
+      rw [h90, hMulVal]
       native_decide
-    have hMultiplierVal : multiplier.val = 115 := by
-      rw [show multiplier = add 89 (mul 26 (mod bU 3)) by rfl]
-      rw [add_val_of_lt _ _ hAddLt, h89, hMulVal]
-    have hShlVal : (shl (div bU 3) multiplier).val = 115 := by
+    have hMultiplierVal : multiplier.val = 116 := by
+      rw [show multiplier = add 90 (mul 26 (mod bU 3)) by rfl]
+      rw [add_val_of_lt _ _ hAddLt, h90, hMulVal]
+    have hShlVal : (shl (div bU 3) multiplier).val = 116 := by
       rw [shl_val, hDivBVal, hMultiplierVal]
       norm_num
-      exact Nat.mod_eq_of_lt (by native_decide : 115 < Verity.Core.Uint256.modulus)
+      exact Nat.mod_eq_of_lt (by native_decide : 116 < Verity.Core.Uint256.modulus)
     have hSeven : (7 : Uint256).val = 7 := by native_decide
     have hShrZero : (shr 7 (shl (div bU 3) multiplier)).val = 0 := by
       rw [shr_val, hShlVal, hSeven]
