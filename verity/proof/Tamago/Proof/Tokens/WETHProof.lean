@@ -1,5 +1,6 @@
 import Tamago.Spec.Tokens.WETHSpec
 import Tamago.Proof.Tokens.ERC20Proof
+import Tamago.Proof.EventSimp
 import Verity.Proofs.Stdlib.Automation
 
 namespace Tamago.Proof.Tokens.WETHProof

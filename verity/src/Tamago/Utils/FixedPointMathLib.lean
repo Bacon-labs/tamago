@@ -4,7 +4,7 @@ namespace Tamago.Utils
 
 open Verity hiding pure bind
 open Contracts
-open Verity.EVM.Uint256
+open Verity.EVM.Uint256 hiding byte
 
 /-
 @title FixedPointMathLib
@@ -18,6 +18,9 @@ verity_contract FixedPointMathLibBase where
 
   constants
     maxUint256 : Uint256 := (sub 0 1)
+    clzDeBruijnMagic : Uint256 := 0x8421084210842108cc6318c6db6d54be
+    clzDeBruijnTable : Uint256 :=
+      0xf8f9f9faf9fdfafbf9fdfcfdfafbfcfef9fafdfafcfcfbfefafafcfbffffffff
 
   /-
   @notice Adds two unsigned integers and saturates on overflow.
@@ -25,7 +28,7 @@ verity_contract FixedPointMathLibBase where
   @param y Second addend.
   @return Sum, or max uint256 if the addition would overflow.
   -/
-  function view saturatingAdd (x : Uint256, y : Uint256) : Uint256 := do
+  function pure saturatingAdd (x : Uint256, y : Uint256) : Uint256 := do
     let room := sub maxUint256 x
     if y > room then
       return maxUint256
@@ -38,7 +41,7 @@ verity_contract FixedPointMathLibBase where
   @param y Second factor.
   @return Product, or max uint256 if the multiplication would overflow.
   -/
-  function view saturatingMul (x : Uint256, y : Uint256) : Uint256 := do
+  function pure saturatingMul (x : Uint256, y : Uint256) : Uint256 := do
     let limit := div maxUint256 x
     if (x != 0) && (y > limit) then
       return maxUint256
@@ -51,7 +54,7 @@ verity_contract FixedPointMathLibBase where
   @param y Subtrahend.
   @return Difference, or zero if `y` is greater than `x`.
   -/
-  function view saturatingSub (x : Uint256, y : Uint256) : Uint256 := do
+  function pure saturatingSub (x : Uint256, y : Uint256) : Uint256 := do
     if y > x then
       return 0
     else
@@ -63,7 +66,7 @@ verity_contract FixedPointMathLibBase where
   @param y Second value.
   @return Absolute difference between `x` and `y`.
   -/
-  function view dist (x : Uint256, y : Uint256) : Uint256 := do
+  function pure dist (x : Uint256, y : Uint256) : Uint256 := do
     if x >= y then
       return (sub x y)
     else
@@ -75,102 +78,84 @@ verity_contract FixedPointMathLibBase where
   @param y Second value.
   @return Floor average of `x` and `y`.
   -/
-  function view avg (x : Uint256, y : Uint256) : Uint256 := do
+  function pure avg (x : Uint256, y : Uint256) : Uint256 := do
     if x >= y then
       return (add y (div (sub x y) 2))
     else
       return (add x (div (sub y x) 2))
 
   /-
+  @notice Counts leading zero bits in a uint256 word.
+  @param x Input value.
+  @return Number of zero bits before the most significant set bit, or 256 for zero.
+  -/
+  function pure clz (x : Uint256) : Uint256 := do
+    let mut r := shl 7 (boolToWord (0xffffffffffffffffffffffffffffffff < x))
+    r := bitOr r (shl 6 (boolToWord (0xffffffffffffffff < shr r x)))
+    r := bitOr r (shl 5 (boolToWord (0xffffffff < shr r x)))
+    r := bitOr r (shl 4 (boolToWord (0xffff < shr r x)))
+    r := bitOr r (shl 3 (boolToWord (0xff < shr r x)))
+    let y := shr r x
+    let deBruijnIndex := bitAnd 0x1f (shr y clzDeBruijnMagic)
+    let clzByte := byte deBruijnIndex clzDeBruijnTable
+    return (add (bitXor r clzByte) (boolToWord (x == 0)))
+
+  /-
   @notice Computes the integer square root.
   @param x Input value.
   @return Floor square root of `x`.
   -/
-  function view sqrt (x : Uint256) : Uint256 := do
-    let mut z := 181
-    let mut r := 0
-    if 0xffffffffffffffffffffffffffffffffff < x then
-      r := shl 7 1
-    else
-      pure ()
-    if 0xffffffffffffffffff < shr r x then
-      r := bitOr r (shl 6 1)
-    else
-      pure ()
-    if 0xffffffffff < shr r x then
-      r := bitOr r (shl 5 1)
-    else
-      pure ()
-    if 0xffffff < shr r x then
-      r := bitOr r (shl 4 1)
-    else
-      pure ()
-    z := shl (shr 1 r) z
-    z := shr 18 (mul z (add (shr r x) 65536))
+  function pure sqrt (x : Uint256) : Uint256 := do
+    /-
+    Initial guess z = 2^⌊(n+1)/2⌋ where n = ⌊log₂(x)⌋. This seed gives ε₁ =
+    0.0607 after one Babylonian step for all inputs. With ε_{n+1} ≈ ε²/2, 6
+    steps yield 2⁻¹⁶⁰ relative error (>128 correct bits). We implicitly
+    represent z₀ as log₂(z) so that the first `div` becomes a `shr`.
+    -/
+    let xClz ← clz x
+    let mut z := shr 1 (sub 256 xClz)
+    z := shr 1 (add (shl z 1) (shr z x))
     z := shr 1 (add z (div x z))
     z := shr 1 (add z (div x z))
     z := shr 1 (add z (div x z))
     z := shr 1 (add z (div x z))
     z := shr 1 (add z (div x z))
-    z := shr 1 (add z (div x z))
-    z := shr 1 (add z (div x z))
-    if div x z < z then
-      return (sub z 1)
-    else
-      return z
+    /-
+    If `x+1` is a perfect square, the Babylonian method oscillates between ⌊√x⌋
+    and ⌈√x⌉. Floor it. See:
+    https://en.wikipedia.org/wiki/Integer_square_root#Using_only_integer_division
+    -/
+    return (sub z (boolToWord (div x z < z)))
 
   /-
   @notice Computes the integer cube root.
   @param x Input value.
   @return Floor cube root of `x`.
   -/
-  function view cbrt (x : Uint256) : Uint256 := do
-    let mut r := 0
-    if 0xffffffffffffffffffffffffffffffff < x then
-      r := shl 7 1
-    else
-      pure ()
-    if 0xffffffffffffffff < shr r x then
-      r := bitOr r (shl 6 1)
-    else
-      pure ()
-    if 0xffffffff < shr r x then
-      r := bitOr r (shl 5 1)
-    else
-      pure ()
-    if 0xffff < shr r x then
-      r := bitOr r (shl 4 1)
-    else
-      pure ()
-    if 0xff < shr r x then
-      r := bitOr r (shl 3 1)
-    else
-      pure ()
-
-    let mut seedBase := 15
-    if 0xf < shr r x then
-      seedBase := 30
-    else
-      pure ()
-    let mut z := div (shl (div r 3) seedBase) (bitXor 7 (mod r 3))
+  function pure cbrt (x : Uint256) : Uint256 := do
+    /-
+    Initial guess z ≈ c · 2𐞥 where b = ⌊log₂(x)⌋ + 2, q = ⌊b / 3⌋. The 8-bit
+    fixed-point multipliers `c`: 90/128, 116/128, and 142/128 are selected by `b
+    % 3` to balance each octave's worst-case final error. This gives >94 bits of
+    precision after only 5 Newton-Raphson iterations.
+    -/
+    let xClz ← clz x
+    let b := sub 257 xClz
+    let mut z := shr 7 (shl (div b 3) (add 90 (mul 26 (mod b 3))))
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
     z := div (add (add (div x (mul z z)) z) z) 3
-    z := div (add (add (div x (mul z z)) z) z) 3
-    z := div (add (add (div x (mul z z)) z) z) 3
-    if div x (mul z z) < z then
-      return (sub z 1)
-    else
-      return z
+    -- Round down.
+    return (sub z (boolToWord (div x (mul z z) < z)))
 
   /-
   @notice Computes the base-256 logarithm.
   @param x Input value.
   @return Floor log base 256 of `x`.
   -/
-  function view log256 (x : Uint256) : Uint256 := do
+  function pure log256 (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
     if 0xffffffffffffffffffffffffffffffff < value then
@@ -203,7 +188,7 @@ verity_contract FixedPointMathLibBase where
   @param x Input value.
   @return Ceiling log base 256 of `x`.
   -/
-  function view log256Up (x : Uint256) : Uint256 := do
+  function pure log256Up (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
     if 0xffffffffffffffffffffffffffffffff < value then
@@ -240,7 +225,7 @@ verity_contract FixedPointMathLibBase where
   @param x Input value.
   @return Floor log base 2 of `x`.
   -/
-  function view log2 (x : Uint256) : Uint256 := do
+  function pure log2 (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
     if 0xffffffffffffffffffffffffffffffff < value then
@@ -288,7 +273,7 @@ verity_contract FixedPointMathLibBase where
   @param x Input value.
   @return Ceiling log base 2 of `x`.
   -/
-  function view log2Up (x : Uint256) : Uint256 := do
+  function pure log2Up (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
     if 0xffffffffffffffffffffffffffffffff < value then
@@ -340,7 +325,7 @@ verity_contract FixedPointMathLibBase where
   @param x Input value.
   @return Floor log base 10 of `x`.
   -/
-  function view log10 (x : Uint256) : Uint256 := do
+  function pure log10 (x : Uint256) : Uint256 := do
     let mut r := 0
     let mut value := x
     if 99999999999999999999999999999999999999 < value then
@@ -385,7 +370,7 @@ verity_contract FixedPointMathLibBase where
   @param x Input value.
   @return Ceiling log base 10 of `x`.
   -/
-  function log10Up (x : Uint256) : Uint256 := do
+  function pure log10Up (x : Uint256) : Uint256 := do
     let r ← log10 x
     let mut scale := 1
     let mut exponent := r
@@ -435,7 +420,7 @@ verity_contract FixedPointMathLibBase where
   @param maxValue Upper bound.
   @return `x` bounded to the inclusive range [`minValue`, `maxValue`].
   -/
-  function view clamp (x : Uint256, minValue : Uint256, maxValue : Uint256) : Uint256 := do
+  function pure clamp (x : Uint256, minValue : Uint256, maxValue : Uint256) : Uint256 := do
     let boundedBelow := max x minValue
     return (min boundedBelow maxValue)
 
@@ -448,6 +433,7 @@ abbrev saturatingMul := FixedPointMathLibBase.saturatingMul
 abbrev saturatingSub := FixedPointMathLibBase.saturatingSub
 abbrev dist := FixedPointMathLibBase.dist
 abbrev avg := FixedPointMathLibBase.avg
+abbrev clz := FixedPointMathLibBase.clz
 abbrev sqrt := FixedPointMathLibBase.sqrt
 abbrev cbrt := FixedPointMathLibBase.cbrt
 abbrev log2 := FixedPointMathLibBase.log2

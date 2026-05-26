@@ -35,8 +35,8 @@ abbrev AssetBalances := Address → Uint256
 def assetBalancesUnchanged (pre post : AssetBalances) : Prop :=
   ∀ account, post account = pre account
 
-def assetTraceContains (event : Event) (events : List Event) : Prop :=
-  event ∈ events
+def assetTraceContains (evt : Event) (events : List Event) : Prop :=
+  evt ∈ events
 
 def hasSafeTransferFromTrace
     (asset fromAddr toAddr : Address) (amount : Uint256)
@@ -65,8 +65,8 @@ def assetWorldAfterTransfer
     else
       pre account
 
-def assetWorldAfterEvent (pre : AssetBalances) (event : Event) : AssetBalances :=
-  match event.name, event.args, event.indexedArgs with
+def assetWorldAfterEvent (pre : AssetBalances) (evt : Event) : AssetBalances :=
+  match evt.name, evt.args, evt.indexedArgs with
   | "ERC4626AssetSafeTransferFrom", [_asset, fromWord, toWord, amount], [] =>
       assetWorldAfterTransfer pre (wordToAddress fromWord) (wordToAddress toWord) amount
   | "ERC4626AssetSafeTransfer", [_asset, fromWord, toWord, amount], [] =>
@@ -75,7 +75,7 @@ def assetWorldAfterEvent (pre : AssetBalances) (event : Event) : AssetBalances :
 
 def assetWorldAfterEvents : AssetBalances → List Event → AssetBalances
   | pre, [] => pre
-  | pre, event :: events => assetWorldAfterEvents (assetWorldAfterEvent pre event) events
+  | pre, evt :: events => assetWorldAfterEvents (assetWorldAfterEvent pre evt) events
 
 def emittedEventsAfterCall {α : Type}
     (s : ContractState) (result : ContractResult α) : List Event :=

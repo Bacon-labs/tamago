@@ -1,28 +1,39 @@
-import Mathlib.Data.Nat.Find
-import Mathlib.Data.Nat.Cast.Order.Field
+import Mathlib.Data.Nat.Bitwise
 import Mathlib.Data.Nat.Log
 import Mathlib.Data.Nat.Sqrt
-import Mathlib.Data.Real.Sqrt
-import Mathlib.Analysis.SpecialFunctions.Pow.Real
+import Tamago.Proof.Utils.Sqrt
+import Tamago.Proof.Utils.Cbrt.OverflowSafety
+import Tamago.Proof.Utils.ClzProof
 import Tamago.Spec.Utils.FixedPointMathLibSpec
 import Verity.Proofs.Stdlib.Automation
 
 namespace Tamago.Proof.Utils.FixedPointMathLibProof
 
-set_option linter.unusedSimpArgs false
-set_option linter.unusedTactic false
-set_option linter.unreachableTactic false
 set_option maxHeartbeats 4000000
-set_option maxRecDepth 100000
+set_option exponentiation.threshold 300
 
 open Verity
 open Verity.EVM.Uint256
 open Tamago.Utils
 open Tamago.Spec.Utils.FixedPointMathLibSpec
 open Tamago.Utils.FixedPointMathLib
+open Tamago.Proof.Utils.Sqrt.Model
+open Tamago.Proof.Utils.Sqrt.FloorBound
+open Tamago.Proof.Utils.Sqrt.OctaveCert
+open Tamago.Proof.Utils.Sqrt.ErrorChain
+open Tamago.Proof.Utils.Sqrt.Wiring
+open Tamago.Proof.Utils.Sqrt.Correctness
+open Tamago.Proof.Utils.Cbrt.Model
+open Tamago.Proof.Utils.Cbrt.FloorBound
+open Tamago.Proof.Utils.Cbrt.Contraction
+open Tamago.Proof.Utils.Cbrt.OctaveCert
+open Tamago.Proof.Utils.Cbrt.ErrorChain
+open Tamago.Proof.Utils.Cbrt.Wiring
+open Tamago.Proof.Utils.Cbrt.Correctness
+open Tamago.Proof.Utils.Cbrt.OverflowSafety
 
 attribute [local simp] maxUint256 saturatingAdd saturatingMul saturatingSub
-  Tamago.Utils.FixedPointMathLib.dist sqrt clamp
+  Tamago.Utils.FixedPointMathLib.dist clz sqrt clamp
 attribute [local simp] Tamago.Utils.FixedPointMathLibBase.maxUint256
   Tamago.Utils.FixedPointMathLibBase.saturatingAdd
   Tamago.Utils.FixedPointMathLibBase.saturatingMul
@@ -70,778 +81,9 @@ private def sqrt_property (x result : Uint256) : Prop :=
   result.val * result.val ≤ x.val ∧
   x.val < (result.val + 1) * (result.val + 1)
 
-private def sqrtCorrectNat (x z : Nat) : Nat :=
-  if x / z < z then z - 1 else z
-
-private def sqrtStepNat (x z : Nat) : Nat :=
-  (z + x / z) / 2
-
-private def sqrtIterNat : Nat → Nat → Nat → Nat
-  | 0, _x, z => z
-  | steps + 1, x, z => sqrtIterNat steps x (sqrtStepNat x z)
-
-private def sqrtScanStepNat (x r shift : Nat) : Nat :=
-  if 2 ^ (shift + 8) - 1 < x / 2 ^ r then r + shift else r
-
-private def sqrtScanNat (x : Nat) : Nat :=
-  let r := sqrtScanStepNat x 0 128
-  let r := sqrtScanStepNat x r 64
-  let r := sqrtScanStepNat x r 32
-  sqrtScanStepNat x r 16
-
-private theorem pow2_div_lower_from_div_lower (x r a b : Nat)
-    (h : 2 ^ (a + b) ≤ x / 2 ^ r) :
-    2 ^ a ≤ x / 2 ^ (r + b) := by
-  have hMul : 2 ^ (a + b) * 2 ^ r ≤ x :=
-    (Nat.le_div_iff_mul_le (Nat.pow_pos (by decide : 0 < 2))).1 h
-  have hGoalMul : 2 ^ a * 2 ^ (r + b) ≤ x := by
-    have hEq : 2 ^ a * 2 ^ (r + b) = 2 ^ (a + b) * 2 ^ r := by
-      rw [Nat.pow_add, Nat.pow_add]
-      ring
-    rw [hEq]
-    exact hMul
-  exact (Nat.le_div_iff_mul_le (Nat.pow_pos (by decide : 0 < 2))).2 hGoalMul
-
-private theorem pow2_div_upper_from_value_upper (value a b : Nat)
-    (h : value < 2 ^ (a + b)) :
-    value / 2 ^ b < 2 ^ a := by
-  have hMul : 2 ^ (a + b) = 2 ^ b * 2 ^ a := by
-    rw [Nat.pow_add]
-    ring
-  rw [hMul] at h
-  exact Nat.div_lt_of_lt_mul h
-
-private theorem sqrtScanStepNat_lower_bound
-    (x r shift : Nat)
-    (hLower : 2 ^ 8 ≤ x / 2 ^ r) :
-    2 ^ 8 ≤ x / 2 ^ sqrtScanStepNat x r shift := by
-  unfold sqrtScanStepNat
-  by_cases hBranch : 2 ^ (shift + 8) - 1 < x / 2 ^ r
-  · have hBranchLe : 2 ^ (8 + shift) ≤ x / 2 ^ r := by
-      have hEq : 2 ^ (8 + shift) = 2 ^ (shift + 8) := by
-        rw [Nat.add_comm]
-      rw [hEq]
-      omega
-    have hLower' : 2 ^ 8 ≤ x / 2 ^ (r + shift) :=
-      pow2_div_lower_from_div_lower x r 8 shift hBranchLe
-    simpa [hBranch] using hLower'
-  · simpa [hBranch] using hLower
-
-private theorem sqrtScanStepNat_upper_bound
-    (x r shift : Nat)
-    (hUpper : x / 2 ^ r < 2 ^ (shift + (shift + 8))) :
-    x / 2 ^ sqrtScanStepNat x r shift < 2 ^ (shift + 8) := by
-  unfold sqrtScanStepNat
-  by_cases hBranch : 2 ^ (shift + 8) - 1 < x / 2 ^ r
-  · have hBranchLe : 2 ^ (8 + shift) ≤ x / 2 ^ r := by
-      have hEq : 2 ^ (8 + shift) = 2 ^ (shift + 8) := by
-        rw [Nat.add_comm]
-      rw [hEq]
-      omega
-    have hUpper' : x / 2 ^ (r + shift) < 2 ^ (shift + 8) := by
-      have hUpperReordered : x / 2 ^ r < 2 ^ (shift + 8 + shift) := by
-        simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hUpper
-      have h : x / 2 ^ r / 2 ^ shift < 2 ^ (shift + 8) :=
-        pow2_div_upper_from_value_upper (x / 2 ^ r) (shift + 8) shift hUpperReordered
-      simpa [Nat.div_div_eq_div_mul, ← Nat.pow_add] using h
-    simpa [hBranch] using hUpper'
-  · have hUpper' : x / 2 ^ r < 2 ^ (shift + 8) := by
-      have hPowPos : 0 < 2 ^ (shift + 8) := Nat.pow_pos (by decide : 0 < 2)
-      omega
-    simpa [hBranch] using hUpper'
-
-private theorem sqrtScanNat_lower_bound (x : Nat) (hx : 2 ^ 8 ≤ x) :
-    2 ^ 8 ≤ x / 2 ^ sqrtScanNat x := by
-  let r1 := sqrtScanStepNat x 0 128
-  have h1 : 2 ^ 8 ≤ x / 2 ^ r1 := by
-    simpa [r1] using sqrtScanStepNat_lower_bound x 0 128 (by simpa using hx)
-  let r2 := sqrtScanStepNat x r1 64
-  have h2 : 2 ^ 8 ≤ x / 2 ^ r2 := by
-    simpa [r2] using sqrtScanStepNat_lower_bound x r1 64 h1
-  let r3 := sqrtScanStepNat x r2 32
-  have h3 : 2 ^ 8 ≤ x / 2 ^ r3 := by
-    simpa [r3] using sqrtScanStepNat_lower_bound x r2 32 h2
-  let r4 := sqrtScanStepNat x r3 16
-  have h4 : 2 ^ 8 ≤ x / 2 ^ r4 := by
-    simpa [r4] using sqrtScanStepNat_lower_bound x r3 16 h3
-  simpa [sqrtScanNat, r1, r2, r3, r4] using h4
-
-private theorem sqrtScanNat_upper_bound (x : Nat) (hx : 2 ^ 8 ≤ x) (hxLt : x < 2 ^ 256) :
-    x / 2 ^ sqrtScanNat x < 2 ^ 24 := by
-  have h0Lower : 2 ^ 8 ≤ x / 2 ^ 0 := by simpa using hx
-  have h0Upper : x / 2 ^ 0 < 2 ^ (128 + (128 + 8)) := by
-    exact lt_of_lt_of_le (by simpa using hxLt) (by norm_num)
-  let r1 := sqrtScanStepNat x 0 128
-  have h1Lower : 2 ^ 8 ≤ x / 2 ^ r1 := by
-    simpa [r1] using sqrtScanStepNat_lower_bound x 0 128 h0Lower
-  have h1Upper : x / 2 ^ r1 < 2 ^ (128 + 8) := by
-    simpa [r1] using sqrtScanStepNat_upper_bound x 0 128 h0Upper
-  let r2 := sqrtScanStepNat x r1 64
-  have h2Lower : 2 ^ 8 ≤ x / 2 ^ r2 := by
-    simpa [r2] using sqrtScanStepNat_lower_bound x r1 64 h1Lower
-  have h2Upper : x / 2 ^ r2 < 2 ^ (64 + 8) := by
-    have hUpper : x / 2 ^ r1 < 2 ^ (64 + (64 + 8)) :=
-      lt_of_lt_of_le h1Upper (by norm_num)
-    simpa [r2] using sqrtScanStepNat_upper_bound x r1 64 hUpper
-  let r3 := sqrtScanStepNat x r2 32
-  have h3Lower : 2 ^ 8 ≤ x / 2 ^ r3 := by
-    simpa [r3] using sqrtScanStepNat_lower_bound x r2 32 h2Lower
-  have h3Upper : x / 2 ^ r3 < 2 ^ (32 + 8) := by
-    have hUpper : x / 2 ^ r2 < 2 ^ (32 + (32 + 8)) :=
-      lt_of_lt_of_le h2Upper (by norm_num)
-    simpa [r3] using sqrtScanStepNat_upper_bound x r2 32 hUpper
-  let r4 := sqrtScanStepNat x r3 16
-  have h4Upper : x / 2 ^ r4 < 2 ^ (16 + 8) := by
-    have hUpper : x / 2 ^ r3 < 2 ^ (16 + (16 + 8)) :=
-      lt_of_lt_of_le h3Upper (by norm_num)
-    simpa [r4] using sqrtScanStepNat_upper_bound x r3 16 hUpper
-  simpa [sqrtScanNat, r1, r2, r3, r4] using h4Upper
-
-private theorem sqrtScanStepNat_mod_16
-    (x r shift : Nat) (hr : r % 16 = 0) (hshift : shift % 16 = 0) :
-    (sqrtScanStepNat x r shift) % 16 = 0 := by
-  unfold sqrtScanStepNat
-  by_cases hBranch : 2 ^ (shift + 8) - 1 < x / 2 ^ r
-  · simp [hBranch, Nat.add_mod, hr, hshift]
-  · simp [hBranch, hr]
-
-private theorem sqrtScanNat_mod_16 (x : Nat) :
-    sqrtScanNat x % 16 = 0 := by
-  let r1 := sqrtScanStepNat x 0 128
-  have h1 : r1 % 16 = 0 := by
-    simpa [r1] using sqrtScanStepNat_mod_16 x 0 128 (by norm_num) (by norm_num)
-  let r2 := sqrtScanStepNat x r1 64
-  have h2 : r2 % 16 = 0 := by
-    simpa [r2] using sqrtScanStepNat_mod_16 x r1 64 h1 (by norm_num)
-  let r3 := sqrtScanStepNat x r2 32
-  have h3 : r3 % 16 = 0 := by
-    simpa [r3] using sqrtScanStepNat_mod_16 x r2 32 h2 (by norm_num)
-  let r4 := sqrtScanStepNat x r3 16
-  have h4 : r4 % 16 = 0 := by
-    simpa [r4] using sqrtScanStepNat_mod_16 x r3 16 h3 (by norm_num)
-  simpa [sqrtScanNat, r1, r2, r3, r4] using h4
-
-private theorem sqrtScanNat_even (x : Nat) :
-    2 ∣ sqrtScanNat x := by
-  have h16 : 16 ∣ sqrtScanNat x := by
-    rw [Nat.dvd_iff_mod_eq_zero]
-    exact sqrtScanNat_mod_16 x
-  exact dvd_trans (by norm_num : 2 ∣ 16) h16
-
-private theorem sqrtScanNat_pow_half_sq (x : Nat) :
-    2 ^ (sqrtScanNat x / 2) * 2 ^ (sqrtScanNat x / 2) =
-      2 ^ sqrtScanNat x := by
-  have hEven := sqrtScanNat_even x
-  have hMul : 2 * (sqrtScanNat x / 2) = sqrtScanNat x :=
-    Nat.mul_div_cancel' hEven
-  have hAdd : sqrtScanNat x / 2 + sqrtScanNat x / 2 = sqrtScanNat x := by
-    omega
-  rw [← Nat.pow_add, hAdd]
-
-private theorem sqrtSeedApprox_upper
-    (y : Nat) (hyLower : 2 ^ 8 ≤ y) (hyUpper : y < 2 ^ 24) :
-    ((181 : ℝ) * ((y : ℝ) + 65536) / (2 ^ 18 : ℝ)) ≤
-      ((23 : ℝ) / 8) * Real.sqrt (y : ℝ) := by
-  have hyNonneg : 0 ≤ (y : ℝ) := by positivity
-  have hyLowerR : (256 : ℝ) ≤ y := by exact_mod_cast hyLower
-  have hyUpperR : (y : ℝ) < 16777216 := by
-    norm_num at hyUpper ⊢
-    exact_mod_cast hyUpper
-  have hMain : ((y : ℝ) + 65536) ^ 2 ≤ 259 * 65536 * (y : ℝ) := by
-    by_cases hyLe : (y : ℝ) ≤ 65536
-    · nlinarith [hyLowerR, hyLe]
-    · have hyGe : (65536 : ℝ) ≤ y := le_of_not_ge hyLe
-      nlinarith [hyGe, le_of_lt hyUpperR]
-  have hPoly :
-      ((181 : ℝ) * ((y : ℝ) + 65536) * 8) ^ 2 ≤
-        (23 ^ 2 : ℝ) * (2 ^ 18 : ℝ) ^ 2 * (y : ℝ) := by
-    nlinarith
-  have hSq :
-      (((181 : ℝ) * ((y : ℝ) + 65536) / (2 ^ 18 : ℝ)) ^ 2) ≤
-        (((23 : ℝ) / 8) * Real.sqrt (y : ℝ)) ^ 2 := by
-    have hSqrtSq : (Real.sqrt (y : ℝ)) ^ 2 = (y : ℝ) :=
-      Real.sq_sqrt hyNonneg
-    field_simp
-    nlinarith
-  have hLeftNonneg :
-      0 ≤ ((181 : ℝ) * ((y : ℝ) + 65536) / (2 ^ 18 : ℝ)) := by positivity
-  have hRightNonneg :
-      0 ≤ ((23 : ℝ) / 8) * Real.sqrt (y : ℝ) := by positivity
-  have hAbs := sq_le_sq.mp hSq
-  rwa [abs_of_nonneg hLeftNonneg, abs_of_nonneg hRightNonneg] at hAbs
-
-private theorem sqrtSeedApprox_lower
-    (y : Nat) (hyLower : 2 ^ 8 ≤ y) :
-    ((8 : ℝ) / 23) * Real.sqrt ((y : ℝ) + 1) + 1 ≤
-      ((181 : ℝ) * ((y : ℝ) + 65536) / (2 ^ 18 : ℝ)) := by
-  have hyLowerR : (256 : ℝ) ≤ y := by exact_mod_cast hyLower
-  have hPoly :
-      (1024 : ℝ) * 65536 ^ 2 * ((y : ℝ) + 1) ≤
-        529 * (181 * (y : ℝ) + 177 * 65536) ^ 2 := by
-    have hSq :
-        0 ≤ (2 * (17330569 : ℝ) * (y : ℝ) - 2176694222848) ^ 2 :=
-      sq_nonneg _
-    nlinarith
-  have hRightNonneg :
-      0 ≤ ((181 : ℝ) * ((y : ℝ) + 65536) / (2 ^ 18 : ℝ) - 1) := by
-    nlinarith
-  have hLeftNonneg : 0 ≤ ((8 : ℝ) / 23) * Real.sqrt ((y : ℝ) + 1) := by
-    positivity
-  have hSq :
-      (((8 : ℝ) / 23) * Real.sqrt ((y : ℝ) + 1)) ^ 2 ≤
-        (((181 : ℝ) * ((y : ℝ) + 65536) / (2 ^ 18 : ℝ) - 1) ^ 2) := by
-    have hSqrtSq : (Real.sqrt ((y : ℝ) + 1)) ^ 2 = (y : ℝ) + 1 := by
-      exact Real.sq_sqrt (by positivity)
-    field_simp
-    nlinarith
-  have hAbs := sq_le_sq.mp hSq
-  rw [abs_of_nonneg hLeftNonneg, abs_of_nonneg hRightNonneg] at hAbs
-  linarith
-
-private theorem real_mul_sqrt_le_sqrt
-    {q y x : ℝ} (hq : 0 ≤ q) (hy : 0 ≤ y) (hx : 0 ≤ x)
-    (h : q * q * y ≤ x) :
-    q * Real.sqrt y ≤ Real.sqrt x := by
-  have hLeftNonneg : 0 ≤ q * Real.sqrt y := by positivity
-  have hRightNonneg : 0 ≤ Real.sqrt x := Real.sqrt_nonneg x
-  have hSq : (q * Real.sqrt y) ^ 2 ≤ (Real.sqrt x) ^ 2 := by
-    have hySq : (Real.sqrt y) ^ 2 = y := Real.sq_sqrt hy
-    have hxSq : (Real.sqrt x) ^ 2 = x := Real.sq_sqrt hx
-    nlinarith
-  have hAbs := sq_le_sq.mp hSq
-  rwa [abs_of_nonneg hLeftNonneg, abs_of_nonneg hRightNonneg] at hAbs
-
-private theorem real_sqrt_le_mul_sqrt
-    {q y x : ℝ} (hq : 0 ≤ q) (hy : 0 ≤ y) (hx : 0 ≤ x)
-    (h : x ≤ q * q * y) :
-    Real.sqrt x ≤ q * Real.sqrt y := by
-  have hLeftNonneg : 0 ≤ Real.sqrt x := Real.sqrt_nonneg x
-  have hRightNonneg : 0 ≤ q * Real.sqrt y := by positivity
-  have hSq : (Real.sqrt x) ^ 2 ≤ (q * Real.sqrt y) ^ 2 := by
-    have hySq : (Real.sqrt y) ^ 2 = y := Real.sq_sqrt hy
-    have hxSq : (Real.sqrt x) ^ 2 = x := Real.sq_sqrt hx
-    nlinarith
-  have hAbs := sq_le_sq.mp hSq
-  rwa [abs_of_nonneg hLeftNonneg, abs_of_nonneg hRightNonneg] at hAbs
-
-private def soladySqrtSeedNat (x : Nat) : Nat :=
-  let r := sqrtScanNat x
-  (181 * 2 ^ (r / 2) * (x / 2 ^ r + 65536)) / 2 ^ 18
-
-private theorem soladySqrtSeedNat_real_bounds
-    (x : Nat) (hx : 2 ^ 8 ≤ x) (hxLt : x < 2 ^ 256) :
-    0 < soladySqrtSeedNat x ∧
-      (1 / ((23 : ℝ) / 8) ≤
-        (soladySqrtSeedNat x : ℝ) / Real.sqrt (x : ℝ)) ∧
-      ((soladySqrtSeedNat x : ℝ) / Real.sqrt (x : ℝ) ≤ (23 : ℝ) / 8) := by
-  let r := sqrtScanNat x
-  let y := x / 2 ^ r
-  let q := 2 ^ (r / 2)
-  let n := 181 * q * (y + 65536)
-  let d := 2 ^ 18
-  have hyLower : 2 ^ 8 ≤ y := by
-    simpa [r, y] using sqrtScanNat_lower_bound x hx
-  have hyUpper : y < 2 ^ 24 := by
-    simpa [r, y] using sqrtScanNat_upper_bound x hx hxLt
-  have hdPosNat : 0 < d := by
-    norm_num [d]
-  have hqPosNat : 0 < q := by
-    dsimp [q]
-    exact Nat.pow_pos (by decide : 0 < 2)
-  have hqGeOneNat : 1 ≤ q := Nat.succ_le_of_lt hqPosNat
-  have hxPosNat : 0 < x := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hx
-  have hxPosReal : 0 < (x : ℝ) := Nat.cast_pos.2 hxPosNat
-  have hSqrtPos : 0 < Real.sqrt (x : ℝ) := Real.sqrt_pos.2 hxPosReal
-  have hqSqNat : q * q = 2 ^ r := by
-    simpa [r, q] using sqrtScanNat_pow_half_sq x
-  have hXLowerNat : q * q * y ≤ x := by
-    have hDivMul : y * 2 ^ r ≤ x := by
-      simpa [y] using Nat.div_mul_le_self x (2 ^ r)
-    rw [hqSqNat]
-    simpa [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm] using hDivMul
-  have hXUpperNat : x < q * q * (y + 1) := by
-    have hUpper := Nat.lt_mul_div_succ x
-      (show 0 < 2 ^ r from Nat.pow_pos (by decide : 0 < 2))
-    have hUpper' : x < (y + 1) * 2 ^ r := by
-      simpa [y, Nat.mul_comm] using hUpper
-    rw [← hqSqNat] at hUpper'
-    simpa [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm] using hUpper'
-  have hSeedEq :
-      soladySqrtSeedNat x = n / d := by
-    simp [soladySqrtSeedNat, r, y, q, n, d]
-  have hNReal :
-      (n : ℝ) / (d : ℝ) =
-        (q : ℝ) * (((181 : ℝ) * ((y : ℝ) + 65536)) / (2 ^ 18 : ℝ)) := by
-    simp [n, d]
-    ring
-  have hFloorUpper :
-      ((n / d : Nat) : ℝ) ≤ (n : ℝ) / (d : ℝ) := Nat.cast_div_le
-  have hFloorLower :
-      (n : ℝ) / (d : ℝ) - 1 < (n / d : Nat) := by
-    have hSucc := Nat.lt_mul_div_succ n hdPosNat
-    have hSuccR : (n : ℝ) < (d : ℝ) * ((n / d : Nat) + 1) := by
-      exact_mod_cast hSucc
-    have hdPosR : 0 < (d : ℝ) := Nat.cast_pos.2 hdPosNat
-    nlinarith
-  have hQsqrtLower :
-      (q : ℝ) * Real.sqrt (y : ℝ) ≤ Real.sqrt (x : ℝ) := by
-    apply real_mul_sqrt_le_sqrt
-    · positivity
-    · positivity
-    · positivity
-    · exact_mod_cast hXLowerNat
-  have hSqrtUpper :
-      Real.sqrt (x : ℝ) ≤ (q : ℝ) * Real.sqrt ((y : ℝ) + 1) := by
-    apply real_sqrt_le_mul_sqrt
-    · positivity
-    · positivity
-    · positivity
-    · exact_mod_cast (le_of_lt hXUpperNat)
-  have hApproxUpper := sqrtSeedApprox_upper y hyLower hyUpper
-  have hApproxLower := sqrtSeedApprox_lower y hyLower
-  have hSeedUpper :
-      (soladySqrtSeedNat x : ℝ) ≤ ((23 : ℝ) / 8) * Real.sqrt (x : ℝ) := by
-    rw [hSeedEq]
-    calc
-      ((n / d : Nat) : ℝ) ≤ (n : ℝ) / (d : ℝ) := hFloorUpper
-      _ = (q : ℝ) * (((181 : ℝ) * ((y : ℝ) + 65536)) / (2 ^ 18 : ℝ)) := hNReal
-      _ ≤ (q : ℝ) * (((23 : ℝ) / 8) * Real.sqrt (y : ℝ)) := by
-        exact mul_le_mul_of_nonneg_left hApproxUpper (by positivity)
-      _ ≤ ((23 : ℝ) / 8) * Real.sqrt (x : ℝ) := by
-        nlinarith
-  have hSeedLower :
-      ((8 : ℝ) / 23) * Real.sqrt (x : ℝ) ≤ (soladySqrtSeedNat x : ℝ) := by
-    rw [hSeedEq]
-    calc
-      ((8 : ℝ) / 23) * Real.sqrt (x : ℝ)
-          ≤ ((8 : ℝ) / 23) * ((q : ℝ) * Real.sqrt ((y : ℝ) + 1)) := by
-            exact mul_le_mul_of_nonneg_left hSqrtUpper (by norm_num)
-      _ ≤ (q : ℝ) *
-            (((181 : ℝ) * ((y : ℝ) + 65536)) / (2 ^ 18 : ℝ)) - 1 := by
-            have hqGeOne : (1 : ℝ) ≤ q := by exact_mod_cast hqGeOneNat
-            nlinarith
-      _ = (n : ℝ) / (d : ℝ) - 1 := by rw [hNReal]
-      _ ≤ ((n / d : Nat) : ℝ) := le_of_lt hFloorLower
-  have hSeedPos : 0 < soladySqrtSeedNat x := by
-    have hPositiveReal : (0 : ℝ) < soladySqrtSeedNat x := by
-      have hLowerPos : (0 : ℝ) < ((8 : ℝ) / 23) * Real.sqrt (x : ℝ) := by positivity
-      exact lt_of_lt_of_le hLowerPos hSeedLower
-    exact Nat.cast_pos.1 hPositiveReal
-  refine ⟨hSeedPos, ?_, ?_⟩
-  · have h : ((8 : ℝ) / 23) ≤ (soladySqrtSeedNat x : ℝ) / Real.sqrt (x : ℝ) := by
-      rw [le_div_iff₀ hSqrtPos]
-      exact hSeedLower
-    norm_num
-    simpa using h
-  · rw [div_le_iff₀ hSqrtPos]
-    exact hSeedUpper
-
-private def soladySqrtBeforeCorrectionNat (x : Nat) : Nat :=
-  sqrtIterNat 7 x (soladySqrtSeedNat x)
-
-private def soladySqrtNat (x : Nat) : Nat :=
-  sqrtCorrectNat x (soladySqrtBeforeCorrectionNat x)
-
-private theorem soladySqrtNat_property_small :
-    ∀ x : Fin 256,
-      soladySqrtNat x.val * soladySqrtNat x.val ≤ x.val ∧
-        x.val < (soladySqrtNat x.val + 1) * (soladySqrtNat x.val + 1) := by
-  native_decide
-
-private theorem soladySqrtNat_property_of_lt_256 (x : Nat) (hx : x < 256) :
-    soladySqrtNat x * soladySqrtNat x ≤ x ∧
-      x < (soladySqrtNat x + 1) * (soladySqrtNat x + 1) := by
-  simpa using soladySqrtNat_property_small ⟨x, hx⟩
-
-private theorem sqrtCorrectNat_property
-    (x z : Nat) (hz : 0 < z)
-    (hLower : (z - 1) * (z - 1) ≤ x)
-    (hUpper : x < (z + 1) * (z + 1)) :
-    sqrtCorrectNat x z * sqrtCorrectNat x z ≤ x ∧
-      x < (sqrtCorrectNat x z + 1) * (sqrtCorrectNat x z + 1) := by
-  unfold sqrtCorrectNat
-  by_cases hBranch : x / z < z
-  · have hUpper' : x < z * z := by
-      exact (Nat.div_lt_iff_lt_mul hz).1 hBranch
-    have hSuccPred : z - 1 + 1 = z := Nat.sub_add_cancel hz
-    simpa [hBranch, hSuccPred] using And.intro hLower hUpper'
-  · have hLower' : z * z ≤ x := by
-      have hLe : z ≤ x / z := Nat.le_of_not_gt hBranch
-      exact (Nat.le_div_iff_mul_le hz).1 hLe
-    simp [hBranch, hLower', hUpper]
-
-private theorem sqrtStepNat_ge_floor (x z : Nat) (hz : 0 < z) :
-    Nat.sqrt x ≤ sqrtStepNat x z := by
-  unfold sqrtStepNat
-  let a := Nat.sqrt x
-  have ha2 : a * a ≤ x := by
-    simpa [a] using Nat.sqrt_le x
-  have hsum : a * 2 ≤ z + x / z := by
-    by_cases hzle : z ≤ 2 * a
-    · have hmul : (2 * a - z) * z ≤ a * a := by
-        have hmulInt :
-            ((2 * a - z : Nat) : Int) * (z : Int) ≤ (a : Int) * (a : Int) := by
-          have hcast :
-              ((2 * a - z : Nat) : Int) = 2 * (a : Int) - (z : Int) := by
-            exact Nat.cast_sub hzle
-          rw [hcast]
-          nlinarith [sq_nonneg ((z : Int) - (a : Int))]
-        exact_mod_cast hmulInt
-      have hmulX : (2 * a - z) * z ≤ x := le_trans hmul ha2
-      have hdiv : 2 * a - z ≤ x / z :=
-        (Nat.le_div_iff_mul_le hz).2 hmulX
-      omega
-    · have hgt : 2 * a < z := Nat.lt_of_not_ge hzle
-      have hle : a * 2 ≤ z := by omega
-      exact le_trans hle (Nat.le_add_right _ _)
-  have hdiv2 : a ≤ (z + x / z) / 2 :=
-    (Nat.le_div_iff_mul_le (by decide : 0 < 2)).2 (by
-      simpa [Nat.mul_comm] using hsum)
-  simpa [a] using hdiv2
-
-private theorem sqrtStepNat_pos (x z : Nat) (hx : 0 < x) (hz : 0 < z) :
-    0 < sqrtStepNat x z := by
-  unfold sqrtStepNat
-  cases z with
-  | zero => cases hz
-  | succ z' =>
-      cases z' with
-      | zero =>
-          have hDiv : x / 1 = x := Nat.div_one x
-          rw [hDiv]
-          exact Nat.div_pos (by omega) (by decide : 0 < 2)
-      | succ z'' =>
-          have hNum :
-              2 ≤ Nat.succ (Nat.succ z'') + x / Nat.succ (Nat.succ z'') :=
-            Nat.le_add_right_of_le (by omega)
-          exact Nat.div_pos hNum (by decide : 0 < 2)
-
-private theorem sqrtNewtonRatioUpper
-    {u t : ℝ} (hu : 1 ≤ u) (htPos : 0 < t)
-    (htLower : 1 / u ≤ t) (htUpper : t ≤ u) :
-    (t + 1 / t) / 2 ≤ (u + 1 / u) / 2 := by
-  have huPos : 0 < u := lt_of_lt_of_le zero_lt_one hu
-  have htNe : t ≠ 0 := ne_of_gt htPos
-  have huNe : u ≠ 0 := ne_of_gt huPos
-  have hUminus : 0 ≤ u - t := sub_nonneg.mpr htUpper
-  have hUt : 1 ≤ u * t := by
-    have hMul := mul_le_mul_of_nonneg_left htLower (le_of_lt huPos)
-    have hLeft : u * (1 / u) = 1 := by field_simp [huNe]
-    linarith
-  have hUtminus : 0 ≤ u * t - 1 := sub_nonneg.mpr hUt
-  have hprod : 0 ≤ (u - t) * (u * t - 1) := mul_nonneg hUminus hUtminus
-  have hden : 0 < u * t := mul_pos huPos htPos
-  have hmain : 0 ≤ (u + 1 / u) - (t + 1 / t) := by
-    have hEq :
-        (u + 1 / u) - (t + 1 / t) = ((u - t) * (u * t - 1)) / (u * t) := by
-      field_simp [huNe, htNe]
-      ring
-    rw [hEq]
-    exact div_nonneg hprod (le_of_lt hden)
-  linarith
-
-private def sqrtNewtonBoundRat : Nat → ℚ
-  | 0 => (23 : ℚ) / 8
-  | steps + 1 =>
-      let u := sqrtNewtonBoundRat steps
-      (u + 1 / u) / 2
-
-private theorem sqrtNewtonBoundRat_ge_one (steps : Nat) :
-    1 ≤ sqrtNewtonBoundRat steps := by
-  induction steps with
-  | zero => native_decide
-  | succ steps ih =>
-      dsimp [sqrtNewtonBoundRat]
-      let u := sqrtNewtonBoundRat steps
-      have hu : 1 ≤ u := ih
-      have huPos : 0 < u := lt_of_lt_of_le zero_lt_one hu
-      have h : 2 ≤ u + 1 / u := by
-        have hnonneg : 0 ≤ (u - 1) * (u - 1) / u :=
-          div_nonneg (mul_nonneg (sub_nonneg.mpr hu) (sub_nonneg.mpr hu)) (le_of_lt huPos)
-        have hEq : u + 1 / u - 2 = (u - 1) * (u - 1) / u := by
-          field_simp [ne_of_gt huPos]
-          ring
-        linarith
-      linarith
-
-private theorem sqrtNewtonBoundRat_pos (steps : Nat) :
-    0 < sqrtNewtonBoundRat steps :=
-  lt_of_lt_of_le zero_lt_one (sqrtNewtonBoundRat_ge_one steps)
-
-private theorem sqrtNewtonBoundRat_seven_tight :
-    sqrtNewtonBoundRat 7 < (1 : ℚ) + 1 / ((2 : ℚ) ^ 128) := by
-  native_decide
-
-private theorem sqrtNewtonBoundRat_seven_real_tight :
-    ((sqrtNewtonBoundRat 7 : ℚ) : ℝ) < (1 : ℝ) + 1 / ((2 : ℝ) ^ 128) := by
-  have hRhs :
-      (((1 : ℚ) + 1 / ((2 : ℚ) ^ 128) : ℚ) : ℝ) =
-        (1 : ℝ) + 1 / ((2 : ℝ) ^ 128) := by
-    norm_num
-  rw [← hRhs]
-  exact Rat.cast_lt.2 sqrtNewtonBoundRat_seven_tight
-
-private theorem sqrtStepNat_real_ratio_upper
-    (x z : Nat) (hx : 0 < x) (hz : 0 < z) {u : ℝ}
-    (hu : 1 ≤ u)
-    (hLowerRatio : 1 / u ≤ (z : ℝ) / Real.sqrt (x : ℝ))
-    (hUpperRatio : (z : ℝ) / Real.sqrt (x : ℝ) ≤ u) :
-    (sqrtStepNat x z : ℝ) ≤ ((u + 1 / u) / 2) * Real.sqrt (x : ℝ) := by
-  let α := Real.sqrt (x : ℝ)
-  have hxRealPos : 0 < (x : ℝ) := Nat.cast_pos.2 hx
-  have hαPos : 0 < α := by
-    simpa [α] using Real.sqrt_pos.2 hxRealPos
-  have hαNe : α ≠ 0 := ne_of_gt hαPos
-  have hzRealPos : 0 < (z : ℝ) := Nat.cast_pos.2 hz
-  have hzRealNe : (z : ℝ) ≠ 0 := ne_of_gt hzRealPos
-  have hStepCast : (sqrtStepNat x z : ℝ) ≤ ((z + x / z : Nat) : ℝ) / 2 := by
-    unfold sqrtStepNat
-    exact Nat.cast_div_le
-  have hDivCast : ((x / z : Nat) : ℝ) ≤ (x : ℝ) / (z : ℝ) := Nat.cast_div_le
-  have hAddCast :
-      ((z + x / z : Nat) : ℝ) / 2 ≤ ((z : ℝ) + (x : ℝ) / (z : ℝ)) / 2 := by
-    norm_num
-    nlinarith [hDivCast]
-  have hRealStep :
-      ((z : ℝ) + (x : ℝ) / (z : ℝ)) / 2 =
-        (((z : ℝ) / α + 1 / ((z : ℝ) / α)) / 2) * α := by
-    have hsq : α ^ 2 = (x : ℝ) := by
-      dsimp [α]
-      exact Real.sq_sqrt (le_of_lt hxRealPos)
-    rw [← hsq]
-    field_simp [hαNe, hzRealNe]
-    ring
-  have htPos : 0 < (z : ℝ) / α := div_pos hzRealPos hαPos
-  have hRatio := sqrtNewtonRatioUpper (u := u) (t := (z : ℝ) / α)
-    hu htPos (by simpa [α] using hLowerRatio) (by simpa [α] using hUpperRatio)
-  have hMul := mul_le_mul_of_nonneg_right hRatio (le_of_lt hαPos)
-  calc
-    (sqrtStepNat x z : ℝ) ≤ ((z + x / z : Nat) : ℝ) / 2 := hStepCast
-    _ ≤ ((z : ℝ) + (x : ℝ) / (z : ℝ)) / 2 := hAddCast
-    _ = (((z : ℝ) / α + 1 / ((z : ℝ) / α)) / 2) * α := hRealStep
-    _ ≤ ((u + 1 / u) / 2) * α := hMul
-    _ = ((u + 1 / u) / 2) * Real.sqrt (x : ℝ) := rfl
-
-private theorem sqrt_near_floor_property
-    (x z : Nat)
-    (hLower : Nat.sqrt x ≤ z)
-    (hUpper : z ≤ Nat.sqrt x + 1) :
-    (z - 1) * (z - 1) ≤ x ∧ x < (z + 1) * (z + 1) := by
-  constructor
-  · have hzPred : z - 1 ≤ Nat.sqrt x := by omega
-    exact le_trans (Nat.mul_le_mul hzPred hzPred) (Nat.sqrt_le x)
-  · have hSuccLe : Nat.sqrt x + 1 ≤ z + 1 := by omega
-    exact lt_of_lt_of_le (Nat.lt_succ_sqrt x) (Nat.mul_le_mul hSuccLe hSuccLe)
-
-private theorem sqrtStepNat_near_of_near
-    (x z : Nat) (hx : 0 < x)
-    (hLower : Nat.sqrt x ≤ z)
-    (hUpper : z ≤ Nat.sqrt x + 1) :
-    sqrtStepNat x z ≤ Nat.sqrt x + 1 := by
-  let a := Nat.sqrt x
-  have haPos : 0 < a := by
-    have hx1 : 1 ≤ x := hx
-    have h : 1 * 1 ≤ x := by simpa using hx1
-    exact (Nat.le_sqrt).2 h
-  have hzCases : z = a ∨ z = a + 1 := by omega
-  rcases hzCases with hzEq | hzEq
-  · have hDivA : x / a ≤ a + 2 := by
-      have hMulLt : x < a * (a + 3) := by
-        have hSqrt := Nat.lt_succ_sqrt x
-        nlinarith
-      have hDivLt : x / a < a + 3 := (Nat.div_lt_iff_lt_mul haPos).2 (by
-        simpa [Nat.mul_comm] using hMulLt)
-      omega
-    unfold sqrtStepNat
-    rw [hzEq]
-    have hNum : a + x / a ≤ 2 * (a + 1) := by omega
-    exact Nat.div_le_of_le_mul hNum
-  · have hDivA : x / (a + 1) ≤ a := by
-      have hDivLt : x / (a + 1) < a + 1 :=
-        (Nat.div_lt_iff_lt_mul (Nat.succ_pos a)).2 (by
-          simpa [Nat.pow_two, Nat.mul_assoc] using Nat.lt_succ_sqrt x)
-      omega
-    unfold sqrtStepNat
-    rw [hzEq]
-    have hNum : a + 1 + x / (a + 1) ≤ 2 * (a + 1) := by omega
-    exact Nat.div_le_of_le_mul hNum
-
-private theorem sqrtIterNat_near_or_bound
-    (steps k x z : Nat) (hx : 0 < x) (hz : 0 < z)
-    (hFloor : Nat.sqrt x ≤ z)
-    (hState :
-      z ≤ Nat.sqrt x + 1 ∨
-        (z : ℝ) ≤ ((sqrtNewtonBoundRat k : ℚ) : ℝ) * Real.sqrt (x : ℝ)) :
-    Nat.sqrt x ≤ sqrtIterNat steps x z ∧
-      (sqrtIterNat steps x z ≤ Nat.sqrt x + 1 ∨
-        (sqrtIterNat steps x z : ℝ) ≤
-          ((sqrtNewtonBoundRat (k + steps) : ℚ) : ℝ) * Real.sqrt (x : ℝ)) := by
-  induction steps generalizing k z with
-  | zero =>
-      simpa using And.intro hFloor hState
-  | succ steps ih =>
-      let z1 := sqrtStepNat x z
-      have hz1Floor : Nat.sqrt x ≤ z1 := by
-        simpa [z1] using sqrtStepNat_ge_floor x z hz
-      have hz1Pos : 0 < z1 := by
-        simpa [z1] using sqrtStepNat_pos x z hx hz
-      have hz1State :
-          z1 ≤ Nat.sqrt x + 1 ∨
-            (z1 : ℝ) ≤ ((sqrtNewtonBoundRat (k + 1) : ℚ) : ℝ) *
-              Real.sqrt (x : ℝ) := by
-        rcases hState with hNear | hBound
-        · left
-          simpa [z1] using sqrtStepNat_near_of_near x z hx hFloor hNear
-        · by_cases hNear : z ≤ Nat.sqrt x + 1
-          · left
-            simpa [z1] using sqrtStepNat_near_of_near x z hx hFloor hNear
-          · right
-            let u : ℝ := ((sqrtNewtonBoundRat k : ℚ) : ℝ)
-            have hu : 1 ≤ u := by
-              simpa [u] using Rat.cast_le.2 (sqrtNewtonBoundRat_ge_one k)
-            have huPos : 0 < u := lt_of_lt_of_le zero_lt_one hu
-            have hSqrtPos : 0 < Real.sqrt (x : ℝ) := by
-              exact Real.sqrt_pos.2 (Nat.cast_pos.2 hx)
-            have hUpperRatio : (z : ℝ) / Real.sqrt (x : ℝ) ≤ u := by
-              rw [div_le_iff₀ hSqrtPos]
-              simpa [u] using hBound
-            have hAlphaLtZ : Real.sqrt (x : ℝ) < (z : ℝ) := by
-              have hAlphaSucc : Real.sqrt (x : ℝ) < (Nat.sqrt x : ℝ) + 1 :=
-                Real.real_sqrt_lt_nat_sqrt_succ
-              have hzGt : Nat.sqrt x + 1 < z := Nat.lt_of_not_ge hNear
-              exact lt_trans hAlphaSucc (by exact_mod_cast hzGt)
-            have hOneLeRatio : (1 : ℝ) ≤ (z : ℝ) / Real.sqrt (x : ℝ) := by
-              rw [le_div_iff₀ hSqrtPos]
-              simpa [one_mul] using le_of_lt hAlphaLtZ
-            have hInvLeOne : (1 : ℝ) / u ≤ 1 := by
-              exact (div_le_one huPos).2 hu
-            have hLowerRatio : (1 : ℝ) / u ≤ (z : ℝ) / Real.sqrt (x : ℝ) :=
-              le_trans hInvLeOne hOneLeRatio
-            have hStepUpper := sqrtStepNat_real_ratio_upper
-              (x := x) (z := z) hx hz (u := u) hu hLowerRatio hUpperRatio
-            have hNext :
-                (z1 : ℝ) ≤ ((u + 1 / u) / 2) * Real.sqrt (x : ℝ) := by
-              simpa [z1] using hStepUpper
-            simpa [z1, u, sqrtNewtonBoundRat] using hNext
-      have hTail := ih (k + 1) z1 hz1Pos hz1Floor hz1State
-      have hIndex : k + 1 + steps = k + (steps + 1) := by omega
-      simpa [sqrtIterNat, z1, hIndex] using hTail
-
-private theorem sqrt_near_of_final_ratio_bound
-    (x z : Nat) (hx : 0 < x) (hxLt : x < 2 ^ 256)
-    (hBound :
-      (z : ℝ) ≤ ((sqrtNewtonBoundRat 7 : ℚ) : ℝ) * Real.sqrt (x : ℝ)) :
-    z ≤ Nat.sqrt x + 1 := by
-  let α := Real.sqrt (x : ℝ)
-  have hαPos : 0 < α := by
-    simpa [α] using Real.sqrt_pos.2 (Nat.cast_pos.2 hx)
-  have hαLtPow : α < (2 : ℝ) ^ 128 := by
-    have hxLtR : (x : ℝ) < (2 : ℝ) ^ 256 := by exact_mod_cast hxLt
-    have hPowEq : ((2 : ℝ) ^ 128) ^ 2 = (2 : ℝ) ^ 256 := by
-      rw [sq, ← pow_add]
-    rw [Real.sqrt_lt' (by positivity : 0 < (2 : ℝ) ^ 128)]
-    rw [hPowEq]
-    exact hxLtR
-  have hTight := sqrtNewtonBoundRat_seven_real_tight
-  have hMulTight :
-      ((sqrtNewtonBoundRat 7 : ℚ) : ℝ) * α <
-        ((1 : ℝ) + 1 / ((2 : ℝ) ^ 128)) * α := by
-    exact mul_lt_mul_of_pos_right hTight hαPos
-  have hExtra : (1 / ((2 : ℝ) ^ 128)) * α < 1 := by
-    rw [one_div_mul_eq_div]
-    rw [div_lt_one (by positivity : 0 < (2 : ℝ) ^ 128)]
-    exact hαLtPow
-  have hZLt : (z : ℝ) < α + 1 := by
-    nlinarith [hBound, hMulTight, hExtra]
-  have hAlphaSucc : α < (Nat.sqrt x : ℝ) + 1 := by
-    simpa [α] using (Real.real_sqrt_lt_nat_sqrt_succ (a := x))
-  have hZLtNat : (z : ℝ) < (Nat.sqrt x + 2 : Nat) := by
-    have h : α + 1 < (Nat.sqrt x : ℝ) + 2 := by nlinarith
-    simpa using lt_trans hZLt h
-  have hNat : z < Nat.sqrt x + 2 := by exact_mod_cast hZLtNat
-  omega
-
-private theorem soladySqrtBeforeCorrectionNat_near_floor
-    (x : Nat) (hx : 2 ^ 8 ≤ x) (hxLt : x < 2 ^ 256) :
-    Nat.sqrt x ≤ soladySqrtBeforeCorrectionNat x ∧
-      soladySqrtBeforeCorrectionNat x ≤ Nat.sqrt x + 1 := by
-  let z0 := soladySqrtSeedNat x
-  let z1 := sqrtStepNat x z0
-  have hxPos : 0 < x := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hx
-  have hSeed := soladySqrtSeedNat_real_bounds x hx hxLt
-  have hz0Pos : 0 < z0 := by simpa [z0] using hSeed.1
-  have hU0 : (1 : ℝ) ≤ (23 : ℝ) / 8 := by norm_num
-  have hStepUpperRaw := sqrtStepNat_real_ratio_upper
-    (x := x) (z := z0) hxPos hz0Pos (u := (23 : ℝ) / 8) hU0
-    (by simpa [z0] using hSeed.2.1)
-    (by simpa [z0] using hSeed.2.2)
-  have hz1Bound :
-      (z1 : ℝ) ≤ ((sqrtNewtonBoundRat 1 : ℚ) : ℝ) * Real.sqrt (x : ℝ) := by
-    simpa [z1, sqrtNewtonBoundRat] using hStepUpperRaw
-  have hz1Floor : Nat.sqrt x ≤ z1 := by
-    simpa [z1] using sqrtStepNat_ge_floor x z0 hz0Pos
-  have hz1Pos : 0 < z1 := by
-    simpa [z1] using sqrtStepNat_pos x z0 hxPos hz0Pos
-  have hIter := sqrtIterNat_near_or_bound 6 1 x z1 hxPos hz1Pos hz1Floor (Or.inr hz1Bound)
-  have hBeforeEq :
-      soladySqrtBeforeCorrectionNat x = sqrtIterNat 6 x z1 := by
-    simp [soladySqrtBeforeCorrectionNat, z0, z1, sqrtIterNat]
-  constructor
-  · rw [hBeforeEq]
-    exact hIter.1
-  · rw [hBeforeEq]
-    rcases hIter.2 with hNear | hBound
-    · exact hNear
-    · have hIndex : 1 + 6 = 7 := by norm_num
-      exact sqrt_near_of_final_ratio_bound x (sqrtIterNat 6 x z1) hxPos hxLt (by
-        simpa [hIndex] using hBound)
-
-private theorem soladySqrtNat_property (x : Nat) (hxLt : x < 2 ^ 256) :
-    soladySqrtNat x * soladySqrtNat x ≤ x ∧
-      x < (soladySqrtNat x + 1) * (soladySqrtNat x + 1) := by
-  by_cases hxSmall : x < 2 ^ 8
-  · exact soladySqrtNat_property_of_lt_256 x (by simpa using hxSmall)
-  · have hxLarge : 2 ^ 8 ≤ x := Nat.le_of_not_gt hxSmall
-    let z := soladySqrtBeforeCorrectionNat x
-    have hNear : Nat.sqrt x ≤ z ∧ z ≤ Nat.sqrt x + 1 := by
-      simpa [z] using soladySqrtBeforeCorrectionNat_near_floor x hxLarge hxLt
-    have hzPos : 0 < z := by
-      have hSqrtPos : 0 < Nat.sqrt x := by
-        have h : 1 * 1 ≤ x := by omega
-        exact (Nat.le_sqrt).2 h
-      exact lt_of_lt_of_le hSqrtPos hNear.1
-    have hBounds := sqrt_near_floor_property x z hNear.1 hNear.2
-    simpa [soladySqrtNat, z] using
-      sqrtCorrectNat_property x z hzPos hBounds.1 hBounds.2
-
 private def cbrt_property (x result : Uint256) : Prop :=
   result.val * result.val * result.val ≤ x.val ∧
   x.val < (result.val + 1) * (result.val + 1) * (result.val + 1)
-
-private def cbrtCorrectNat (x z : Nat) : Nat :=
-  if x / (z * z) < z then z - 1 else z
-
-private theorem cbrtCorrectNat_property
-    (x z : Nat) (hz : 0 < z)
-    (hLower : (z - 1) * (z - 1) * (z - 1) ≤ x)
-    (hUpper : x < (z + 1) * (z + 1) * (z + 1)) :
-    cbrtCorrectNat x z * cbrtCorrectNat x z * cbrtCorrectNat x z ≤ x ∧
-      x < (cbrtCorrectNat x z + 1) * (cbrtCorrectNat x z + 1) *
-        (cbrtCorrectNat x z + 1) := by
-  unfold cbrtCorrectNat
-  have hzz : 0 < z * z := Nat.mul_pos hz hz
-  by_cases hBranch : x / (z * z) < z
-  · have hUpper' : x < z * (z * z) := by
-      exact (Nat.div_lt_iff_lt_mul hzz).1 hBranch
-    have hSuccPred : z - 1 + 1 = z := Nat.sub_add_cancel hz
-    constructor
-    · simpa [hBranch] using hLower
-    · simpa [hBranch, hSuccPred, Nat.mul_assoc, Nat.mul_left_comm, Nat.mul_comm] using hUpper'
-  · have hLower' : z * z * z ≤ x := by
-      have hLe : z ≤ x / (z * z) := Nat.le_of_not_gt hBranch
-      have hRaw := (Nat.le_div_iff_mul_le hzz).1 hLe
-      simpa [Nat.mul_assoc, Nat.mul_left_comm, Nat.mul_comm] using hRaw
-    simp [hBranch, hLower', hUpper]
 
 private def logFloor_property (base : Nat) (x result : Uint256) : Prop :=
   (x.val = 0 → result = 0) ∧
@@ -924,6 +166,18 @@ private theorem shl_val (shift value : Uint256) :
   simp [shl, Verity.Core.Uint256.shl, Verity.Core.Uint256.ofNat,
     Nat.shiftLeft_eq]
 
+private theorem shl_zero_of_shift_ge_256 (shift value : Uint256)
+    (h : 256 ≤ shift.val) :
+    (shl shift value).val = 0 := by
+  rw [shl_val]
+  have hshift : shift.val = 256 + (shift.val - 256) := by omega
+  rw [hshift, Nat.pow_add]
+  change value.val * (2 ^ 256 * 2 ^ (shift.val - 256)) % 2 ^ 256 = 0
+  rw [← Nat.mul_assoc]
+  rw [Nat.mul_comm value.val (2 ^ 256)]
+  rw [Nat.mul_assoc]
+  exact Nat.mul_mod_right _ _
+
 private def uintOfNat (n : Nat) : Uint256 :=
   Verity.Core.Uint256.ofNat n
 
@@ -955,6 +209,11 @@ private theorem mul_small_val (a : Uint256) {b : Nat}
   simpa [HMul.hMul, uintOfNat_val_of_lt hbLt] using
     Verity.Core.Uint256.mul_eq_of_lt (a := a) (b := uintOfNat b) hMulLt
 
+private theorem add_val_of_lt (a b : Uint256)
+    (h : a.val + b.val < Verity.Core.Uint256.modulus) :
+    (add a b).val = a.val + b.val := by
+  simpa [HAdd.hAdd] using Verity.Core.Uint256.add_eq_of_lt (a := a) (b := b) h
+
 private theorem sub_small_val (a : Uint256) {b : Nat}
     (h : b ≤ a.val) :
     (sub a (uintOfNat b)).val = a.val - b := by
@@ -965,6 +224,18 @@ private theorem sub_small_val (a : Uint256) {b : Nat}
     exact h
   simpa [HSub.hSub, uintOfNat_val_of_lt hbLt] using
     Verity.Core.Uint256.sub_eq_of_le (a := a) (b := uintOfNat b) hLe
+
+private theorem sub_zero_val (a : Uint256) :
+    (sub a 0).val = a.val := by
+  have hLe : (0 : Uint256).val ≤ a.val := by simp
+  simpa [HSub.hSub] using
+    Verity.Core.Uint256.sub_eq_of_le (a := a) (b := (0 : Uint256)) hLe
+
+private theorem sub_boolToWord_val_eq_if (z : Uint256) (p : Prop) [Decidable p] :
+    (sub z (boolToWord p)).val = (if p then sub z 1 else z).val := by
+  by_cases hp : p
+  · simp [hp, boolToWord]
+  · simp [hp, boolToWord, sub_zero_val]
 
 private theorem bitOr_val (a b : Uint256) :
     (Contracts.bitOr a b).val =
@@ -996,6 +267,325 @@ private theorem mod_val (a b : Uint256) (hb : b.val ≠ 0) :
   simp [HMod.hMod, mod, Verity.Core.Uint256.mod, hb, Verity.Core.Uint256.ofNat]
   exact Nat.mod_eq_of_lt hLt
 
+private theorem byte_val (index value : Uint256) :
+    (byte index value).val =
+      if index.val > 31 then 0 else (value.val / 2 ^ ((31 - index.val) * 8)) % 256 := by
+  by_cases h : 31 < index.val
+  · simp [Verity.Core.Uint256.byte, Verity.Core.Uint256.ofNat, h]
+  · simp [Verity.Core.Uint256.byte, Verity.Core.Uint256.ofNat, Nat.shiftRight_eq_div_pow,
+      h, Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS]
+    rw [Nat.and_two_pow_sub_one_eq_mod
+      (x := value.val / 2 ^ ((31 - index.val) * 8)) (n := 8)]
+    exact Nat.mod_eq_of_lt (lt_trans (Nat.mod_lt _ (by norm_num : 0 < 256))
+      (by native_decide : 256 < 2 ^ 256))
+
+private theorem cbrtSeedExpr_val (bU : Uint256) (b : Nat)
+    (hbVal : bU.val = b + 2) (hbLt256 : b < 256) :
+    (shr 7 (shl (div bU 3) (add 90 (mul 26 (mod bU 3))))).val =
+      (cbrtSeedMultiplier b * 2 ^ (b / 3)) / 2 ^ 7 := by
+  have hThree : (3 : Uint256).val = 3 := by native_decide
+  have hDivBVal : (div bU 3).val = (b + 2) / 3 := by
+    rw [div_val bU 3 (by rw [hThree]; norm_num), hbVal, hThree]
+  have hModBVal : (mod bU 3).val = (b + 2) % 3 := by
+    rw [mod_val bU 3 (by rw [hThree]; norm_num), hbVal, hThree]
+  have hModLt : (b + 2) % 3 < 3 := Nat.mod_lt _ (by decide)
+  have h26 : (26 : Uint256).val = 26 := by native_decide
+  have hMulLt :
+      (26 : Uint256).val * (mod bU 3).val < Verity.Core.Uint256.modulus := by
+    rw [h26, hModBVal]
+    have hLe : 26 * ((b + 2) % 3) ≤ 52 := by omega
+    have hBound : 52 < Verity.Core.Uint256.modulus := by native_decide
+    exact lt_of_le_of_lt hLe hBound
+  have hMulVal : (mul 26 (mod bU 3)).val = 26 * ((b + 2) % 3) := by
+    simpa [HMul.hMul, h26, hModBVal] using
+      Verity.Core.Uint256.mul_eq_of_lt (a := (26 : Uint256)) (b := mod bU 3) hMulLt
+  have h90 : (90 : Uint256).val = 90 := by native_decide
+  have hAddLt :
+      (90 : Uint256).val + (mul 26 (mod bU 3)).val <
+        Verity.Core.Uint256.modulus := by
+    rw [h90, hMulVal]
+    have hLe : 90 + 26 * ((b + 2) % 3) ≤ 142 := by omega
+    have hBound : 142 < Verity.Core.Uint256.modulus := by native_decide
+    exact lt_of_le_of_lt hLe hBound
+  have hMultiplierVal :
+      (add 90 (mul 26 (mod bU 3))).val = 90 + 26 * ((b + 2) % 3) := by
+    rw [add_val_of_lt _ _ hAddLt, h90, hMulVal]
+  let multiplier := add 90 (mul 26 (mod bU 3))
+  have hMultiplierLe : multiplier.val ≤ 142 := by
+    rw [show multiplier.val = 90 + 26 * ((b + 2) % 3) by simpa [multiplier] using hMultiplierVal]
+    omega
+  have hDivLe : (b + 2) / 3 ≤ 85 := by omega
+  have hShlLt : multiplier.val * 2 ^ (div bU 3).val <
+      Verity.Core.Uint256.modulus := by
+    rw [hDivBVal]
+    have hPow : 2 ^ ((b + 2) / 3) ≤ 2 ^ 85 :=
+      Nat.pow_le_pow_right (by decide : 1 ≤ 2) hDivLe
+    have hMul : multiplier.val * 2 ^ ((b + 2) / 3) ≤ 142 * 2 ^ 85 :=
+      Nat.mul_le_mul hMultiplierLe hPow
+    have hBound : 142 * 2 ^ 85 < Verity.Core.Uint256.modulus := by native_decide
+    exact lt_of_le_of_lt hMul hBound
+  have hShlVal : (shl (div bU 3) multiplier).val =
+      multiplier.val * 2 ^ ((b + 2) / 3) := by
+    rw [shl_val, hDivBVal]
+    exact Nat.mod_eq_of_lt (by simpa [hDivBVal] using hShlLt)
+  have hSeven : (7 : Uint256).val = 7 := by native_decide
+  have hShrVal : (shr 7 (shl (div bU 3) multiplier)).val =
+      (multiplier.val * 2 ^ ((b + 2) / 3)) / 2 ^ 7 := by
+    rw [shr_val, hShlVal, hSeven]
+  have hSeedExpr :
+      (multiplier.val * 2 ^ ((b + 2) / 3)) / 2 ^ 7 =
+        (cbrtSeedMultiplier b * 2 ^ (b / 3)) / 2 ^ 7 := by
+    rw [show multiplier.val = 90 + 26 * ((b + 2) % 3) by simpa [multiplier] using hMultiplierVal]
+    unfold cbrtSeedMultiplier
+    have hCases : b % 3 = 0 ∨ b % 3 = 1 ∨ b % 3 = 2 := by omega
+    rcases hCases with h | h | h
+    · have hmod : (b + 2) % 3 = 2 := by omega
+      have hdiv : (b + 2) / 3 = b / 3 := by omega
+      simp [h, hmod, hdiv]
+    · have hmod : (b + 2) % 3 = 0 := by omega
+      have hdiv : (b + 2) / 3 = b / 3 + 1 := by omega
+      simp [h, hmod, hdiv, Nat.pow_succ]
+      rw [Nat.mul_comm (2 ^ (b / 3)) 2, ← Nat.mul_assoc]
+    · have hmod : (b + 2) % 3 = 1 := by omega
+      have hdiv : (b + 2) / 3 = b / 3 + 1 := by omega
+      simp [h, hmod, hdiv, Nat.pow_succ]
+      rw [Nat.mul_comm (2 ^ (b / 3)) 2, ← Nat.mul_assoc]
+  simpa [multiplier] using hShrVal.trans hSeedExpr
+
+@[simp] private theorem uintOne_val : (1 : Uint256).val = 1 := by
+  native_decide
+
+@[simp] private theorem uintTwoFiveSix_val : (256 : Uint256).val = 256 := by
+  native_decide
+
+private theorem sqrtExponentUint_val (x : Uint256) :
+    (shr 1 (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x))).val =
+      if x.val = 0 then 0 else (Nat.log2 x.val + 1) / 2 := by
+  rw [shr_val]
+  by_cases hx0 : x.val = 0
+  · have hClz :
+        (Tamago.Proof.Utils.ClzProof.clzFormulaUint x).val = 256 := by
+      simp [Tamago.Proof.Utils.ClzProof.clzFormulaUint_val, hx0]
+    have hLe :
+        (Tamago.Proof.Utils.ClzProof.clzFormulaUint x).val ≤ (256 : Uint256).val := by
+      simp [hClz]
+    have hSub :
+        (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x)).val = 0 := by
+      have h := Verity.Core.Uint256.sub_eq_of_le
+        (a := (256 : Uint256))
+        (b := Tamago.Proof.Utils.ClzProof.clzFormulaUint x) hLe
+      simpa [HSub.hSub, hClz] using h
+    simp [hx0, hSub]
+  · have hxPos : 0 < x.val := Nat.pos_of_ne_zero hx0
+    have hxLt : x.val < 2 ^ 256 := by
+      simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
+    have hLogLt : Nat.log2 x.val < 256 :=
+      (Nat.log2_lt (Nat.ne_of_gt hxPos)).2 hxLt
+    have hClz :
+        (Tamago.Proof.Utils.ClzProof.clzFormulaUint x).val =
+          255 - Nat.log2 x.val := by
+      simp [Tamago.Proof.Utils.ClzProof.clzFormulaUint_val, hx0]
+    have hLe :
+        (Tamago.Proof.Utils.ClzProof.clzFormulaUint x).val ≤ (256 : Uint256).val := by
+      rw [hClz, uintTwoFiveSix_val]
+      omega
+    have hSub :
+        (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x)).val =
+          Nat.log2 x.val + 1 := by
+      have h := Verity.Core.Uint256.sub_eq_of_le
+        (a := (256 : Uint256))
+        (b := Tamago.Proof.Utils.ClzProof.clzFormulaUint x) hLe
+      have hRaw :
+          (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x)).val =
+            256 - (255 - Nat.log2 x.val) := by
+        simpa [HSub.hSub, hClz] using h
+      rw [hRaw]
+      omega
+    simp [hx0, hSub]
+
+private theorem sqrtSeedUint_val_of_ne (x : Uint256) (hx0 : x.val ≠ 0) :
+    (shl (shr 1 (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x))) 1).val =
+      sqrtSeed x.val := by
+  have hQ := sqrtExponentUint_val x
+  rw [if_neg hx0] at hQ
+  rw [shl_val, hQ]
+  have hxPos : 0 < x.val := Nat.pos_of_ne_zero hx0
+  have hxLt : x.val < 2 ^ 256 := by
+    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
+  have hLogLt : Nat.log2 x.val < 256 :=
+    (Nat.log2_lt (Nat.ne_of_gt hxPos)).2 hxLt
+  have hShiftLt : (Nat.log2 x.val + 1) / 2 < 256 := by
+    omega
+  have hPowLt :
+      1 * 2 ^ ((Nat.log2 x.val + 1) / 2) < Verity.Core.Uint256.modulus := by
+    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using
+      Nat.pow_lt_pow_right (by decide : 1 < (2 : Nat)) hShiftLt
+  rw [uintOne_val]
+  rw [Nat.mod_eq_of_lt hPowLt]
+  unfold sqrtSeed
+  simp [hx0, Nat.shiftLeft_eq]
+
+private theorem sqrt_m_lt_pow128_of_u256
+    (m x : Nat)
+    (hmlo : m * m ≤ x)
+    (hx : x < Verity.Core.Uint256.modulus) :
+    m < 2 ^ 128 := by
+  by_cases hm128 : m < 2 ^ 128
+  · exact hm128
+  · have hmGe : 2 ^ 128 ≤ m := Nat.le_of_not_lt hm128
+    have hmSqGe : 2 ^ 256 ≤ m * m := by
+      have hpow : 2 ^ 256 = (2 ^ 128) * (2 ^ 128) := by
+        calc
+          2 ^ 256 = 2 ^ (128 + 128) := by decide
+          _ = (2 ^ 128) * (2 ^ 128) := by rw [Nat.pow_add]
+      have hmul : (2 ^ 128) * (2 ^ 128) ≤ m * m := Nat.mul_le_mul hmGe hmGe
+      simpa [hpow] using hmul
+    have hxGe : 2 ^ 256 ≤ x := Nat.le_trans hmSqGe hmlo
+    exact False.elim ((Nat.not_lt_of_ge hxGe)
+      (by simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using hx))
+
+private theorem sqrt_x_div_m_le_m_plus_two
+    (x m : Nat)
+    (hm : 0 < m)
+    (hmhi : x < (m + 1) * (m + 1)) :
+    x / m ≤ m + 2 := by
+  have hmhi' : x < m * m + 2 * m + 1 := by
+    have hsq : (m + 1) * (m + 1) = m * m + 2 * m + 1 := by
+      rw [Nat.add_mul, Nat.mul_add, Nat.mul_one, Nat.one_mul]
+      omega
+    simpa [hsq] using hmhi
+  have hmhi'' : x < (m * m + 2 * m) + 1 := by omega
+  have hxLe : x ≤ m * m + 2 * m := Nat.lt_succ_iff.mp hmhi''
+  calc
+    x / m ≤ (m * m + 2 * m) / m := Nat.div_le_div_right hxLe
+    _ = (m + 2) * m / m := by rw [Nat.add_mul]
+    _ = m + 2 := Nat.mul_div_cancel (m + 2) hm
+
+private theorem sqrt_sum_lt_uint256_of_cert
+    (x m z d : Nat)
+    (hx : x < Verity.Core.Uint256.modulus)
+    (hm : 0 < m)
+    (hmlo : m * m ≤ x)
+    (hmhi : x < (m + 1) * (m + 1))
+    (hmz : m ≤ z)
+    (hzd : z - m ≤ d)
+    (hdm : d ≤ m) :
+    z + x / z < Verity.Core.Uint256.modulus := by
+  have hdiv_z_m : x / z ≤ x / m := Nat.div_le_div_left hmz hm
+  have hdiv_m : x / m ≤ m + 2 := sqrt_x_div_m_le_m_plus_two x m hm hmhi
+  have hdiv : x / z ≤ m + 2 := Nat.le_trans hdiv_z_m hdiv_m
+  have hz_le_md : z ≤ d + m := (Nat.sub_le_iff_le_add).1 hzd
+  have hz_le_2m : z ≤ 2 * m := by omega
+  have hsum_lt_const : z + x / z < 3 * (2 ^ 128) + 2 := by
+    have hm128 : m < 2 ^ 128 := sqrt_m_lt_pow128_of_u256 m x hmlo hx
+    omega
+  have hconst : 3 * (2 ^ 128) + 2 < Verity.Core.Uint256.modulus := by
+    native_decide
+  exact Nat.lt_trans hsum_lt_const hconst
+
+private theorem sqrtSeed_sum_lt_uint256
+    (i : Fin 256) (x : Nat)
+    (hOct : 2 ^ i.val ≤ x ∧ x < 2 ^ (i.val + 1)) :
+    Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i + x / Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i < Verity.Core.Uint256.modulus := by
+  have hsPos : 0 < Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by
+    simp [Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf, Nat.shiftLeft_eq]
+  have hk_le : (i.val + 1) / 2 ≤ 128 := by omega
+  have hz_le : Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i ≤ 2 ^ 128 := by
+    unfold Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf
+    rw [Nat.shiftLeft_eq, Nat.one_mul]
+    exact Nat.pow_le_pow_right (by decide : (2 : Nat) > 0) hk_le
+  have hExp : i.val + 1 ≤ 2 * ((i.val + 1) / 2) + 1 := by omega
+  have hPowLe : 2 ^ (i.val + 1) ≤ 2 ^ (2 * ((i.val + 1) / 2) + 1) :=
+    Nat.pow_le_pow_right (by decide : (2 : Nat) > 0) hExp
+  have hPowMul :
+      2 ^ (2 * ((i.val + 1) / 2) + 1) =
+        2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by
+    calc
+      2 ^ (2 * ((i.val + 1) / 2) + 1) =
+          2 ^ (2 * ((i.val + 1) / 2)) * 2 := by rw [Nat.pow_add]
+      _ = (2 ^ ((i.val + 1) / 2) * 2 ^ ((i.val + 1) / 2)) * 2 := by
+            rw [show 2 * ((i.val + 1) / 2) =
+              ((i.val + 1) / 2) + ((i.val + 1) / 2) by omega, Nat.pow_add]
+      _ = 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by
+            unfold Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf
+            simp [Nat.shiftLeft_eq, Nat.mul_comm, Nat.mul_left_comm]
+  have hxmul : x < 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i :=
+    Nat.lt_of_lt_of_le hOct.2 (by simpa [hPowMul] using hPowLe)
+  have hdiv : x / Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i < 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by
+    exact (Nat.div_lt_iff_lt_mul hsPos).2
+      (by simpa [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm] using hxmul)
+  have hsum_lt :
+      Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i + x / Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i <
+        Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i + 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i := by omega
+  have hsum_le : Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i + 2 * Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i ≤ 3 * (2 ^ 128) := by
+    omega
+  have hconst : 3 * (2 ^ 128) < Verity.Core.Uint256.modulus := by
+    native_decide
+  exact Nat.lt_of_lt_of_le (Nat.lt_of_lt_of_le hsum_lt hsum_le) (Nat.le_of_lt hconst)
+
+private theorem sqrtFirstStepUint_val (x : Uint256) (hx0 : x.val ≠ 0) :
+    (let q := shr 1 (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x))
+     shr 1 (add (shl q 1) (shr q x))).val =
+      sqrtStep x.val (sqrtSeed x.val) := by
+  let q := shr 1 (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x))
+  have hQ : q.val = (Nat.log2 x.val + 1) / 2 := by
+    simpa [q, hx0] using sqrtExponentUint_val x
+  have hSeedVal : (shl q 1).val = sqrtSeed x.val := by
+    simpa [q] using sqrtSeedUint_val_of_ne x hx0
+  have hShrVal : (shr q x).val = x.val / sqrtSeed x.val := by
+    rw [shr_val, hQ]
+    unfold sqrtSeed
+    simp [hx0, Nat.shiftLeft_eq]
+  have hxPos : 0 < x.val := Nat.pos_of_ne_zero hx0
+  have hxLt : x.val < 2 ^ 256 := by
+    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
+  let i : Fin 256 := ⟨Nat.log2 x.val, (Nat.log2_lt (Nat.ne_of_gt hxPos)).2 hxLt⟩
+  have hOct : 2 ^ i.val ≤ x.val ∧ x.val < 2 ^ (i.val + 1) := by
+    have hlog : 2 ^ Nat.log2 x.val ≤ x.val ∧ x.val < 2 ^ (Nat.log2 x.val + 1) := by
+      constructor
+      · simpa [Nat.log2_eq_log_two] using Nat.pow_log_le_self 2 (Nat.ne_of_gt hxPos)
+      · simpa [Nat.log2_eq_log_two, Nat.succ_eq_add_one] using
+          Nat.lt_pow_succ_log_self (by decide : 1 < 2) x.val
+    simpa [i] using hlog
+  have hSeedEq : sqrtSeed x.val = Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i :=
+    sqrtSeed_eq_octaveSeed i x.val hOct
+  have hAddLt :
+      (shl q 1).val + (shr q x).val < Verity.Core.Uint256.modulus := by
+    rw [hSeedVal, hShrVal, hSeedEq]
+    exact sqrtSeed_sum_lt_uint256 i x.val hOct
+  have hAddVal :
+      (add (shl q 1) (shr q x)).val = sqrtSeed x.val + x.val / sqrtSeed x.val := by
+    rw [add_val_of_lt _ _ hAddLt, hSeedVal, hShrVal]
+  change (shr 1 (add (shl q 1) (shr q x))).val = sqrtStep x.val (sqrtSeed x.val)
+  rw [shr_val, hAddVal]
+  simp [sqrtStep]
+
+private theorem if_pure_run_fst {α : Type} [Inhabited α] (c : Prop) [Decidable c]
+    (a b : α) (s : ContractState) :
+    ((if c then Verity.pure a else Verity.pure b).run s).fst =
+      if c then a else b := by
+  by_cases h : c
+  · simp [h, Contract.run, Verity.pure]
+  · simp [h, Contract.run, Verity.pure]
+
+private theorem contract_run_fst {α : Type} [Inhabited α]
+    (c : Contract α) (s : ContractState) :
+    (c.run s).fst = (c s).fst := by
+  cases h : c s <;> simp [Contract.run, ContractResult.fst, h]
+
+private theorem bind_success_run_fst {α β : Type} [Inhabited β]
+    (ma : Contract α) (f : α → Contract β) (a : α) (s s' : ContractState)
+    (h : ma s = ContractResult.success a s') :
+    ((Verity.bind ma f).run s).fst = ((f a).run s').fst := by
+  cases hfa : f a s' <;> simp [Contract.run, Verity.bind, h, hfa, ContractResult.fst]
+
+private theorem monad_bind_success_run_fst {α β : Type} [Inhabited β]
+    (ma : Contract α) (f : α → Contract β) (a : α) (s s' : ContractState)
+    (h : ma s = ContractResult.success a s') :
+    (((ma >>= f).run s).fst) = ((f a).run s').fst := by
+  cases hfa : f a s' <;>
+    simp [Contract.run, Bind.bind, Verity.bind, h, hfa, ContractResult.fst]
+
 private theorem two_mul_div_two_le (n : Nat) :
     2 * (n / 2) ≤ n := by
   simpa [Nat.mul_comm] using Nat.div_mul_le_self n 2
@@ -1023,13 +613,10 @@ theorem saturatingAdd_saturates_at_uint256_max (x y : Uint256) (s : ContractStat
     · intro h
       exact False.elim (hNotNoOverflow h)
     · intro _h
-      simp [saturatingAdd, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hBranchRaw]
-    · simp [saturatingAdd, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hBranchRaw, maxUint256_val]
+      simp [saturatingAdd, Contract.run, Verity.pure, Pure.pure, hBranchRaw]
+    · simp [saturatingAdd, Contract.run, Verity.pure, Pure.pure, hBranchRaw]
       simpa [Verity.Stdlib.Math.MAX_UINT256] using Verity.Core.Uint256.val_le_max x
-    · simp [saturatingAdd, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hBranchRaw, maxUint256_val]
+    · simp [saturatingAdd, Contract.run, Verity.pure, Pure.pure, hBranchRaw]
       simpa [Verity.Stdlib.Math.MAX_UINT256] using Verity.Core.Uint256.val_le_max y
   · have hNoOverflow : x.val + y.val ≤ Verity.Stdlib.Math.MAX_UINT256 := by
       omega
@@ -1052,14 +639,11 @@ theorem saturatingAdd_saturates_at_uint256_max (x y : Uint256) (s : ContractStat
       simpa [HAdd.hAdd] using Verity.Core.Uint256.add_eq_of_lt (a := x) (b := y) hAddLt
     refine ⟨?_, ?_, ?_, ?_⟩
     · intro _h
-      simp [saturatingAdd, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hNotBranchRaw, hAddVal]
+      simp [saturatingAdd, Contract.run, Verity.pure, Pure.pure, hNotBranchRaw, hAddVal]
     · intro h
       exact False.elim (hOverflow h)
-    · simp [saturatingAdd, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hNotBranchRaw, hAddVal]
-    · simp [saturatingAdd, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hNotBranchRaw, hAddVal]
+    · simp [saturatingAdd, Contract.run, Verity.pure, Pure.pure, hNotBranchRaw, hAddVal]
+    · simp [saturatingAdd, Contract.run, Verity.pure, Pure.pure, hNotBranchRaw, hAddVal]
 
 theorem saturatingMul_saturates_at_uint256_max (x y : Uint256) (s : ContractState) :
     saturatingMul_property x y ((saturatingMul x y).run s).fst := by
@@ -1069,8 +653,7 @@ theorem saturatingMul_saturates_at_uint256_max (x y : Uint256) (s : ContractStat
       simp [hXZero]
     refine ⟨?_, ?_, ?_⟩
     · intro _h
-      simp [saturatingMul, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hXZero, hxVal, mul, Verity.Core.Uint256.mul,
+      simp [saturatingMul, Contract.run, Verity.pure, Pure.pure, hXZero, mul, Verity.Core.Uint256.mul,
         Verity.Core.Uint256.ofNat]
     · intro hOverflow
       have hProdZero : x.val * y.val = 0 := by
@@ -1078,8 +661,7 @@ theorem saturatingMul_saturates_at_uint256_max (x y : Uint256) (s : ContractStat
       omega
     · intro _h
       apply Verity.Core.Uint256.ext
-      simp [saturatingMul, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hXZero, mul, Verity.Core.Uint256.mul,
+      simp [saturatingMul, Contract.run, Verity.pure, Pure.pure, hXZero, mul, Verity.Core.Uint256.mul,
         Verity.Core.Uint256.ofNat]
   · have hxValNe : x.val ≠ 0 := by
       intro hxVal
@@ -1100,8 +682,7 @@ theorem saturatingMul_saturates_at_uint256_max (x y : Uint256) (s : ContractStat
       · intro hNoOverflow
         omega
       · intro _h
-        simp [saturatingMul, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hXZero, hBranchRaw]
+        simp [saturatingMul, Contract.run, Verity.pure, Pure.pure, hXZero, hBranchRaw]
       · intro hZero
         rcases hZero with hx | hy
         · exact False.elim (hxValNe hx)
@@ -1131,14 +712,12 @@ theorem saturatingMul_saturates_at_uint256_max (x y : Uint256) (s : ContractStat
           Verity.Core.Uint256.mul_eq_of_lt (a := x) (b := y) hMulLt
       refine ⟨?_, ?_, ?_⟩
       · intro _h
-        simp [saturatingMul, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hXZero, hNotBranchRaw, hMulVal]
+        simp [saturatingMul, Contract.run, Verity.pure, Pure.pure, hNotBranchRaw, hMulVal]
       · intro h
         exact False.elim (hOverflow h)
       · intro hZero
         apply Verity.Core.Uint256.ext
-        simp [saturatingMul, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hXZero, hNotBranchRaw, hMulVal]
+        simp [saturatingMul, Contract.run, Verity.pure, Pure.pure, hNotBranchRaw, hMulVal]
         rcases hZero with hx | hy
         · exact False.elim (hxValNe hx)
         · simp [hy]
@@ -1151,12 +730,10 @@ theorem saturatingSub_never_underflows (x y : Uint256) (s : ContractState) :
     have hBranch : y > x := hUnderflow
     refine ⟨?_, ?_, ?_⟩
     · intro _h
-      simp [saturatingSub, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hBranch]
+      simp [saturatingSub, Contract.run, Verity.pure, Pure.pure, hBranch]
     · intro h
       exact False.elim (hNotLe h)
-    · simp [saturatingSub, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hBranch]
+    · simp [saturatingSub, Contract.run, Verity.pure, Pure.pure, hBranch]
   · have hLe : y.val ≤ x.val := by omega
     have hNotBranch : ¬ y > x := by
       exact Nat.not_lt_of_ge hLe
@@ -1166,14 +743,11 @@ theorem saturatingSub_never_underflows (x y : Uint256) (s : ContractState) :
     · intro h
       have hEq : x.val = y.val := by omega
       apply Verity.Core.Uint256.ext
-      simp [saturatingSub, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hNotBranch, hSubVal, hEq]
+      simp [saturatingSub, Contract.run, Verity.pure, Pure.pure, hNotBranch, hSubVal, hEq]
     · intro _h
-      simp [saturatingSub, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hNotBranch, hSubVal]
+      simp [saturatingSub, Contract.run, Verity.pure, Pure.pure, hNotBranch, hSubVal]
       omega
-    · simp [saturatingSub, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-        Pure.pure, hNotBranch, hSubVal]
+    · simp [saturatingSub, Contract.run, Verity.pure, Pure.pure, hNotBranch, hSubVal]
 
 theorem dist_is_absolute_difference (x y : Uint256) (s : ContractState) :
     dist_property x y ((Tamago.Utils.FixedPointMathLib.dist x y).run s).fst := by
@@ -1184,12 +758,12 @@ theorem dist_is_absolute_difference (x y : Uint256) (s : ContractState) :
       simpa [HSub.hSub] using Verity.Core.Uint256.sub_eq_of_le (a := x) (b := y) hGe
     refine ⟨?_, ?_⟩
     · intro h
-      simp [Tamago.Utils.FixedPointMathLib.dist, Contract.run, Verity.bind, Bind.bind, Verity.pure,
+      simp [Tamago.Utils.FixedPointMathLib.dist, Contract.run, Verity.pure,
         Pure.pure,
         hBranch, hSubVal]
       omega
     · intro _h
-      simp [Tamago.Utils.FixedPointMathLib.dist, Contract.run, Verity.bind, Bind.bind, Verity.pure,
+      simp [Tamago.Utils.FixedPointMathLib.dist, Contract.run, Verity.pure,
         Pure.pure,
         hBranch, hSubVal]
       omega
@@ -1201,7 +775,7 @@ theorem dist_is_absolute_difference (x y : Uint256) (s : ContractState) :
       simpa [HSub.hSub] using Verity.Core.Uint256.sub_eq_of_le (a := y) (b := x) hLe
     refine ⟨?_, ?_⟩
     · intro _h
-      simp [Tamago.Utils.FixedPointMathLib.dist, Contract.run, Verity.bind, Bind.bind, Verity.pure,
+      simp [Tamago.Utils.FixedPointMathLib.dist, Contract.run, Verity.pure,
         Pure.pure,
         hNotBranch, hSubVal]
       omega
@@ -1229,8 +803,7 @@ theorem avg_returns_floor_average (x y : Uint256) (s : ContractState) :
         Verity.Core.Uint256.add_eq_of_lt (a := y) (b := div (sub x y) 2) hAddLt
     have hRun :
         ((avg x y).run s).fst.val = y.val + (x.val - y.val) / 2 := by
-      simp [avg, Contract.run, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
-        hBranch, hSubVal, hDivVal, hAddVal]
+      simp [avg, Contract.run, Verity.pure, Pure.pure, hBranch, hAddVal]
     constructor
     · rw [hRun]
       have hDivLower := two_mul_div_two_le (x.val - y.val)
@@ -1257,8 +830,7 @@ theorem avg_returns_floor_average (x y : Uint256) (s : ContractState) :
         Verity.Core.Uint256.add_eq_of_lt (a := x) (b := div (sub y x) 2) hAddLt
     have hRun :
         ((avg x y).run s).fst.val = x.val + (y.val - x.val) / 2 := by
-      simp [avg, Contract.run, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
-        hNotBranch, hSubVal, hDivVal, hAddVal]
+      simp [avg, Contract.run, Verity.pure, Pure.pure, hNotBranch, hAddVal]
     constructor
     · rw [hRun]
       have hDivLower := two_mul_div_two_le (y.val - x.val)
@@ -1267,646 +839,16 @@ theorem avg_returns_floor_average (x y : Uint256) (s : ContractState) :
       have hDivUpper := lt_two_mul_div_two_succ (y.val - x.val)
       omega
 
-private def sqrtIterUint : Nat → Uint256 → Uint256 → Uint256
-  | 0, _x, z => z
-  | steps + 1, x, z => sqrtIterUint steps x (shr 1 (add z (div x z)))
-
-private def sqrtFinishSeedUint (x r z : Uint256) : Uint256 :=
-  let z := shl (shr 1 r) z
-  shr 18 (mul z (add (shr r x) 65536))
-
-private def sqrtBeforeCorrectionUint (x r z : Uint256) : Uint256 :=
-  sqrtIterUint 7 x (sqrtFinishSeedUint x r z)
-
-private def sqrtFinishUint (x r z : Uint256) : Uint256 :=
-  let z := sqrtBeforeCorrectionUint x r z
-  if div x z < z then sub z 1 else z
-
-private def sqrtFinishContract (x r z : Uint256) : Contract Uint256 :=
-  let z := sqrtBeforeCorrectionUint x r z
-  if div x z < z then Verity.pure (sub z 1) else Verity.pure z
-
-private def sqrtScan4Contract (x r z : Uint256) : Contract Uint256 :=
-  if 16777215 < shr r x then
-    let r := Contracts.bitOr r (shl 4 1)
-    Verity.bind (Verity.pure PUnit.unit) fun _ => sqrtFinishContract x r z
-  else
-    Verity.bind (Verity.pure PUnit.unit) fun _ => sqrtFinishContract x r z
-
-private def sqrtScan4Uint (x r z : Uint256) : Uint256 :=
-  if 16777215 < shr r x then
-    sqrtFinishUint x (Contracts.bitOr r (shl 4 1)) z
-  else
-    sqrtFinishUint x r z
-
-private def sqrtScan5Contract (x r z : Uint256) : Contract Uint256 :=
-  if 1099511627775 < shr r x then
-    let r := Contracts.bitOr r (shl 5 1)
-    Verity.bind (Verity.pure PUnit.unit) fun _ => sqrtScan4Contract x r z
-  else
-    Verity.bind (Verity.pure PUnit.unit) fun _ => sqrtScan4Contract x r z
-
-private def sqrtScan5Uint (x r z : Uint256) : Uint256 :=
-  if 1099511627775 < shr r x then
-    sqrtScan4Uint x (Contracts.bitOr r (shl 5 1)) z
-  else
-    sqrtScan4Uint x r z
-
-private def sqrtScan6Contract (x r z : Uint256) : Contract Uint256 :=
-  if 4722366482869645213695 < shr r x then
-    let r := Contracts.bitOr r (shl 6 1)
-    Verity.bind (Verity.pure PUnit.unit) fun _ => sqrtScan5Contract x r z
-  else
-    Verity.bind (Verity.pure PUnit.unit) fun _ => sqrtScan5Contract x r z
-
-private def sqrtScan6Uint (x r z : Uint256) : Uint256 :=
-  if 4722366482869645213695 < shr r x then
-    sqrtScan5Uint x (Contracts.bitOr r (shl 6 1)) z
-  else
-    sqrtScan5Uint x r z
-
-private def sqrtScanSourceUint (x : Uint256) : Uint256 :=
-  let r : Uint256 := 0
-  let r := if 87112285931760246646623899502532662132735 < x then shl 7 1 else r
-  let r := if 4722366482869645213695 < shr r x then Contracts.bitOr r (shl 6 1) else r
-  let r := if 1099511627775 < shr r x then Contracts.bitOr r (shl 5 1) else r
-  if 16777215 < shr r x then Contracts.bitOr r (shl 4 1) else r
-
-private def sqrtSourceContract (x : Uint256) : Contract Uint256 :=
-  let z : Uint256 := 181
-  let r : Uint256 := 0
-  if 87112285931760246646623899502532662132735 < x then
-    let r := shl 7 1
-    Verity.bind (Verity.pure PUnit.unit) fun _ => sqrtScan6Contract x r z
-  else
-    Verity.bind (Verity.pure PUnit.unit) fun _ => sqrtScan6Contract x r z
-
-private def sqrtSourceUint (x : Uint256) : Uint256 :=
-  let z : Uint256 := 181
-  let r : Uint256 := 0
-  if 87112285931760246646623899502532662132735 < x then
-    sqrtScan6Uint x (shl 7 1) z
-  else
-    sqrtScan6Uint x r z
-
-private theorem sqrtSourceUint_eq_finishScan (x : Uint256) :
-    sqrtSourceUint x = sqrtFinishUint x (sqrtScanSourceUint x) 181 := by
-  unfold sqrtSourceUint sqrtScanSourceUint sqrtScan6Uint sqrtScan5Uint sqrtScan4Uint
-  by_cases h0 : 87112285931760246646623899502532662132735 < x
-  · simp only [h0, if_true]
-    by_cases h1 : 4722366482869645213695 < shr (shl 7 1) x
-    · simp only [h1, if_true]
-      by_cases h2 :
-          1099511627775 < shr (Contracts.bitOr (shl 7 1) (shl 6 1)) x
-      · simp only [h2, if_true]
-        by_cases h3 :
-            16777215 <
-              shr (Contracts.bitOr (Contracts.bitOr (shl 7 1) (shl 6 1)) (shl 5 1)) x
-        · simp only [h3, if_true]
-        · simp only [h3, if_false]
-      · simp only [h2, if_false]
-        by_cases h3 : 16777215 < shr (Contracts.bitOr (shl 7 1) (shl 6 1)) x
-        · simp only [h3, if_true]
-        · simp only [h3, if_false]
-    · simp only [h1, if_false]
-      by_cases h2 : 1099511627775 < shr (shl 7 1) x
-      · simp only [h2, if_true]
-        by_cases h3 : 16777215 < shr (Contracts.bitOr (shl 7 1) (shl 5 1)) x
-        · simp only [h3, if_true]
-        · simp only [h3, if_false]
-      · simp only [h2, if_false]
-        by_cases h3 : 16777215 < shr (shl 7 1) x
-        · simp only [h3, if_true]
-        · simp only [h3, if_false]
-  · simp only [h0, if_false]
-    by_cases h1 : 4722366482869645213695 < shr 0 x
-    · simp only [h1, if_true]
-      by_cases h2 : 1099511627775 < shr (Contracts.bitOr 0 (shl 6 1)) x
-      · simp only [h2, if_true]
-        by_cases h3 :
-            16777215 < shr (Contracts.bitOr (Contracts.bitOr 0 (shl 6 1)) (shl 5 1)) x
-        · simp only [h3, if_true]
-        · simp only [h3, if_false]
-      · simp only [h2, if_false]
-        by_cases h3 : 16777215 < shr (Contracts.bitOr 0 (shl 6 1)) x
-        · simp only [h3, if_true]
-        · simp only [h3, if_false]
-    · simp only [h1, if_false]
-      by_cases h2 : 1099511627775 < shr 0 x
-      · simp only [h2, if_true]
-        by_cases h3 : 16777215 < shr (Contracts.bitOr 0 (shl 5 1)) x
-        · simp only [h3, if_true]
-        · simp only [h3, if_false]
-      · simp only [h2, if_false]
-        by_cases h3 : 16777215 < shr 0 x
-        · simp only [h3, if_true]
-        · simp only [h3, if_false]
-
-@[simp] private theorem sqrtThreshold136_val :
-    (87112285931760246646623899502532662132735 : Uint256).val = 2 ^ 136 - 1 := by
-  native_decide
-
-@[simp] private theorem sqrtThreshold72_val :
-    (4722366482869645213695 : Uint256).val = 2 ^ 72 - 1 := by
-  native_decide
-
-@[simp] private theorem sqrtThreshold40_val :
-    (1099511627775 : Uint256).val = 2 ^ 40 - 1 := by
-  native_decide
-
-@[simp] private theorem sqrtThreshold24_val :
-    (16777215 : Uint256).val = 2 ^ 24 - 1 := by
-  native_decide
-
-@[simp] private theorem shl_7_1_val : (shl 7 1).val = 128 := by
-  native_decide
-
-@[simp] private theorem shl_6_1_val : (shl 6 1).val = 64 := by
-  native_decide
-
-@[simp] private theorem shl_5_1_val : (shl 5 1).val = 32 := by
-  native_decide
-
-@[simp] private theorem shl_4_1_val : (shl 4 1).val = 16 := by
-  native_decide
-
-@[simp] private theorem bitOr_0_shl_6_1_val :
-    (Contracts.bitOr 0 (shl 6 1)).val = 64 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_7_1_shl_6_1_val :
-    (Contracts.bitOr (shl 7 1) (shl 6 1)).val = 192 := by
-  native_decide
-
-@[simp] private theorem bitOr_0_shl_5_1_val :
-    (Contracts.bitOr 0 (shl 5 1)).val = 32 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_7_1_shl_5_1_val :
-    (Contracts.bitOr (shl 7 1) (shl 5 1)).val = 160 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_6_1_shl_5_1_val :
-    (Contracts.bitOr (shl 6 1) (shl 5 1)).val = 96 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_7_1_shl_6_1_shl_5_1_val :
-    (Contracts.bitOr (Contracts.bitOr (shl 7 1) (shl 6 1)) (shl 5 1)).val =
-      224 := by
-  native_decide
-
-@[simp] private theorem bitOr_0_shl_4_1_val :
-    (Contracts.bitOr 0 (shl 4 1)).val = 16 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_7_1_shl_4_1_val :
-    (Contracts.bitOr (shl 7 1) (shl 4 1)).val = 144 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_6_1_shl_4_1_val :
-    (Contracts.bitOr (shl 6 1) (shl 4 1)).val = 80 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_7_1_shl_6_1_shl_4_1_val :
-    (Contracts.bitOr (Contracts.bitOr (shl 7 1) (shl 6 1)) (shl 4 1)).val =
-      208 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_5_1_shl_4_1_val :
-    (Contracts.bitOr (shl 5 1) (shl 4 1)).val = 48 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_7_1_shl_5_1_shl_4_1_val :
-    (Contracts.bitOr (Contracts.bitOr (shl 7 1) (shl 5 1)) (shl 4 1)).val =
-      176 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_6_1_shl_5_1_shl_4_1_val :
-    (Contracts.bitOr (Contracts.bitOr (shl 6 1) (shl 5 1)) (shl 4 1)).val =
-      112 := by
-  native_decide
-
-@[simp] private theorem bitOr_shl_7_1_shl_6_1_shl_5_1_shl_4_1_val :
-    (Contracts.bitOr
-      (Contracts.bitOr (Contracts.bitOr (shl 7 1) (shl 6 1)) (shl 5 1))
-      (shl 4 1)).val = 240 := by
-  native_decide
-
-private theorem sqrtScanStepUint_val
-    (x r shiftWord thresholdWord : Uint256) (rn shift : Nat)
-    (hr : r.val = rn)
-    (hThreshold : thresholdWord.val = 2 ^ (shift + 8) - 1)
-    (hOr : (Contracts.bitOr r shiftWord).val = rn + shift) :
-    (if thresholdWord < shr r x then Contracts.bitOr r shiftWord else r).val =
-      sqrtScanStepNat x.val rn shift := by
-  unfold sqrtScanStepNat
-  have hBranch :
-      (thresholdWord < shr r x) ↔
-        2 ^ (shift + 8) - 1 < x.val / 2 ^ rn := by
-    change thresholdWord.val < (shr r x).val ↔
-      2 ^ (shift + 8) - 1 < x.val / 2 ^ rn
-    rw [shr_val, hr, hThreshold]
-  by_cases h : 2 ^ (shift + 8) - 1 < x.val / 2 ^ rn
-  · have hUint := hBranch.mpr h
-    rw [if_pos hUint, if_pos h]
-    exact hOr
-  · have hUint : ¬ thresholdWord < shr r x := fun hh => h (hBranch.mp hh)
-    rw [if_neg hUint, if_neg h]
-    exact hr
-
-private theorem bitOr_shl_6_1_sqrtScan_val
-    (r : Uint256) {rn : Nat} (hr : r.val = rn)
-    (hrn : rn = 0 ∨ rn = 128) :
-    (Contracts.bitOr r (shl 6 1)).val = rn + 64 := by
-  rcases hrn with rfl | rfl <;>
-    simp [bitOr_val, hr, Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] <;>
-    native_decide
-
-private theorem bitOr_shl_5_1_sqrtScan_val
-    (r : Uint256) {rn : Nat} (hr : r.val = rn)
-    (hrn : rn = 0 ∨ rn = 128 ∨ rn = 64 ∨ rn = 192) :
-    (Contracts.bitOr r (shl 5 1)).val = rn + 32 := by
-  rcases hrn with rfl | rfl | rfl | rfl <;>
-    simp [bitOr_val, hr, Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] <;>
-    native_decide
-
-private theorem bitOr_shl_4_1_sqrtScan_val
-    (r : Uint256) {rn : Nat} (hr : r.val = rn)
-    (hrn :
-      rn = 0 ∨ rn = 128 ∨ rn = 64 ∨ rn = 192 ∨
-        rn = 32 ∨ rn = 160 ∨ rn = 96 ∨ rn = 224) :
-    (Contracts.bitOr r (shl 4 1)).val = rn + 16 := by
-  rcases hrn with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-    simp [bitOr_val, hr, Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] <;>
-    native_decide
-
-private theorem sqrtScanStepNat_128_possible (x : Nat) :
-    sqrtScanStepNat x 0 128 = 0 ∨ sqrtScanStepNat x 0 128 = 128 := by
-  unfold sqrtScanStepNat
-  by_cases h : 2 ^ (128 + 8) - 1 < x / 2 ^ 0
-  · rw [if_pos h]
-    omega
-  · rw [if_neg h]
-    omega
-
-private theorem sqrtScanStepNat_64_possible
-    (x rn : Nat) (hrn : rn = 0 ∨ rn = 128) :
-    sqrtScanStepNat x rn 64 = 0 ∨ sqrtScanStepNat x rn 64 = 128 ∨
-      sqrtScanStepNat x rn 64 = 64 ∨ sqrtScanStepNat x rn 64 = 192 := by
-  unfold sqrtScanStepNat
-  rcases hrn with rfl | rfl
-  · by_cases h : 2 ^ (64 + 8) - 1 < x / 2 ^ 0
-    · rw [if_pos h]
-      omega
-    · rw [if_neg h]
-      omega
-  · by_cases h : 2 ^ (64 + 8) - 1 < x / 2 ^ 128
-    · rw [if_pos h]
-      omega
-    · rw [if_neg h]
-      omega
-
-private theorem sqrtScanStepNat_32_possible
-    (x rn : Nat)
-    (hrn : rn = 0 ∨ rn = 128 ∨ rn = 64 ∨ rn = 192) :
-    sqrtScanStepNat x rn 32 = 0 ∨ sqrtScanStepNat x rn 32 = 128 ∨
-      sqrtScanStepNat x rn 32 = 64 ∨ sqrtScanStepNat x rn 32 = 192 ∨
-        sqrtScanStepNat x rn 32 = 32 ∨ sqrtScanStepNat x rn 32 = 160 ∨
-          sqrtScanStepNat x rn 32 = 96 ∨ sqrtScanStepNat x rn 32 = 224 := by
-  unfold sqrtScanStepNat
-  rcases hrn with rfl | rfl | rfl | rfl
-  · by_cases h : 2 ^ (32 + 8) - 1 < x / 2 ^ 0
-    · rw [if_pos h]
-      omega
-    · rw [if_neg h]
-      omega
-  · by_cases h : 2 ^ (32 + 8) - 1 < x / 2 ^ 128
-    · rw [if_pos h]
-      omega
-    · rw [if_neg h]
-      omega
-  · by_cases h : 2 ^ (32 + 8) - 1 < x / 2 ^ 64
-    · rw [if_pos h]
-      omega
-    · rw [if_neg h]
-      omega
-  · by_cases h : 2 ^ (32 + 8) - 1 < x / 2 ^ 192
-    · rw [if_pos h]
-      omega
-    · rw [if_neg h]
-      omega
-
-private theorem sqrtScanStepNat_16_le_240
-    (x rn : Nat)
-    (hrn :
-      rn = 0 ∨ rn = 128 ∨ rn = 64 ∨ rn = 192 ∨
-        rn = 32 ∨ rn = 160 ∨ rn = 96 ∨ rn = 224) :
-    sqrtScanStepNat x rn 16 ≤ 240 := by
-  unfold sqrtScanStepNat
-  rcases hrn with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-  all_goals
-    split <;> norm_num
-
-private theorem sqrtScanNat_le_240 (x : Nat) :
-    sqrtScanNat x ≤ 240 := by
-  let r1 := sqrtScanStepNat x 0 128
-  have hr1 : r1 = 0 ∨ r1 = 128 := by
-    simpa [r1] using sqrtScanStepNat_128_possible x
-  let r2 := sqrtScanStepNat x r1 64
-  have hr2 : r2 = 0 ∨ r2 = 128 ∨ r2 = 64 ∨ r2 = 192 := by
-    simpa [r2] using sqrtScanStepNat_64_possible x r1 hr1
-  let r3 := sqrtScanStepNat x r2 32
-  have hr3 :
-      r3 = 0 ∨ r3 = 128 ∨ r3 = 64 ∨ r3 = 192 ∨
-        r3 = 32 ∨ r3 = 160 ∨ r3 = 96 ∨ r3 = 224 := by
-    simpa [r3] using sqrtScanStepNat_32_possible x r2 hr2
-  simpa [sqrtScanNat, r1, r2, r3] using sqrtScanStepNat_16_le_240 x r3 hr3
-
-private theorem sqrtScanSourceUint_val (x : Uint256) :
-    (sqrtScanSourceUint x).val = sqrtScanNat x.val := by
-  unfold sqrtScanSourceUint sqrtScanNat
-  let ru1 : Uint256 :=
-    if 87112285931760246646623899502532662132735 < x then shl 7 1 else 0
-  let rn1 : Nat := sqrtScanStepNat x.val 0 128
-  have hru1 : ru1.val = rn1 := by
-    dsimp [ru1, rn1, sqrtScanStepNat]
-    have hBranch :
-        (87112285931760246646623899502532662132735 < x) ↔
-          2 ^ (128 + 8) - 1 < x.val / 2 ^ 0 := by
-      change (87112285931760246646623899502532662132735 : Uint256).val < x.val ↔
-        2 ^ (128 + 8) - 1 < x.val / 2 ^ 0
-      rw [sqrtThreshold136_val]
-      norm_num
-    by_cases h : 2 ^ (128 + 8) - 1 < x.val / 2 ^ 0
-    · have hUint := hBranch.mpr h
-      have hUintVal :
-          (87112285931760246646623899502532662132735 : Uint256).val < x.val := hUint
-      have hNat : 87112285931760246646623899502532662132735 < x.val / 1 := by
-        simpa using h
-      rw [if_pos hUintVal, if_pos hNat]
-      exact shl_7_1_val
-    · have hUint : ¬ 87112285931760246646623899502532662132735 < x :=
-        fun hh => h (hBranch.mp hh)
-      have hUintVal :
-          ¬ (87112285931760246646623899502532662132735 : Uint256).val < x.val := hUint
-      have hNat : ¬ 87112285931760246646623899502532662132735 < x.val / 1 := by
-        simpa using h
-      rw [if_neg hUintVal, if_neg hNat]
-      rfl
-  let ru2 : Uint256 :=
-    if 4722366482869645213695 < shr ru1 x then
-      Contracts.bitOr ru1 (shl 6 1)
-    else
-      ru1
-  let rn2 : Nat := sqrtScanStepNat x.val rn1 64
-  have hrn1 : rn1 = 0 ∨ rn1 = 128 := by
-    simpa [rn1] using sqrtScanStepNat_128_possible x.val
-  have hOr2 : (Contracts.bitOr ru1 (shl 6 1)).val = rn1 + 64 := by
-    exact bitOr_shl_6_1_sqrtScan_val ru1 hru1 hrn1
-  have hru2 : ru2.val = rn2 := by
-    dsimp [ru2, rn2]
-    exact sqrtScanStepUint_val x ru1 (shl 6 1) 4722366482869645213695 rn1 64
-      hru1 (by norm_num) hOr2
-  let ru3 : Uint256 :=
-    if 1099511627775 < shr ru2 x then
-      Contracts.bitOr ru2 (shl 5 1)
-    else
-      ru2
-  let rn3 : Nat := sqrtScanStepNat x.val rn2 32
-  have hrn2 : rn2 = 0 ∨ rn2 = 128 ∨ rn2 = 64 ∨ rn2 = 192 := by
-    simpa [rn2] using sqrtScanStepNat_64_possible x.val rn1 hrn1
-  have hOr3 : (Contracts.bitOr ru2 (shl 5 1)).val = rn2 + 32 := by
-    exact bitOr_shl_5_1_sqrtScan_val ru2 hru2 hrn2
-  have hru3 : ru3.val = rn3 := by
-    dsimp [ru3, rn3]
-    exact sqrtScanStepUint_val x ru2 (shl 5 1) 1099511627775 rn2 32
-      hru2 (by norm_num) hOr3
-  let ru4 : Uint256 :=
-    if 16777215 < shr ru3 x then
-      Contracts.bitOr ru3 (shl 4 1)
-    else
-      ru3
-  let rn4 : Nat := sqrtScanStepNat x.val rn3 16
-  have hrn3 :
-      rn3 = 0 ∨ rn3 = 128 ∨ rn3 = 64 ∨ rn3 = 192 ∨
-        rn3 = 32 ∨ rn3 = 160 ∨ rn3 = 96 ∨ rn3 = 224 := by
-    simpa [rn3] using sqrtScanStepNat_32_possible x.val rn2 hrn2
-  have hOr4 : (Contracts.bitOr ru3 (shl 4 1)).val = rn3 + 16 := by
-    exact bitOr_shl_4_1_sqrtScan_val ru3 hru3 hrn3
-  have hru4 : ru4.val = rn4 := by
-    dsimp [ru4, rn4]
-    exact sqrtScanStepUint_val x ru3 (shl 4 1) 16777215 rn3 16
-      hru3 (by norm_num) hOr4
-  change ru4.val = rn4
-  exact hru4
-
-private theorem uint181_val : (181 : Uint256).val = 181 := by
-  native_decide
-
-private theorem uint65536_val : (65536 : Uint256).val = 65536 := by
-  native_decide
-
-private theorem uint18_val : (18 : Uint256).val = 18 := by
-  native_decide
-
-private theorem shl_small_val (shift value : Uint256)
-    (h : value.val * 2 ^ shift.val < Verity.Core.Uint256.modulus) :
-    (shl shift value).val = value.val * 2 ^ shift.val := by
-  rw [shl_val]
-  exact Nat.mod_eq_of_lt h
-
-private theorem add_uint65536_val (a : Uint256)
-    (h : a.val + 65536 < Verity.Core.Uint256.modulus) :
-    (add a 65536).val = a.val + 65536 := by
-  have hAddLt : a.val + (65536 : Uint256).val < Verity.Core.Uint256.modulus := by
-    simpa [uint65536_val] using h
-  simpa [HAdd.hAdd, add, Verity.Core.Uint256.add, Verity.Core.Uint256.ofNat,
-    uint65536_val] using Verity.Core.Uint256.add_eq_of_lt
-      (a := a) (b := (65536 : Uint256)) hAddLt
-
 private theorem mul_val_of_lt (a b : Uint256)
     (h : a.val * b.val < Verity.Core.Uint256.modulus) :
     (mul a b).val = a.val * b.val := by
   simpa [HMul.hMul] using Verity.Core.Uint256.mul_eq_of_lt (a := a) (b := b) h
 
-private theorem add_val_of_lt (a b : Uint256)
-    (h : a.val + b.val < Verity.Core.Uint256.modulus) :
-    (add a b).val = a.val + b.val := by
-  simpa [HAdd.hAdd] using Verity.Core.Uint256.add_eq_of_lt (a := a) (b := b) h
-
-private theorem nat_sqrt_lt_pow128 {x : Nat} (hxLt : x < 2 ^ 256) :
-    Nat.sqrt x < 2 ^ 128 := by
-  by_contra h
-  have hLe : 2 ^ 128 ≤ Nat.sqrt x := Nat.le_of_not_gt h
-  have hSqLe : (2 ^ 128) * (2 ^ 128) ≤ Nat.sqrt x * Nat.sqrt x :=
-    Nat.mul_le_mul hLe hLe
-  have hSqrtLe : Nat.sqrt x * Nat.sqrt x ≤ x := Nat.sqrt_le x
-  have hPow : (2 ^ 128 : Nat) * 2 ^ 128 = 2 ^ 256 := by
-    rw [← Nat.pow_add]
-  omega
-
-private theorem nat_sqrt_pos_of_ge_256 {x : Nat} (hx : 2 ^ 8 ≤ x) :
-    0 < Nat.sqrt x := by
-  have h : 1 * 1 ≤ x := by omega
-  exact (Nat.le_sqrt).2 h
-
-private theorem div_le_sqrt_add_two
-    (x z : Nat) (haPos : 0 < Nat.sqrt x) (hFloor : Nat.sqrt x ≤ z) :
-    x / z ≤ Nat.sqrt x + 2 := by
-  let a := Nat.sqrt x
-  have hzPos : 0 < z := lt_of_lt_of_le (by simpa [a] using haPos) hFloor
-  have hDivMono : x / z ≤ x / a := by
-    exact Nat.div_le_div_left hFloor (by simpa [a] using haPos)
-  have hMulLt : x < a * (a + 3) := by
-    have hSqrt := Nat.lt_succ_sqrt x
-    nlinarith [hSqrt]
-  have hDivLt : x / a < a + 3 := by
-    exact (Nat.div_lt_iff_lt_mul (by simpa [a] using haPos)).2
-      (by simpa [Nat.mul_comm] using hMulLt)
-  have hDivLe : x / a ≤ a + 2 := by omega
-  exact le_trans hDivMono (by simpa [a] using hDivLe)
-
-private theorem sqrtStepNat_add_no_overflow
-    (x z : Nat) (hxLt : x < 2 ^ 256) (haPos : 0 < Nat.sqrt x)
-    (hFloor : Nat.sqrt x ≤ z) (hUpper : z ≤ 3 * 2 ^ 128) :
-    z + x / z < Verity.Core.Uint256.modulus := by
-  have hDivLe := div_le_sqrt_add_two x z haPos hFloor
-  have hSqrtLt := nat_sqrt_lt_pow128 (x := x) hxLt
-  have hSumLe : z + x / z ≤ 4 * 2 ^ 128 + 2 := by
-    omega
-  have hBound : 4 * 2 ^ 128 + 2 < Verity.Core.Uint256.modulus := by
-    native_decide
-  exact lt_of_le_of_lt hSumLe hBound
-
-private theorem sqrtStepNat_le_three_pow128
-    (x z : Nat) (hxLt : x < 2 ^ 256) (haPos : 0 < Nat.sqrt x)
-    (hFloor : Nat.sqrt x ≤ z) (hUpper : z ≤ 3 * 2 ^ 128) :
-    sqrtStepNat x z ≤ 3 * 2 ^ 128 := by
-  unfold sqrtStepNat
-  have hDivLe := div_le_sqrt_add_two x z haPos hFloor
-  have hSqrtLt := nat_sqrt_lt_pow128 (x := x) hxLt
-  have hNum : z + x / z ≤ 4 * 2 ^ 128 + 2 := by omega
-  have hDiv : (z + x / z) / 2 ≤ (4 * 2 ^ 128 + 2) / 2 :=
-    Nat.div_le_div_right hNum
-  have hBound : (4 * 2 ^ 128 + 2) / 2 ≤ 3 * 2 ^ 128 := by
-    native_decide
-  exact le_trans hDiv hBound
-
-private theorem sqrtSeedNat_add_no_overflow
-    (x : Nat) (hx : 2 ^ 8 ≤ x) (hxLt : x < 2 ^ 256) :
-    soladySqrtSeedNat x + x / soladySqrtSeedNat x <
-      Verity.Core.Uint256.modulus := by
-  let z := soladySqrtSeedNat x
-  let α := Real.sqrt (x : ℝ)
-  have hSeed := soladySqrtSeedNat_real_bounds x hx hxLt
-  have hxPos : 0 < x := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hx
-  have hαPos : 0 < α := by
-    simpa [α] using Real.sqrt_pos.2 (Nat.cast_pos.2 hxPos)
-  have hαLt : α < (2 : ℝ) ^ 128 := by
-    have hxLtR : (x : ℝ) < (2 : ℝ) ^ 256 := by exact_mod_cast hxLt
-    have hPowEq : ((2 : ℝ) ^ 128) ^ 2 = (2 : ℝ) ^ 256 := by
-      rw [sq, ← pow_add]
-    rw [Real.sqrt_lt' (by positivity : 0 < (2 : ℝ) ^ 128)]
-    rw [hPowEq]
-    exact hxLtR
-  have hzPos : 0 < z := by simpa [z] using hSeed.1
-  have hzUpperR : (z : ℝ) < 3 * (2 : ℝ) ^ 128 := by
-    have h : (z : ℝ) ≤ ((23 : ℝ) / 8) * α := by
-      have hRatio := hSeed.2.2
-      rw [div_le_iff₀ hαPos] at hRatio
-      simpa [z, α] using hRatio
-    nlinarith
-  have hzUpper : z < 3 * 2 ^ 128 := by exact_mod_cast hzUpperR
-  have hDivUpperR : ((x / z : Nat) : ℝ) < 3 * (2 : ℝ) ^ 128 := by
-    have hDivCast : ((x / z : Nat) : ℝ) ≤ (x : ℝ) / (z : ℝ) := Nat.cast_div_le
-    have hzLower : ((8 : ℝ) / 23) * α ≤ (z : ℝ) := by
-      have hRatio := hSeed.2.1
-      rw [le_div_iff₀ hαPos] at hRatio
-      simpa [z, α] using hRatio
-    have hzPosR : 0 < (z : ℝ) := Nat.cast_pos.2 hzPos
-    have hDivReal : (x : ℝ) / (z : ℝ) ≤ ((23 : ℝ) / 8) * α := by
-      have hαSq : α ^ 2 = (x : ℝ) := by
-        simp [α, Real.sq_sqrt (le_of_lt (Nat.cast_pos.2 hxPos))]
-      rw [← hαSq]
-      rw [div_le_iff₀ hzPosR]
-      nlinarith
-    exact lt_of_le_of_lt (le_trans hDivCast hDivReal) (by nlinarith)
-  have hDivUpper : x / z < 3 * 2 ^ 128 := by exact_mod_cast hDivUpperR
-  have hSum : z + x / z < 6 * 2 ^ 128 := by omega
-  have hBound : 6 * 2 ^ 128 < Verity.Core.Uint256.modulus := by
-    native_decide
-  exact lt_trans hSum hBound
-
-private theorem sqrtFinishSeedUint_val_large
-    (x : Uint256) (hx : 2 ^ 8 ≤ x.val) :
-    (sqrtFinishSeedUint x (sqrtScanSourceUint x) 181).val =
-      soladySqrtSeedNat x.val := by
-  let rU := sqrtScanSourceUint x
-  let r := sqrtScanNat x.val
-  have hR : rU.val = r := by
-    simpa [rU, r] using sqrtScanSourceUint_val x
-  have hxLt : x.val < 2 ^ 256 := by
-    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
-  have hrLe : r ≤ 240 := by
-    simpa [r] using sqrtScanNat_le_240 x.val
-  have hrHalfLe : r / 2 ≤ 120 := by
-    have hTwo : 2 * (r / 2) ≤ r := by
-      simpa [Nat.mul_comm] using Nat.div_mul_le_self r 2
-    omega
-  have hShiftVal : (shr 1 rU).val = r / 2 := by
-    rw [shr_val, hR]
-    norm_num
-  have hShlLt : (181 : Uint256).val * 2 ^ (shr 1 rU).val <
-      Verity.Core.Uint256.modulus := by
-    rw [uint181_val, hShiftVal]
-    have hPow : 2 ^ (r / 2) ≤ 2 ^ 120 :=
-      Nat.pow_le_pow_right (by decide : 1 ≤ 2) hrHalfLe
-    have hBound : 181 * 2 ^ 120 < Verity.Core.Uint256.modulus := by
-      native_decide
-    exact lt_of_le_of_lt (Nat.mul_le_mul_left 181 hPow) hBound
-  have hScaledVal : (shl (shr 1 rU) 181).val = 181 * 2 ^ (r / 2) := by
-    rw [shl_small_val _ _ hShlLt, uint181_val, hShiftVal]
-  have hShrXVal : (shr rU x).val = x.val / 2 ^ r := by
-    rw [shr_val, hR]
-  have hyUpper : x.val / 2 ^ r < 2 ^ 24 := by
-    simpa [r] using sqrtScanNat_upper_bound x.val hx hxLt
-  have hAddLt : (shr rU x).val + 65536 < Verity.Core.Uint256.modulus := by
-    rw [hShrXVal]
-    have hSmall : x.val / 2 ^ r + 65536 < 2 ^ 25 := by
-      norm_num
-      omega
-    exact lt_of_lt_of_le hSmall (by native_decide)
-  have hAddVal : (add (shr rU x) 65536).val = x.val / 2 ^ r + 65536 := by
-    rw [add_uint65536_val (shr rU x) hAddLt, hShrXVal]
-  have hMulLt :
-      (shl (shr 1 rU) 181).val * (add (shr rU x) 65536).val <
-        Verity.Core.Uint256.modulus := by
-    rw [hScaledVal, hAddVal]
-    have hPow : 2 ^ (r / 2) ≤ 2 ^ 120 :=
-      Nat.pow_le_pow_right (by decide : 1 ≤ 2) hrHalfLe
-    have hScaledLe : 181 * 2 ^ (r / 2) ≤ 181 * 2 ^ 120 :=
-      Nat.mul_le_mul_left 181 hPow
-    have hAddLe : x.val / 2 ^ r + 65536 ≤ 2 ^ 25 := by omega
-    have hProductLe :
-        (181 * 2 ^ (r / 2)) * (x.val / 2 ^ r + 65536) ≤
-          (181 * 2 ^ 120) * 2 ^ 25 :=
-      Nat.mul_le_mul hScaledLe hAddLe
-    have hBound : (181 * 2 ^ 120) * 2 ^ 25 < Verity.Core.Uint256.modulus := by
-      native_decide
-    exact lt_of_le_of_lt hProductLe hBound
-  have hMulVal :
-      (mul (shl (shr 1 rU) 181) (add (shr rU x) 65536)).val =
-        (181 * 2 ^ (r / 2)) * (x.val / 2 ^ r + 65536) := by
-    rw [mul_val_of_lt _ _ hMulLt, hScaledVal, hAddVal]
-  unfold sqrtFinishSeedUint soladySqrtSeedNat
-  simp only [rU, r]
-  rw [shr_val, hMulVal, uint18_val]
-
 private theorem sqrtStepUint_val
     (x zU : Uint256) (z : Nat)
     (hzVal : zU.val = z) (hzPos : 0 < z)
     (hAddLt : z + x.val / z < Verity.Core.Uint256.modulus) :
-    (shr 1 (add zU (div x zU))).val = sqrtStepNat x.val z := by
+    (shr 1 (add zU (div x zU))).val = sqrtStep x.val z := by
   have hzUNe : zU.val ≠ 0 := by omega
   have hDivVal : (div x zU).val = x.val / z := by
     rw [div_val x zU hzUNe, hzVal]
@@ -1914,97 +856,24 @@ private theorem sqrtStepUint_val
     simpa [hzVal, hDivVal] using hAddLt
   have hAddVal : (add zU (div x zU)).val = z + x.val / z := by
     rw [add_val_of_lt _ _ hAddLtU, hzVal, hDivVal]
-  unfold sqrtStepNat
+  unfold sqrtStep
   rw [shr_val, hAddVal]
   norm_num
-
-private theorem sqrtIterUint_val_of_nat_floor
-    (steps : Nat) (x zU : Uint256) (z : Nat)
-    (hxLt : x.val < 2 ^ 256) (haPos : 0 < Nat.sqrt x.val)
-    (hzVal : zU.val = z)
-    (hFloor : Nat.sqrt x.val ≤ z) (hUpper : z ≤ 3 * 2 ^ 128) :
-    (sqrtIterUint steps x zU).val = sqrtIterNat steps x.val z := by
-  induction steps generalizing zU z with
-  | zero =>
-      simpa [sqrtIterUint, sqrtIterNat] using hzVal
-  | succ steps ih =>
-      have hzPos : 0 < z := lt_of_lt_of_le haPos hFloor
-      have hAddLt := sqrtStepNat_add_no_overflow x.val z hxLt haPos hFloor hUpper
-      have hStepVal :
-          (shr 1 (add zU (div x zU))).val = sqrtStepNat x.val z :=
-        sqrtStepUint_val x zU z hzVal hzPos hAddLt
-      have hNextFloor : Nat.sqrt x.val ≤ sqrtStepNat x.val z :=
-        sqrtStepNat_ge_floor x.val z hzPos
-      have hNextUpper : sqrtStepNat x.val z ≤ 3 * 2 ^ 128 :=
-        sqrtStepNat_le_three_pow128 x.val z hxLt haPos hFloor hUpper
-      have hTail := ih (shr 1 (add zU (div x zU))) (sqrtStepNat x.val z)
-        hStepVal hNextFloor hNextUpper
-      simpa [sqrtIterUint, sqrtIterNat] using hTail
-
-private theorem sqrtBeforeCorrectionUint_val_large
-    (x : Uint256) (hx : 2 ^ 8 ≤ x.val) :
-    (sqrtBeforeCorrectionUint x (sqrtScanSourceUint x) 181).val =
-      soladySqrtBeforeCorrectionNat x.val := by
-  let seedU := sqrtFinishSeedUint x (sqrtScanSourceUint x) 181
-  let seed := soladySqrtSeedNat x.val
-  let z1 := sqrtStepNat x.val seed
-  have hxLt : x.val < 2 ^ 256 := by
-    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
-  have hxPos : 0 < x.val := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hx
-  have hSqrtPos : 0 < Nat.sqrt x.val := nat_sqrt_pos_of_ge_256 hx
-  have hSeedVal : seedU.val = seed := by
-    simpa [seedU, seed] using sqrtFinishSeedUint_val_large x hx
-  have hSeedInfo := soladySqrtSeedNat_real_bounds x.val hx hxLt
-  have hSeedPos : 0 < seed := by simpa [seed] using hSeedInfo.1
-  have hSeedAddLt : seed + x.val / seed < Verity.Core.Uint256.modulus := by
-    simpa [seed] using sqrtSeedNat_add_no_overflow x.val hx hxLt
-  have hStepVal :
-      (shr 1 (add seedU (div x seedU))).val = z1 := by
-    simpa [z1] using sqrtStepUint_val x seedU seed hSeedVal hSeedPos hSeedAddLt
-  have hZ1Floor : Nat.sqrt x.val ≤ z1 := by
-    simpa [z1] using sqrtStepNat_ge_floor x.val seed hSeedPos
-  have hZ1Upper : z1 ≤ 3 * 2 ^ 128 := by
-    let α := Real.sqrt (x.val : ℝ)
-    have hxPosR : 0 < (x.val : ℝ) := Nat.cast_pos.2 hxPos
-    have hαPos : 0 < α := by
-      simpa [α] using Real.sqrt_pos.2 hxPosR
-    have hStepUpperRaw := sqrtStepNat_real_ratio_upper
-      (x := x.val) (z := seed) hxPos hSeedPos (u := (23 : ℝ) / 8)
-      (by norm_num)
-      (by simpa [seed, α] using hSeedInfo.2.1)
-      (by simpa [seed, α] using hSeedInfo.2.2)
-    have hαLt : α < (2 : ℝ) ^ 128 := by
-      have hxLtR : (x.val : ℝ) < (2 : ℝ) ^ 256 := by exact_mod_cast hxLt
-      have hPowEq : ((2 : ℝ) ^ 128) ^ 2 = (2 : ℝ) ^ 256 := by
-        rw [sq, ← pow_add]
-      rw [Real.sqrt_lt' (by positivity : 0 < (2 : ℝ) ^ 128)]
-      rw [hPowEq]
-      exact hxLtR
-    have hZ1R : (z1 : ℝ) < 3 * (2 : ℝ) ^ 128 := by
-      have h : (z1 : ℝ) ≤ (((23 : ℝ) / 8 + 1 / ((23 : ℝ) / 8)) / 2) * α := by
-        simpa [z1, sqrtNewtonBoundRat] using hStepUpperRaw
-      nlinarith
-    exact le_of_lt (by exact_mod_cast hZ1R)
-  have hTail := sqrtIterUint_val_of_nat_floor 6 x (shr 1 (add seedU (div x seedU))) z1
-    hxLt hSqrtPos hStepVal hZ1Floor hZ1Upper
-  unfold sqrtBeforeCorrectionUint soladySqrtBeforeCorrectionNat sqrtIterUint sqrtIterNat
-  simpa [seedU, seed, z1] using hTail
 
 private theorem sqrtFinishCorrectionUint_val
     (x zU : Uint256) (z : Nat)
     (hZVal : zU.val = z) (hzPos : 0 < z) :
-    (if div x zU < zU then sub zU 1 else zU).val =
-      sqrtCorrectNat x.val z := by
+    (sub zU (boolToWord (div x zU < zU))).val =
+      z - if x.val / z < z then 1 else 0 := by
   have hzUNe : zU.val ≠ 0 := by omega
   have hDivVal : (div x zU).val = x.val / z := by
     rw [div_val x zU hzUNe, hZVal]
   have hBranchIff : (div x zU < zU) ↔ x.val / z < z := by
     change (div x zU).val < zU.val ↔ x.val / z < z
     rw [hDivVal, hZVal]
-  unfold sqrtCorrectNat
   by_cases h : x.val / z < z
   · have hUint := hBranchIff.mpr h
-    rw [if_pos hUint, if_pos h]
+    simp [hUint, h, boolToWord]
     have hOne : (1 : Uint256).val = 1 := by simp
     have hSub : (sub zU 1).val = z - 1 := by
       have hLe : (1 : Uint256).val ≤ zU.val := by
@@ -2014,1491 +883,222 @@ private theorem sqrtFinishCorrectionUint_val
         Verity.Core.Uint256.sub_eq_of_le (a := zU) (b := (1 : Uint256)) hLe
     exact hSub
   · have hUint : ¬ div x zU < zU := fun hh => h (hBranchIff.mp hh)
-    rw [if_neg hUint, if_neg h]
-    exact hZVal
+    have hFlag : boolToWord (div x zU < zU) = (0 : Uint256) := by
+      simp [boolToWord, hUint]
+    rw [hFlag, sub_zero_val]
+    simp [h, hZVal]
 
-private theorem sqrtFinishUint_val_large
-    (x : Uint256) (hx : 2 ^ 8 ≤ x.val) :
-    (sqrtFinishUint x (sqrtScanSourceUint x) 181).val =
-      soladySqrtNat x.val := by
-  have hZVal :
-      (sqrtBeforeCorrectionUint x (sqrtScanSourceUint x) 181).val =
-        soladySqrtBeforeCorrectionNat x.val :=
-    sqrtBeforeCorrectionUint_val_large x hx
-  have hxLt : x.val < 2 ^ 256 := by
-    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
-  have hNear := soladySqrtBeforeCorrectionNat_near_floor x.val hx hxLt
-  have hzPos : 0 < soladySqrtBeforeCorrectionNat x.val := by
-    have hSqrtPos : 0 < Nat.sqrt x.val := nat_sqrt_pos_of_ge_256 hx
-    exact lt_of_lt_of_le hSqrtPos hNear.1
-  simpa [sqrtFinishUint, soladySqrtNat] using
-    sqrtFinishCorrectionUint_val x
-      (sqrtBeforeCorrectionUint x (sqrtScanSourceUint x) 181)
-      (soladySqrtBeforeCorrectionNat x.val) hZVal hzPos
-
-private theorem sqrtFinishIf_run_eq_uint (x z : Uint256) (s : ContractState) :
-    ((if div x z < z then Verity.pure (sub z 1) else Verity.pure z).run s).fst =
-      if div x z < z then sub z 1 else z := by
-  by_cases h : div x z < z
-  · rw [if_pos h, if_pos h]
-    rfl
-  · rw [if_neg h, if_neg h]
-    rfl
-
-private theorem sqrtFinishContract_run_eq_uint
-    (x r z : Uint256) (s : ContractState) :
-    ((sqrtFinishContract x r z).run s).fst = sqrtFinishUint x r z := by
-  unfold sqrtFinishContract sqrtFinishUint
-  exact sqrtFinishIf_run_eq_uint x (sqrtBeforeCorrectionUint x r z) s
-
-private theorem sqrtScan4Contract_run_eq_uint
-    (x r z : Uint256) (s : ContractState) :
-    ((sqrtScan4Contract x r z).run s).fst = sqrtScan4Uint x r z := by
-  unfold sqrtScan4Contract sqrtScan4Uint
-  by_cases h : 16777215 < shr r x
-  · simp only [h, if_true, bind_pure_contract, sqrtFinishContract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, sqrtFinishContract_run_eq_uint]
-
-private theorem sqrtScan5Contract_run_eq_uint
-    (x r z : Uint256) (s : ContractState) :
-    ((sqrtScan5Contract x r z).run s).fst = sqrtScan5Uint x r z := by
-  unfold sqrtScan5Contract sqrtScan5Uint
-  by_cases h : 1099511627775 < shr r x
-  · simp only [h, if_true, bind_pure_contract, sqrtScan4Contract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, sqrtScan4Contract_run_eq_uint]
-
-private theorem sqrtScan6Contract_run_eq_uint
-    (x r z : Uint256) (s : ContractState) :
-    ((sqrtScan6Contract x r z).run s).fst = sqrtScan6Uint x r z := by
-  unfold sqrtScan6Contract sqrtScan6Uint
-  by_cases h : 4722366482869645213695 < shr r x
-  · simp only [h, if_true, bind_pure_contract, sqrtScan5Contract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, sqrtScan5Contract_run_eq_uint]
-
-private theorem sqrtSourceContract_run_eq_uint (x : Uint256) (s : ContractState) :
-    ((sqrtSourceContract x).run s).fst = sqrtSourceUint x := by
-  unfold sqrtSourceContract sqrtSourceUint
-  by_cases h : 87112285931760246646623899502532662132735 < x
-  · simp only [h, if_true, bind_pure_contract, sqrtScan6Contract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, sqrtScan6Contract_run_eq_uint]
-
-private theorem sqrt_run_eq_sourceUint (x : Uint256) (s : ContractState) :
-    ((sqrt x).run s).fst = sqrtSourceUint x := by
-  rw [sqrt, Tamago.Utils.FixedPointMathLibBase.sqrt.eq_1]
-  unfold sqrtSourceUint
-  by_cases h : 87112285931760246646623899502532662132735 < x
-  · simp only [h, if_true, bind_pure_contract]
-    change ((sqrtScan6Contract x (shl 7 1) 181).run s).fst =
-      sqrtScan6Uint x (shl 7 1) 181
-    exact sqrtScan6Contract_run_eq_uint x (shl 7 1) 181 s
-  · simp only [h, if_false, bind_pure_contract]
-    change ((sqrtScan6Contract x 0 181).run s).fst = sqrtScan6Uint x 0 181
-    exact sqrtScan6Contract_run_eq_uint x 0 181 s
-
-private theorem sqrtSourceUint_val_small :
-    ∀ x : Fin 256,
-      (sqrtSourceUint (uintOfNat x.val)).val = soladySqrtNat x.val := by
-  native_decide
-
-private theorem soladySqrt_run_eq_model (x : Uint256) (s : ContractState) :
-    ((sqrt x).run s).fst.val = soladySqrtNat x.val := by
-  rw [sqrt_run_eq_sourceUint x s]
-  by_cases hxSmall : x.val < 256
-  · have hxEq : x = uintOfNat x.val := by
+private theorem sqrtInnerUint_val (x : Uint256) :
+    (let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
+     let z := shr 1 (sub 256 xClz)
+     let z := shr 1 (add (shl z 1) (shr z x))
+     let z := shr 1 (add z (div x z))
+     let z := shr 1 (add z (div x z))
+     let z := shr 1 (add z (div x z))
+     let z := shr 1 (add z (div x z))
+     let z := shr 1 (add z (div x z))
+     z).val = innerSqrt x.val := by
+  by_cases hx0 : x.val = 0
+  · have hxEq : x = 0 := by
       apply Verity.Core.Uint256.ext
-      have hLt : x.val < Verity.Core.Uint256.modulus := x.isLt
-      simp [uintOfNat_val_of_lt hLt]
+      simpa using hx0
     rw [hxEq]
-    simpa [uintOfNat_val_of_lt x.isLt] using
-      sqrtSourceUint_val_small ⟨x.val, hxSmall⟩
-  · have hxLarge : 2 ^ 8 ≤ x.val := by
-      norm_num at hxSmall
+    native_decide
+  · have hxPos : 0 < x.val := Nat.pos_of_ne_zero hx0
+    have hxLt : x.val < 2 ^ 256 := by
+      simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
+    let i : Fin 256 := ⟨Nat.log2 x.val, (Nat.log2_lt (Nat.ne_of_gt hxPos)).2 hxLt⟩
+    let m := Nat.sqrt x.val
+    have hmlo : m * m ≤ x.val := by simpa [m] using Nat.sqrt_le x.val
+    have hmhi : x.val < (m + 1) * (m + 1) := by
+      simpa [m] using Nat.lt_succ_sqrt x.val
+    have hOct : 2 ^ i.val ≤ x.val ∧ x.val < 2 ^ (i.val + 1) := by
+      have hlog :
+          2 ^ Nat.log2 x.val ≤ x.val ∧ x.val < 2 ^ (Nat.log2 x.val + 1) := by
+        constructor
+        · simpa [Nat.log2_eq_log_two] using Nat.pow_log_le_self 2 (Nat.ne_of_gt hxPos)
+        · simpa [Nat.log2_eq_log_two, Nat.succ_eq_add_one] using
+            Nat.lt_pow_succ_log_self (by decide : 1 < 2) x.val
+      simpa [i] using hlog
+    have hm : 0 < m := by
+      by_cases hm0 : m = 0
+      · have hx1 : 1 ≤ x.val := Nat.succ_le_of_lt hxPos
+        have hlt1 : x.val < 1 := by
+          have : x.val < (0 + 1) * (0 + 1) := by simpa [m, hm0] using hmhi
+          simpa using this
+        exact False.elim ((Nat.not_lt_of_ge hx1) hlt1)
+      · exact Nat.pos_of_ne_zero hm0
+    have hinterval : Tamago.Proof.Utils.Sqrt.OctaveCert.loOf i ≤ m ∧ m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.hiOf i :=
+      m_within_cert_interval i x.val m hmlo hmhi hOct
+    have hSeedEq : sqrtSeed x.val = Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i :=
+      sqrtSeed_eq_octaveSeed i x.val hOct
+    let qU := shr 1 (sub 256 (Tamago.Proof.Utils.ClzProof.clzFormulaUint x))
+    let z1U := shr 1 (add (shl qU 1) (shr qU x))
+    let z2U := shr 1 (add z1U (div x z1U))
+    let z3U := shr 1 (add z2U (div x z2U))
+    let z4U := shr 1 (add z3U (div x z3U))
+    let z5U := shr 1 (add z4U (div x z4U))
+    let z6U := shr 1 (add z5U (div x z5U))
+    let z0 := Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i
+    let z1 := sqrtStep x.val z0
+    let z2 := sqrtStep x.val z1
+    let z3 := sqrtStep x.val z2
+    let z4 := sqrtStep x.val z3
+    let z5 := sqrtStep x.val z4
+    let z6 := sqrtStep x.val z5
+    have hz1Val : z1U.val = z1 := by
+      have h := sqrtFirstStepUint_val x hx0
+      simpa [qU, z1U, z0, z1, hSeedEq] using h
+    have hz0Pos : 0 < z0 := by
+      simp [z0, Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf, Nat.shiftLeft_eq]
+    have hmz1 : m ≤ z1 := by
+      dsimp [z1, z0]
+      exact sqrt_step_floor_bound x.val (Tamago.Proof.Utils.Sqrt.OctaveCert.seedOf i) m hz0Pos hmlo
+    have hz1Pos : 0 < z1 := Nat.lt_of_lt_of_le hm hmz1
+    have hmz2 : m ≤ z2 := by
+      dsimp [z2]
+      exact sqrt_step_floor_bound x.val z1 m hz1Pos hmlo
+    have hz2Pos : 0 < z2 := Nat.lt_of_lt_of_le hm hmz2
+    have hmz3 : m ≤ z3 := by
+      dsimp [z3]
+      exact sqrt_step_floor_bound x.val z2 m hz2Pos hmlo
+    have hz3Pos : 0 < z3 := Nat.lt_of_lt_of_le hm hmz3
+    have hmz4 : m ≤ z4 := by
+      dsimp [z4]
+      exact sqrt_step_floor_bound x.val z3 m hz3Pos hmlo
+    have hz4Pos : 0 < z4 := Nat.lt_of_lt_of_le hm hmz4
+    have hmz5 : m ≤ z5 := by
+      dsimp [z5]
+      exact sqrt_step_floor_bound x.val z4 m hz4Pos hmlo
+    have hz5Pos : 0 < z5 := Nat.lt_of_lt_of_le hm hmz5
+    have hrun5 := Tamago.Proof.Utils.Sqrt.ErrorChain.run5_error_bounds i x.val m hm hmlo hmhi
+      hinterval.1 hinterval.2
+    have hd1 : z1 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d1 i := by
+      simpa [z0, z1, z2, z3, z4, z5] using hrun5.1
+    have hd2 : z2 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d2 i := by
+      simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.1
+    have hd3 : z3 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d3 i := by
+      simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.2.1
+    have hd4 : z4 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d4 i := by
+      simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.2.2.1
+    have hd5 : z5 - m ≤ Tamago.Proof.Utils.Sqrt.OctaveCert.d5 i := by
+      simpa [z0, z1, z2, z3, z4, z5] using hrun5.2.2.2.2
+    have hd1m : Tamago.Proof.Utils.Sqrt.OctaveCert.d1 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d1_le_lo i) hinterval.1
+    have hd2m : Tamago.Proof.Utils.Sqrt.OctaveCert.d2 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d2_le_lo i) hinterval.1
+    have hd3m : Tamago.Proof.Utils.Sqrt.OctaveCert.d3 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d3_le_lo i) hinterval.1
+    have hd4m : Tamago.Proof.Utils.Sqrt.OctaveCert.d4 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d4_le_lo i) hinterval.1
+    have hd5m : Tamago.Proof.Utils.Sqrt.OctaveCert.d5 i ≤ m := Nat.le_trans (Tamago.Proof.Utils.Sqrt.OctaveCert.d5_le_lo i) hinterval.1
+    have hxMod : x.val < Verity.Core.Uint256.modulus := x.isLt
+    have hsum1 : z1 + x.val / z1 < Verity.Core.Uint256.modulus :=
+      sqrt_sum_lt_uint256_of_cert x.val m z1 (Tamago.Proof.Utils.Sqrt.OctaveCert.d1 i)
+        hxMod hm hmlo hmhi hmz1 hd1 hd1m
+    have hsum2 : z2 + x.val / z2 < Verity.Core.Uint256.modulus :=
+      sqrt_sum_lt_uint256_of_cert x.val m z2 (Tamago.Proof.Utils.Sqrt.OctaveCert.d2 i)
+        hxMod hm hmlo hmhi hmz2 hd2 hd2m
+    have hsum3 : z3 + x.val / z3 < Verity.Core.Uint256.modulus :=
+      sqrt_sum_lt_uint256_of_cert x.val m z3 (Tamago.Proof.Utils.Sqrt.OctaveCert.d3 i)
+        hxMod hm hmlo hmhi hmz3 hd3 hd3m
+    have hsum4 : z4 + x.val / z4 < Verity.Core.Uint256.modulus :=
+      sqrt_sum_lt_uint256_of_cert x.val m z4 (Tamago.Proof.Utils.Sqrt.OctaveCert.d4 i)
+        hxMod hm hmlo hmhi hmz4 hd4 hd4m
+    have hsum5 : z5 + x.val / z5 < Verity.Core.Uint256.modulus :=
+      sqrt_sum_lt_uint256_of_cert x.val m z5 (Tamago.Proof.Utils.Sqrt.OctaveCert.d5 i)
+        hxMod hm hmlo hmhi hmz5 hd5 hd5m
+    have hz2Val : z2U.val = z2 := by
+      have h := sqrtStepUint_val x z1U z1 hz1Val hz1Pos hsum1
+      simpa [z2U, z2, sqrtStep] using h
+    have hz3Val : z3U.val = z3 := by
+      have h := sqrtStepUint_val x z2U z2 hz2Val hz2Pos hsum2
+      simpa [z3U, z3, sqrtStep] using h
+    have hz4Val : z4U.val = z4 := by
+      have h := sqrtStepUint_val x z3U z3 hz3Val hz3Pos hsum3
+      simpa [z4U, z4, sqrtStep] using h
+    have hz5Val : z5U.val = z5 := by
+      have h := sqrtStepUint_val x z4U z4 hz4Val hz4Pos hsum4
+      simpa [z5U, z5, sqrtStep] using h
+    have hz6Val : z6U.val = z6 := by
+      have h := sqrtStepUint_val x z5U z5 hz5Val hz5Pos hsum5
+      simpa [z6U, z6, sqrtStep] using h
+    have hInner : innerSqrt x.val = z6 := by
+      unfold innerSqrt
+      simp [Nat.ne_of_gt hxPos, hSeedEq, z0, z1, z2, z3, z4, z5, z6]
+    change z6U.val = innerSqrt x.val
+    rw [hz6Val, hInner]
+
+private theorem sqrtFloorCorrectionUint_val
+    (x z : Uint256)
+    (hZVal : z.val = innerSqrt x.val) :
+    (sub z (boolToWord (div x z < z))).val = floorSqrt x.val := by
+  by_cases hz0 : innerSqrt x.val = 0
+  · have hzValZero : z.val = 0 := by simpa [hz0] using hZVal
+    have hNot : ¬ div x z < z := by
+      change ¬ (div x z).val < z.val
       omega
-    simpa [sqrtSourceUint_eq_finishScan x] using sqrtFinishUint_val_large x hxLarge
+    unfold floorSqrt
+    have hFlag : boolToWord (div x z < z) = (0 : Uint256) := by
+      simp [boolToWord, hNot]
+    rw [hFlag, sub_zero_val]
+    simp [hz0, hzValZero]
+  · have hzPos : 0 < innerSqrt x.val := Nat.pos_of_ne_zero hz0
+    have h := sqrtFinishCorrectionUint_val x z (innerSqrt x.val) hZVal hzPos
+    unfold floorSqrt
+    simpa [hz0] using h
+
+private theorem sqrtBodyUint_val (x : Uint256) :
+    (let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
+     let z := shr 1 (sub 256 xClz)
+     let z := shr 1 (add (shl z 1) (shr z x))
+     let z := shr 1 (add z (div x z))
+     let z := shr 1 (add z (div x z))
+     let z := shr 1 (add z (div x z))
+     let z := shr 1 (add z (div x z))
+     let z := shr 1 (add z (div x z))
+     sub z (boolToWord (div x z < z))).val =
+      floorSqrt x.val := by
+  let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
+  let z1 := shr 1 (sub 256 xClz)
+  let z2 := shr 1 (add (shl z1 1) (shr z1 x))
+  let z3 := shr 1 (add z2 (div x z2))
+  let z4 := shr 1 (add z3 (div x z3))
+  let z5 := shr 1 (add z4 (div x z4))
+  let z6 := shr 1 (add z5 (div x z5))
+  let z7 := shr 1 (add z6 (div x z6))
+  have hInner : z7.val = innerSqrt x.val := by
+    simpa [xClz, z1, z2, z3, z4, z5, z6, z7] using sqrtInnerUint_val x
+  change (sub z7 (boolToWord (div x z7 < z7))).val = floorSqrt x.val
+  exact sqrtFloorCorrectionUint_val x z7 hInner
+
+private theorem sqrt_run_eq_floorSqrt (x : Uint256) (s : ContractState) :
+    ((sqrt x).run s).fst.val = floorSqrt x.val := by
+  rw [sqrt, Tamago.Utils.FixedPointMathLibBase.sqrt.eq_1]
+  rw [monad_bind_success_run_fst _ _ (Tamago.Proof.Utils.ClzProof.clzFormulaUint x) s s
+    (Tamago.Proof.Utils.ClzProof.clz_apply_eq_success x s)]
+  let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
+  let z1 := shr 1 (sub 256 xClz)
+  let z2 := shr 1 (add (shl z1 1) (shr z1 x))
+  let z3 := shr 1 (add z2 (div x z2))
+  let z4 := shr 1 (add z3 (div x z3))
+  let z5 := shr 1 (add z4 (div x z4))
+  let z6 := shr 1 (add z5 (div x z5))
+  let z7 := shr 1 (add z6 (div x z6))
+  have hBody :
+      (sub z7 (boolToWord (div x z7 < z7))).val = floorSqrt x.val := by
+    simpa [xClz, z1, z2, z3, z4, z5, z6, z7] using sqrtBodyUint_val x
+  change
+      ((Verity.pure (sub z7 (boolToWord (div x z7 < z7)))).run s).fst.val =
+        floorSqrt x.val
+  simpa [Verity.pure, Pure.pure] using hBody
 
 theorem sqrt_returns_math_floor (x : Uint256) (s : ContractState) :
     sqrt_property x ((sqrt x).run s).fst := by
   unfold sqrt_property
-  rw [soladySqrt_run_eq_model x s]
-  exact soladySqrtNat_property x.val (by
-    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt)
-
-private def natCbrt (n : Nat) : Nat :=
-  Nat.findGreatest (fun r => r ^ 3 ≤ n) n
-
-private theorem nat_le_cube_of_pos {n : Nat} (hn : 0 < n) : n ≤ n ^ 3 := by
-  have hsq : 1 ≤ n * n := Nat.succ_le_of_lt (Nat.mul_pos hn hn)
-  calc
-    n = n * 1 := by rw [Nat.mul_one]
-    _ ≤ n * (n * n) := Nat.mul_le_mul_left n hsq
-    _ = n ^ 3 := by
-      simp [Nat.pow_succ, Nat.pow_zero, Nat.mul_assoc]
-
-private theorem natCbrt_cube_le (n : Nat) :
-    natCbrt n ^ 3 ≤ n := by
-  unfold natCbrt
-  exact Nat.findGreatest_spec
-    (P := fun r => r ^ 3 ≤ n)
-    (m := 0) (n := n)
-    (Nat.zero_le _) (by norm_num)
-
-private theorem natCbrt_next_cube_gt (n : Nat) :
-    n < (natCbrt n + 1) ^ 3 := by
-  by_contra h
-  have hCube : (natCbrt n + 1) ^ 3 ≤ n := Nat.le_of_not_gt h
-  have hBound : natCbrt n + 1 ≤ n := by
-    exact Nat.le_trans (nat_le_cube_of_pos (Nat.succ_pos _)) hCube
-  have hNot :
-      ¬ (natCbrt n + 1) ^ 3 ≤ n := by
-    exact Nat.findGreatest_is_greatest
-      (P := fun r => r ^ 3 ≤ n)
-      (n := n)
-      (k := natCbrt n + 1)
-      (Nat.lt_succ_self _) hBound
-  exact hNot hCube
-
-private theorem cbrt_near_floor_property
-    (x z : Nat)
-    (hLower : natCbrt x ≤ z)
-    (hUpper : z ≤ natCbrt x + 1) :
-    (z - 1) * (z - 1) * (z - 1) ≤ x ∧
-      x < (z + 1) * (z + 1) * (z + 1) := by
-  constructor
-  · have hzPred : z - 1 ≤ natCbrt x := by omega
-    have hCube :=
-      Nat.mul_le_mul (Nat.mul_le_mul hzPred hzPred) hzPred
-    exact le_trans hCube (by
-      simpa [Nat.pow_succ, Nat.pow_zero, Nat.mul_assoc] using natCbrt_cube_le x)
-  · have hSuccLe : natCbrt x + 1 ≤ z + 1 := by omega
-    have hCube :=
-      Nat.mul_le_mul (Nat.mul_le_mul hSuccLe hSuccLe) hSuccLe
-    exact lt_of_lt_of_le (by
-      simpa [Nat.pow_succ, Nat.pow_zero, Nat.mul_assoc] using natCbrt_next_cube_gt x) hCube
-
-private def cbrtStepNat (x z : Nat) : Nat :=
-  (x / (z * z) + z + z) / 3
-
-private def cbrtIterNat : Nat → Nat → Nat → Nat
-  | 0, _x, z => z
-  | steps + 1, x, z => cbrtIterNat steps x (cbrtStepNat x z)
-
-private def cbrtScanStepNat (x r shift : Nat) : Nat :=
-  if 2 ^ shift - 1 < x / 2 ^ r then r + shift else r
-
-private def cbrtScanNat (x : Nat) : Nat :=
-  let r := cbrtScanStepNat x 0 128
-  let r := cbrtScanStepNat x r 64
-  let r := cbrtScanStepNat x r 32
-  let r := cbrtScanStepNat x r 16
-  cbrtScanStepNat x r 8
-
-private def soladyCbrtSeedNat (x : Nat) : Nat :=
-  let r := cbrtScanNat x
-  let seedBase := if 15 < x / 2 ^ r then 30 else 15
-  (seedBase * 2 ^ (r / 3)) / Nat.xor 7 (r % 3)
-
-private def soladyCbrtBeforeCorrectionNat (x : Nat) : Nat :=
-  cbrtIterNat 7 x (soladyCbrtSeedNat x)
-
-private def soladyCbrtNat (x : Nat) : Nat :=
-  cbrtCorrectNat x (soladyCbrtBeforeCorrectionNat x)
-
-private theorem soladyCbrtNat_property_small :
-    ∀ x : Fin 256,
-      soladyCbrtNat x.val * soladyCbrtNat x.val * soladyCbrtNat x.val ≤ x.val ∧
-        x.val < (soladyCbrtNat x.val + 1) * (soladyCbrtNat x.val + 1) *
-          (soladyCbrtNat x.val + 1) := by
-  native_decide
-
-private theorem soladyCbrtNat_property_of_lt_256 (x : Nat) (hx : x < 256) :
-    soladyCbrtNat x * soladyCbrtNat x * soladyCbrtNat x ≤ x ∧
-      x < (soladyCbrtNat x + 1) * (soladyCbrtNat x + 1) *
-        (soladyCbrtNat x + 1) := by
-  simpa using soladyCbrtNat_property_small ⟨x, hx⟩
-
-private theorem cbrtStepNat_pos (x z : Nat) (hx : 0 < x) (hz : 0 < z) :
-    0 < cbrtStepNat x z := by
-  unfold cbrtStepNat
-  cases z with
-  | zero => cases hz
-  | succ z' =>
-      cases z' with
-      | zero =>
-          have hDiv : x / (1 * 1) = x := by simp
-          rw [hDiv]
-          exact Nat.div_pos (by omega) (by decide : 0 < 3)
-      | succ z'' =>
-          have hBase : 3 ≤ Nat.succ (Nat.succ z'') + Nat.succ (Nat.succ z'') := by
-            omega
-          have hNum :
-              3 ≤ x / (Nat.succ (Nat.succ z'') * Nat.succ (Nat.succ z'')) +
-                Nat.succ (Nat.succ z'') + Nat.succ (Nat.succ z'') := by
-            exact le_trans hBase
-              (Nat.add_le_add_right
-                (Nat.le_add_left (Nat.succ (Nat.succ z''))
-                  (x / (Nat.succ (Nat.succ z'') * Nat.succ (Nat.succ z''))))
-                (Nat.succ (Nat.succ z'')))
-          exact Nat.div_pos hNum (by decide : 0 < 3)
-
-private theorem cbrtStepNat_ge_floor (x z : Nat) (hz : 0 < z) :
-    natCbrt x ≤ cbrtStepNat x z := by
-  unfold cbrtStepNat
-  let a := natCbrt x
-  have ha3 : a * a * a ≤ x := by
-    simpa [Nat.pow_succ, Nat.pow_zero, Nat.mul_assoc, a] using natCbrt_cube_le x
-  have hzz : 0 < z * z := Nat.mul_pos hz hz
-  have hsum : a * 3 ≤ x / (z * z) + z + z := by
-    by_cases hzle : 2 * z ≤ 3 * a
-    · have hmul : (3 * a - 2 * z) * (z * z) ≤ a * a * a := by
-        have hmulInt :
-            ((3 * a - 2 * z : Nat) : Int) * ((z * z : Nat) : Int) ≤
-              (a : Int) * (a : Int) * (a : Int) := by
-          have hcast :
-              ((3 * a - 2 * z : Nat) : Int) = 3 * (a : Int) - 2 * (z : Int) := by
-            exact Nat.cast_sub hzle
-          have hnonneg :
-              0 ≤ ((a : Int) - (z : Int)) ^ 2 * ((a : Int) + 2 * (z : Int)) := by
-            apply mul_nonneg
-            · exact sq_nonneg ((a : Int) - (z : Int))
-            · omega
-          rw [hcast]
-          norm_num
-          nlinarith [hnonneg]
-        exact_mod_cast hmulInt
-      have hmulX : (3 * a - 2 * z) * (z * z) ≤ x := le_trans hmul ha3
-      have hdiv : 3 * a - 2 * z ≤ x / (z * z) :=
-        (Nat.le_div_iff_mul_le hzz).2 hmulX
-      omega
-    · have hgt : 3 * a < 2 * z := Nat.lt_of_not_ge hzle
-      have hle : a * 3 ≤ z + z := by omega
-      exact le_trans hle (Nat.add_le_add_right (Nat.le_add_left z (x / (z * z))) z)
-  have hdiv3 : a ≤ (x / (z * z) + z + z) / 3 :=
-    (Nat.le_div_iff_mul_le (by decide : 0 < 3)).2 (by
-      simpa [Nat.mul_comm] using hsum)
-  exact hdiv3
-
-private theorem cbrtScanStepNat_lower_bound
-    (x r shift : Nat)
-    (hLower : 1 ≤ x / 2 ^ r) :
-    1 ≤ x / 2 ^ cbrtScanStepNat x r shift := by
-  unfold cbrtScanStepNat
-  by_cases hBranch : 2 ^ shift - 1 < x / 2 ^ r
-  · have hBranchLe : 2 ^ shift ≤ x / 2 ^ r := by omega
-    have hLower' : 2 ^ 0 ≤ x / 2 ^ (r + shift) :=
-      pow2_div_lower_from_div_lower x r 0 shift (by simpa using hBranchLe)
-    simpa [hBranch] using hLower'
-  · simpa [hBranch] using hLower
-
-private theorem cbrtScanStepNat_upper_bound
-    (x r shift : Nat)
-    (hUpper : x / 2 ^ r < 2 ^ (shift + shift)) :
-    x / 2 ^ cbrtScanStepNat x r shift < 2 ^ shift := by
-  unfold cbrtScanStepNat
-  by_cases hBranch : 2 ^ shift - 1 < x / 2 ^ r
-  · have hUpper' : x / 2 ^ (r + shift) < 2 ^ shift := by
-      have h : x / 2 ^ r / 2 ^ shift < 2 ^ shift :=
-        pow2_div_upper_from_value_upper (x / 2 ^ r) shift shift hUpper
-      simpa [Nat.div_div_eq_div_mul, ← Nat.pow_add] using h
-    simpa [hBranch] using hUpper'
-  · have hUpper' : x / 2 ^ r < 2 ^ shift := by
-      have hPowPos : 0 < 2 ^ shift := Nat.pow_pos (by decide : 0 < 2)
-      omega
-    simpa [hBranch] using hUpper'
-
-private theorem cbrtScanNat_lower_bound (x : Nat) (hx : 2 ^ 8 ≤ x) :
-    1 ≤ x / 2 ^ cbrtScanNat x := by
-  have h0Lower : 1 ≤ x / 2 ^ 0 := by simpa using (by omega : 1 ≤ x)
-  let r1 := cbrtScanStepNat x 0 128
-  have h1 : 1 ≤ x / 2 ^ r1 := by
-    simpa [r1] using cbrtScanStepNat_lower_bound x 0 128 h0Lower
-  let r2 := cbrtScanStepNat x r1 64
-  have h2 : 1 ≤ x / 2 ^ r2 := by
-    simpa [r2] using cbrtScanStepNat_lower_bound x r1 64 h1
-  let r3 := cbrtScanStepNat x r2 32
-  have h3 : 1 ≤ x / 2 ^ r3 := by
-    simpa [r3] using cbrtScanStepNat_lower_bound x r2 32 h2
-  let r4 := cbrtScanStepNat x r3 16
-  have h4 : 1 ≤ x / 2 ^ r4 := by
-    simpa [r4] using cbrtScanStepNat_lower_bound x r3 16 h3
-  let r5 := cbrtScanStepNat x r4 8
-  have h5 : 1 ≤ x / 2 ^ r5 := by
-    simpa [r5] using cbrtScanStepNat_lower_bound x r4 8 h4
-  simpa [cbrtScanNat, r1, r2, r3, r4, r5] using h5
-
-private theorem cbrtScanNat_upper_bound
-    (x : Nat) (hxLt : x < 2 ^ 256) :
-    x / 2 ^ cbrtScanNat x < 2 ^ 8 := by
-  have h0Upper : x / 2 ^ 0 < 2 ^ (128 + 128) := by
-    simpa using hxLt
-  let r1 := cbrtScanStepNat x 0 128
-  have h1 : x / 2 ^ r1 < 2 ^ 128 := by
-    simpa [r1] using cbrtScanStepNat_upper_bound x 0 128 h0Upper
-  let r2 := cbrtScanStepNat x r1 64
-  have h2 : x / 2 ^ r2 < 2 ^ 64 := by
-    have hUpper : x / 2 ^ r1 < 2 ^ (64 + 64) := by simpa using h1
-    simpa [r2] using cbrtScanStepNat_upper_bound x r1 64 hUpper
-  let r3 := cbrtScanStepNat x r2 32
-  have h3 : x / 2 ^ r3 < 2 ^ 32 := by
-    have hUpper : x / 2 ^ r2 < 2 ^ (32 + 32) := by simpa using h2
-    simpa [r3] using cbrtScanStepNat_upper_bound x r2 32 hUpper
-  let r4 := cbrtScanStepNat x r3 16
-  have h4 : x / 2 ^ r4 < 2 ^ 16 := by
-    have hUpper : x / 2 ^ r3 < 2 ^ (16 + 16) := by simpa using h3
-    simpa [r4] using cbrtScanStepNat_upper_bound x r3 16 hUpper
-  let r5 := cbrtScanStepNat x r4 8
-  have h5 : x / 2 ^ r5 < 2 ^ 8 := by
-    have hUpper : x / 2 ^ r4 < 2 ^ (8 + 8) := by simpa using h4
-    simpa [r5] using cbrtScanStepNat_upper_bound x r4 8 hUpper
-  simpa [cbrtScanNat, r1, r2, r3, r4, r5] using h5
-
-private theorem cbrtScanStepNat_mod_8
-    (x r shift : Nat) (hr : r % 8 = 0) (hshift : shift % 8 = 0) :
-    (cbrtScanStepNat x r shift) % 8 = 0 := by
-  unfold cbrtScanStepNat
-  by_cases hBranch : 2 ^ shift - 1 < x / 2 ^ r
-  · simp [hBranch, Nat.add_mod, hr, hshift]
-  · simp [hBranch, hr]
-
-private theorem cbrtScanNat_mod_8 (x : Nat) :
-    cbrtScanNat x % 8 = 0 := by
-  let r1 := cbrtScanStepNat x 0 128
-  have h1 : r1 % 8 = 0 := by
-    simpa [r1] using cbrtScanStepNat_mod_8 x 0 128 (by norm_num) (by norm_num)
-  let r2 := cbrtScanStepNat x r1 64
-  have h2 : r2 % 8 = 0 := by
-    simpa [r2] using cbrtScanStepNat_mod_8 x r1 64 h1 (by norm_num)
-  let r3 := cbrtScanStepNat x r2 32
-  have h3 : r3 % 8 = 0 := by
-    simpa [r3] using cbrtScanStepNat_mod_8 x r2 32 h2 (by norm_num)
-  let r4 := cbrtScanStepNat x r3 16
-  have h4 : r4 % 8 = 0 := by
-    simpa [r4] using cbrtScanStepNat_mod_8 x r3 16 h3 (by norm_num)
-  let r5 := cbrtScanStepNat x r4 8
-  have h5 : r5 % 8 = 0 := by
-    simpa [r5] using cbrtScanStepNat_mod_8 x r4 8 h4 (by norm_num)
-  simpa [cbrtScanNat, r1, r2, r3, r4, r5] using h5
-
-private theorem cbrtScanStepNat_le_add (x r shift : Nat) :
-    cbrtScanStepNat x r shift ≤ r + shift := by
-  unfold cbrtScanStepNat
-  split <;> omega
-
-private theorem cbrtScanNat_le_248 (x : Nat) :
-    cbrtScanNat x ≤ 248 := by
-  let r1 := cbrtScanStepNat x 0 128
-  have h1 : r1 ≤ 128 := by
-    simpa [r1] using cbrtScanStepNat_le_add x 0 128
-  let r2 := cbrtScanStepNat x r1 64
-  have h2 : r2 ≤ r1 + 64 := by
-    simpa [r2] using cbrtScanStepNat_le_add x r1 64
-  let r3 := cbrtScanStepNat x r2 32
-  have h3 : r3 ≤ r2 + 32 := by
-    simpa [r3] using cbrtScanStepNat_le_add x r2 32
-  let r4 := cbrtScanStepNat x r3 16
-  have h4 : r4 ≤ r3 + 16 := by
-    simpa [r4] using cbrtScanStepNat_le_add x r3 16
-  let r5 := cbrtScanStepNat x r4 8
-  have h5 : r5 ≤ r4 + 8 := by
-    simpa [r5] using cbrtScanStepNat_le_add x r4 8
-  change r5 ≤ 248
-  omega
-
-private noncomputable def realCbrtNat (x : Nat) : ℝ :=
-  (x : ℝ) ^ ((3 : ℝ)⁻¹)
-
-private theorem realCbrtNat_nonneg (x : Nat) :
-    0 ≤ realCbrtNat x := by
-  unfold realCbrtNat
-  positivity
-
-private theorem realCbrtNat_pos {x : Nat} (hx : 0 < x) :
-    0 < realCbrtNat x := by
-  unfold realCbrtNat
-  positivity
-
-private theorem realCbrtNat_cube (x : Nat) :
-    realCbrtNat x ^ 3 = (x : ℝ) := by
-  simpa [realCbrtNat] using
-    (Real.rpow_inv_natCast_pow (x := (x : ℝ)) (n := 3)
-      (Nat.cast_nonneg x) (by decide : (3 : Nat) ≠ 0))
-
-private theorem natCbrt_le_realCbrtNat (x : Nat) :
-    (natCbrt x : ℝ) ≤ realCbrtNat x := by
-  by_contra h
-  have hGt : realCbrtNat x < (natCbrt x : ℝ) := lt_of_not_ge h
-  have hCubeLe : (natCbrt x : ℝ) ^ 3 ≤ realCbrtNat x ^ 3 := by
-    rw [realCbrtNat_cube]
-    exact_mod_cast natCbrt_cube_le x
-  have hCubeGt : realCbrtNat x ^ 3 < (natCbrt x : ℝ) ^ 3 := by
-    have haNonneg : (0 : ℝ) ≤ (natCbrt x : ℝ) := by positivity
-    exact pow_lt_pow_left₀ hGt (realCbrtNat_nonneg x) (by decide : (3 : Nat) ≠ 0)
-  nlinarith
-
-private theorem realCbrtNat_lt_natCbrt_succ (x : Nat) :
-    realCbrtNat x < (natCbrt x : ℝ) + 1 := by
-  by_contra h
-  have hLe : (natCbrt x : ℝ) + 1 ≤ realCbrtNat x := le_of_not_gt h
-  have hCubeLe : ((natCbrt x : ℝ) + 1) ^ 3 ≤ realCbrtNat x ^ 3 := by
-    have haNonneg : (0 : ℝ) ≤ (natCbrt x : ℝ) + 1 := by positivity
-    exact pow_le_pow_left₀ haNonneg hLe 3
-  have hCubeGt : realCbrtNat x ^ 3 < ((natCbrt x : ℝ) + 1) ^ 3 := by
-    rw [realCbrtNat_cube]
-    have h := natCbrt_next_cube_gt x
-    exact_mod_cast h
-  nlinarith
-
-private theorem cbrtSeed_upper_check :
-    ∀ k : Fin 32, ∀ y : Fin 256,
-      0 < y.val →
-      let r := 8 * k.val
-      let seedBase := if 15 < y.val then 30 else 15
-      let seed := (seedBase * 2 ^ (r / 3)) / Nat.xor 7 (r % 3)
-      125 * seed ^ 3 ≤ 1331 * (2 ^ r * y.val) := by
-  native_decide
-
-private theorem cbrtSeed_lower_check :
-    ∀ k : Fin 32, ∀ y : Fin 256,
-      0 < y.val →
-      let r := 8 * k.val
-      let seedBase := if 15 < y.val then 30 else 15
-      let seed := (seedBase * 2 ^ (r / 3)) / Nat.xor 7 (r % 3)
-      343 * (2 ^ r * (y.val + 1)) ≤ 1728 * seed ^ 3 := by
-  native_decide
-
-private theorem soladyCbrtSeedNat_real_bounds
-    (x : Nat) (hx : 2 ^ 8 ≤ x) (hxLt : x < 2 ^ 256) :
-    0 < soladyCbrtSeedNat x ∧
-      ((7 : ℝ) / 12) * realCbrtNat x ≤ (soladyCbrtSeedNat x : ℝ) ∧
-      (soladyCbrtSeedNat x : ℝ) ≤ ((11 : ℝ) / 5) * realCbrtNat x := by
-  let r := cbrtScanNat x
-  let y := x / 2 ^ r
-  let seedBase := if 15 < y then 30 else 15
-  let seed := (seedBase * 2 ^ (r / 3)) / Nat.xor 7 (r % 3)
-  have hSeedEq : soladyCbrtSeedNat x = seed := by
-    simp [soladyCbrtSeedNat, r, y, seedBase, seed]
-  have hyPos : 0 < y := by
-    have h : 1 ≤ y := by
-      simpa [y, r] using cbrtScanNat_lower_bound x hx
-    omega
-  have hyUpper : y < 256 := by
-    simpa [y, r] using cbrtScanNat_upper_bound x hxLt
-  have hPowPos : 0 < 2 ^ r := Nat.pow_pos (by decide : 0 < 2)
-  have hXYLe : 2 ^ r * y ≤ x := by
-    simpa [y, Nat.mul_comm] using Nat.div_mul_le_self x (2 ^ r)
-  have hXUpper : x < 2 ^ r * (y + 1) := by
-    simpa [y, Nat.mul_comm] using Nat.lt_mul_div_succ x hPowPos
-  have hrMod : r % 8 = 0 := by
-    simpa [r] using cbrtScanNat_mod_8 x
-  have hrLe : r ≤ 248 := by
-    simpa [r] using cbrtScanNat_le_248 x
-  have hDvd : 8 ∣ r := by
-    rw [Nat.dvd_iff_mod_eq_zero]
-    exact hrMod
-  rcases hDvd with ⟨k, hk⟩
-  have hkLt : k < 32 := by omega
-  let kFin : Fin 32 := ⟨k, hkLt⟩
-  let yFin : Fin 256 := ⟨y, hyUpper⟩
-  have hUpperCheck := cbrtSeed_upper_check kFin yFin hyPos
-  have hLowerCheck := cbrtSeed_lower_check kFin yFin hyPos
-  have hUpperCheck' : 125 * seed ^ 3 ≤ 1331 * (2 ^ r * y) := by
-    simpa [kFin, yFin, seed, seedBase, hk, Nat.mul_comm, Nat.mul_left_comm,
-      Nat.mul_assoc] using hUpperCheck
-  have hLowerCheck' : 343 * (2 ^ r * (y + 1)) ≤ 1728 * seed ^ 3 := by
-    simpa [kFin, yFin, seed, seedBase, hk, Nat.mul_comm, Nat.mul_left_comm,
-      Nat.mul_assoc] using hLowerCheck
-  have hUpperNat : 125 * seed ^ 3 ≤ 1331 * x := by
-    exact le_trans hUpperCheck' (Nat.mul_le_mul_left 1331 hXYLe)
-  have hLowerNat : 343 * x < 1728 * seed ^ 3 := by
-    exact lt_of_lt_of_le ((mul_lt_mul_left (by decide : 0 < 343)).2 hXUpper)
-      hLowerCheck'
-  let α := realCbrtNat x
-  have hxPos : 0 < x := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hx
-  have hαPos : 0 < α := by
-    simpa [α] using realCbrtNat_pos hxPos
-  have hαCube : α ^ 3 = (x : ℝ) := by
-    simpa [α] using realCbrtNat_cube x
-  have hSeedUpperR : (seed : ℝ) ≤ ((11 : ℝ) / 5) * α := by
-    have hUpperR : (125 : ℝ) * (seed : ℝ) ^ 3 ≤ 1331 * (x : ℝ) := by
-      exact_mod_cast hUpperNat
-    by_contra hNot
-    have hGt : ((11 : ℝ) / 5) * α < (seed : ℝ) := lt_of_not_ge hNot
-    have hLeftNonneg : 0 ≤ ((11 : ℝ) / 5) * α := by positivity
-    have hPow : (((11 : ℝ) / 5) * α) ^ 3 < (seed : ℝ) ^ 3 :=
-      pow_lt_pow_left₀ hGt hLeftNonneg (by decide : (3 : Nat) ≠ 0)
-    have hCubeGt : 1331 * (x : ℝ) < 125 * (seed : ℝ) ^ 3 := by
-      nlinarith [hPow, hαCube]
-    nlinarith
-  have hSeedLowerR : ((7 : ℝ) / 12) * α ≤ (seed : ℝ) := by
-    have hLowerR : (343 : ℝ) * (x : ℝ) < 1728 * (seed : ℝ) ^ 3 := by
-      exact_mod_cast hLowerNat
-    by_contra hNot
-    have hGt : (seed : ℝ) < ((7 : ℝ) / 12) * α := lt_of_not_ge hNot
-    have hSeedNonneg : 0 ≤ (seed : ℝ) := by positivity
-    have hPow : (seed : ℝ) ^ 3 < (((7 : ℝ) / 12) * α) ^ 3 :=
-      pow_lt_pow_left₀ hGt hSeedNonneg (by decide : (3 : Nat) ≠ 0)
-    have hCubeGt : 1728 * (seed : ℝ) ^ 3 < 343 * (x : ℝ) := by
-      nlinarith [hPow, hαCube]
-    nlinarith
-  have hSeedPos : 0 < seed := by
-    have hSeedPosR : 0 < (seed : ℝ) := by
-      nlinarith
-    exact Nat.cast_pos.mp hSeedPosR
-  constructor
-  · simpa [hSeedEq] using hSeedPos
-  · constructor
-    · simpa [hSeedEq, α] using hSeedLowerR
-    · simpa [hSeedEq, α] using hSeedUpperR
-
-private theorem cbrtSeedNewtonRatioBound
-    {t : ℝ} (htPos : 0 < t)
-    (hLower : (7 : ℝ) / 12 ≤ t)
-    (hUpper : t ≤ (11 : ℝ) / 5) :
-    (1 / (t * t) + t + t) / 3 ≤ (929 : ℝ) / 605 := by
-  have htNonneg : 0 ≤ t := le_of_lt htPos
-  by_cases htOne : t ≤ 1
-  · have hA : 0 ≤ 12 * t - 7 := by nlinarith
-    have hTSqLe : t ^ 2 ≤ t := by nlinarith
-    have hB : 0 ≤ -147 * t ^ 2 + 216 * t + 126 := by nlinarith
-    have hPoly : 0 ≤ 3621 * t ^ 2 - 882 - 1764 * t ^ 3 := by
-      have hProd : 0 ≤ (12 * t - 7) * (-147 * t ^ 2 + 216 * t + 126) :=
-        mul_nonneg hA hB
-      have hEq :
-          (12 * t - 7) * (-147 * t ^ 2 + 216 * t + 126) =
-            3621 * t ^ 2 - 882 - 1764 * t ^ 3 := by
-        ring
-      rwa [hEq] at hProd
-    have hTarget : 882 + 1764 * t ^ 3 ≤ 3621 * t ^ 2 := by nlinarith
-    have hLow :
-        (1 / (t * t) + t + t) / 3 ≤ (1207 : ℝ) / 882 := by
-      calc
-        (1 / (t * t) + t + t) / 3
-            = (882 + 1764 * t ^ 3) / (2646 * t ^ 2) := by
-              field_simp [ne_of_gt htPos]
-              ring
-        _ ≤ (3621 * t ^ 2) / (2646 * t ^ 2) := by
-              exact div_le_div_of_nonneg_right hTarget (by positivity)
-        _ = (1207 : ℝ) / 882 := by
-              field_simp [ne_of_gt htPos]
-              ring
-    exact le_trans hLow (by norm_num)
-  · have htLowerOne : 1 ≤ t := le_of_not_ge htOne
-    have hA : 0 ≤ 11 - 5 * t := by nlinarith
-    have hTSqGe : t ≤ t ^ 2 := by nlinarith
-    have hB : 0 ≤ 242 * t ^ 2 - 25 * t - 55 := by nlinarith
-    have hPoly : 0 ≤ 2787 * t ^ 2 - 605 - 1210 * t ^ 3 := by
-      have hProd : 0 ≤ (11 - 5 * t) * (242 * t ^ 2 - 25 * t - 55) :=
-        mul_nonneg hA hB
-      have hEq :
-          (11 - 5 * t) * (242 * t ^ 2 - 25 * t - 55) =
-            2787 * t ^ 2 - 605 - 1210 * t ^ 3 := by
-        ring
-      rwa [hEq] at hProd
-    have hTarget : 605 + 1210 * t ^ 3 ≤ 2787 * t ^ 2 := by nlinarith
-    calc
-      (1 / (t * t) + t + t) / 3
-          = (605 + 1210 * t ^ 3) / (1815 * t ^ 2) := by
-            field_simp [ne_of_gt htPos]
-            ring
-      _ ≤ (2787 * t ^ 2) / (1815 * t ^ 2) := by
-            exact div_le_div_of_nonneg_right hTarget (by positivity)
-      _ = (929 : ℝ) / 605 := by
-            field_simp [ne_of_gt htPos]
-            ring
-
-private theorem cbrtNewtonRatioUpperAbove
-    {u t : ℝ} (hu : 1 ≤ u) (htLower : 1 ≤ t) (htUpper : t ≤ u) :
-    (1 / (t * t) + t + t) / 3 ≤ (1 / (u * u) + u + u) / 3 := by
-  have htPos : 0 < t := lt_of_lt_of_le zero_lt_one htLower
-  have huPos : 0 < u := lt_of_lt_of_le zero_lt_one hu
-  have hNonneg : 0 ≤
-      (u - t) * (2 * u ^ 2 * t ^ 2 - (u + t)) := by
-    apply mul_nonneg
-    · exact sub_nonneg.mpr htUpper
-    · have htSq : 1 ≤ t ^ 2 := by nlinarith [htLower]
-      have hUSqFactor : 1 ≤ u * t ^ 2 :=
-        by simpa using mul_le_mul hu htSq zero_le_one (le_of_lt huPos)
-      have hU : u ≤ u ^ 2 * t ^ 2 := by
-        have h := mul_le_mul_of_nonneg_left hUSqFactor (le_of_lt huPos)
-        nlinarith
-      have hT : t ≤ u ^ 2 * t ^ 2 := le_trans htUpper hU
-      nlinarith
-  have hmain :
-      0 ≤ (1 / (u * u) + u + u) - (1 / (t * t) + t + t) := by
-    have hEq :
-        (1 / (u * u) + u + u) - (1 / (t * t) + t + t) =
-          ((u - t) * (2 * u ^ 2 * t ^ 2 - (u + t))) / (u ^ 2 * t ^ 2) := by
-      field_simp [ne_of_gt huPos, ne_of_gt htPos]
-      ring
-    rw [hEq]
-    exact div_nonneg hNonneg (by positivity)
-  linarith
-
-private theorem cbrtStepNat_real_ratio_upper_seed
-    (x z : Nat) (hx : 0 < x) (hz : 0 < z)
-    (hLowerRatio : (7 : ℝ) / 12 ≤ (z : ℝ) / realCbrtNat x)
-    (hUpperRatio : (z : ℝ) / realCbrtNat x ≤ (11 : ℝ) / 5) :
-    (cbrtStepNat x z : ℝ) ≤ ((929 : ℝ) / 605) * realCbrtNat x := by
-  let α := realCbrtNat x
-  have hαPos : 0 < α := by simpa [α] using realCbrtNat_pos hx
-  have hαNe : α ≠ 0 := ne_of_gt hαPos
-  have hzRealPos : 0 < (z : ℝ) := Nat.cast_pos.2 hz
-  have hzRealNe : (z : ℝ) ≠ 0 := ne_of_gt hzRealPos
-  have hStepCast :
-      (cbrtStepNat x z : ℝ) ≤
-        ((x / (z * z) + z + z : Nat) : ℝ) / 3 := by
-    unfold cbrtStepNat
-    exact Nat.cast_div_le
-  have hDivCast :
-      ((x / (z * z) : Nat) : ℝ) ≤ (x : ℝ) / ((z : ℝ) * (z : ℝ)) :=
-    by simpa using (Nat.cast_div_le (m := x) (n := z * z) : ((x / (z * z) : Nat) : ℝ) ≤ (x : ℝ) / (z * z : Nat))
-  have hAddCast :
-      ((x / (z * z) + z + z : Nat) : ℝ) / 3 ≤
-        ((x : ℝ) / ((z : ℝ) * (z : ℝ)) + (z : ℝ) + (z : ℝ)) / 3 := by
-    norm_num
-    nlinarith [hDivCast]
-  have hRealStep :
-      ((x : ℝ) / ((z : ℝ) * (z : ℝ)) + (z : ℝ) + (z : ℝ)) / 3 =
-        ((1 / (((z : ℝ) / α) * ((z : ℝ) / α)) +
-            (z : ℝ) / α + (z : ℝ) / α) / 3) * α := by
-    have hαCube : α ^ 3 = (x : ℝ) := by simpa [α] using realCbrtNat_cube x
-    rw [← hαCube]
-    field_simp [hαNe, hzRealNe]
-    ring
-  have htPos : 0 < (z : ℝ) / α := div_pos hzRealPos hαPos
-  have hRatio := cbrtSeedNewtonRatioBound htPos
-    (by simpa [α] using hLowerRatio) (by simpa [α] using hUpperRatio)
-  have hMul := mul_le_mul_of_nonneg_right hRatio (le_of_lt hαPos)
-  calc
-    (cbrtStepNat x z : ℝ) ≤
-        ((x / (z * z) + z + z : Nat) : ℝ) / 3 := hStepCast
-    _ ≤ ((x : ℝ) / ((z : ℝ) * (z : ℝ)) + (z : ℝ) + (z : ℝ)) / 3 := hAddCast
-    _ = ((1 / (((z : ℝ) / α) * ((z : ℝ) / α)) +
-            (z : ℝ) / α + (z : ℝ) / α) / 3) * α := hRealStep
-    _ ≤ ((929 : ℝ) / 605) * α := hMul
-    _ = ((929 : ℝ) / 605) * realCbrtNat x := rfl
-
-private theorem cbrtStepNat_real_ratio_upper_above
-    (x z : Nat) (hx : 0 < x) (hz : 0 < z) {u : ℝ}
-    (hu : 1 ≤ u)
-    (hLowerRatio : 1 ≤ (z : ℝ) / realCbrtNat x)
-    (hUpperRatio : (z : ℝ) / realCbrtNat x ≤ u) :
-    (cbrtStepNat x z : ℝ) ≤ ((1 / (u * u) + u + u) / 3) * realCbrtNat x := by
-  let α := realCbrtNat x
-  have hαPos : 0 < α := by simpa [α] using realCbrtNat_pos hx
-  have hαNe : α ≠ 0 := ne_of_gt hαPos
-  have hzRealPos : 0 < (z : ℝ) := Nat.cast_pos.2 hz
-  have hzRealNe : (z : ℝ) ≠ 0 := ne_of_gt hzRealPos
-  have hStepCast :
-      (cbrtStepNat x z : ℝ) ≤
-        ((x / (z * z) + z + z : Nat) : ℝ) / 3 := by
-    unfold cbrtStepNat
-    exact Nat.cast_div_le
-  have hDivCast :
-      ((x / (z * z) : Nat) : ℝ) ≤ (x : ℝ) / ((z : ℝ) * (z : ℝ)) :=
-    by simpa using (Nat.cast_div_le (m := x) (n := z * z) : ((x / (z * z) : Nat) : ℝ) ≤ (x : ℝ) / (z * z : Nat))
-  have hAddCast :
-      ((x / (z * z) + z + z : Nat) : ℝ) / 3 ≤
-        ((x : ℝ) / ((z : ℝ) * (z : ℝ)) + (z : ℝ) + (z : ℝ)) / 3 := by
-    norm_num
-    nlinarith [hDivCast]
-  have hRealStep :
-      ((x : ℝ) / ((z : ℝ) * (z : ℝ)) + (z : ℝ) + (z : ℝ)) / 3 =
-        ((1 / (((z : ℝ) / α) * ((z : ℝ) / α)) +
-            (z : ℝ) / α + (z : ℝ) / α) / 3) * α := by
-    have hαCube : α ^ 3 = (x : ℝ) := by simpa [α] using realCbrtNat_cube x
-    rw [← hαCube]
-    field_simp [hαNe, hzRealNe]
-    ring
-  have hRatio := cbrtNewtonRatioUpperAbove hu
-    (by simpa [α] using hLowerRatio) (by simpa [α] using hUpperRatio)
-  have hMul := mul_le_mul_of_nonneg_right hRatio (le_of_lt hαPos)
-  calc
-    (cbrtStepNat x z : ℝ) ≤
-        ((x / (z * z) + z + z : Nat) : ℝ) / 3 := hStepCast
-    _ ≤ ((x : ℝ) / ((z : ℝ) * (z : ℝ)) + (z : ℝ) + (z : ℝ)) / 3 := hAddCast
-    _ = ((1 / (((z : ℝ) / α) * ((z : ℝ) / α)) +
-            (z : ℝ) / α + (z : ℝ) / α) / 3) * α := hRealStep
-    _ ≤ ((1 / (u * u) + u + u) / 3) * α := hMul
-    _ = ((1 / (u * u) + u + u) / 3) * realCbrtNat x := rfl
-
-private def cbrtNewtonTailBoundRat : Nat → ℚ
-  | 0 => (929 : ℚ) / 605
-  | steps + 1 =>
-      let u := cbrtNewtonTailBoundRat steps
-      (1 / (u * u) + u + u) / 3
-
-private theorem cbrtNewtonTailBoundRat_ge_one (steps : Nat) :
-    1 ≤ cbrtNewtonTailBoundRat steps := by
-  induction steps with
-  | zero => native_decide
-  | succ steps ih =>
-      dsimp [cbrtNewtonTailBoundRat]
-      let u := cbrtNewtonTailBoundRat steps
-      have hu : 1 ≤ u := ih
-      have huPos : 0 < u := lt_of_lt_of_le zero_lt_one hu
-      have hNonneg : 0 ≤ (u - 1) ^ 2 * (2 * u + 1) / (u * u) := by
-        exact div_nonneg (mul_nonneg (sq_nonneg _) (by nlinarith))
-          (mul_nonneg (le_of_lt huPos) (le_of_lt huPos))
-      have hEq :
-          1 / (u * u) + u + u - 3 =
-            (u - 1) ^ 2 * (2 * u + 1) / (u * u) := by
-        field_simp [ne_of_gt huPos]
-        ring
-      have h : 3 ≤ 1 / (u * u) + u + u := by nlinarith
-      nlinarith
-
-private theorem cbrtNewtonTailBoundRat_six_tight :
-    cbrtNewtonTailBoundRat 6 < (1 : ℚ) + 1 / ((2 : ℚ) ^ 86) := by
-  native_decide
-
-private theorem cbrtNewtonTailBoundRat_six_real_tight :
-    ((cbrtNewtonTailBoundRat 6 : ℚ) : ℝ) <
-      (1 : ℝ) + 1 / ((2 : ℝ) ^ 86) := by
-  have hRhs :
-      (((1 : ℚ) + 1 / ((2 : ℚ) ^ 86) : ℚ) : ℝ) =
-        (1 : ℝ) + 1 / ((2 : ℝ) ^ 86) := by
-    norm_num
-  rw [← hRhs]
-  exact Rat.cast_lt.2 cbrtNewtonTailBoundRat_six_tight
-
-private theorem natCbrt_ge_six_of_ge_256 {x : Nat} (hx : 2 ^ 8 ≤ x) :
-    6 ≤ natCbrt x := by
-  unfold natCbrt
-  exact Nat.le_findGreatest (P := fun r => r ^ 3 ≤ x) (m := 6) (n := x)
-    (by omega) (by norm_num; omega)
-
-private theorem cbrtStepNat_near_of_near
-    (x z : Nat) (haGe : 6 ≤ natCbrt x)
-    (hLower : natCbrt x ≤ z)
-    (hUpper : z ≤ natCbrt x + 1) :
-    cbrtStepNat x z ≤ natCbrt x + 1 := by
-  let a := natCbrt x
-  have haPos : 0 < a := by omega
-  have hzCases : z = a ∨ z = a + 1 := by omega
-  have hNextCube : x < (a + 1) ^ 3 := by
-    simpa [a] using natCbrt_next_cube_gt x
-  rcases hzCases with hzEq | hzEq
-  · have haaPos : 0 < a * a := Nat.mul_pos haPos haPos
-    have hDivA : x / (a * a) ≤ a + 3 := by
-      have hCubeBound : (a + 1) ^ 3 ≤ (a + 4) * (a * a) := by
-        nlinarith [haGe]
-      have hDivLt : x / (a * a) < a + 4 :=
-        (Nat.div_lt_iff_lt_mul haaPos).2 (lt_of_lt_of_le hNextCube hCubeBound)
-      omega
-    unfold cbrtStepNat
-    rw [hzEq]
-    have hNum : x / (a * a) + a + a ≤ 3 * (a + 1) := by omega
-    exact Nat.div_le_of_le_mul hNum
-  · have hsPos : 0 < (a + 1) * (a + 1) :=
-      Nat.mul_pos (Nat.succ_pos a) (Nat.succ_pos a)
-    have hDivSucc : x / ((a + 1) * (a + 1)) ≤ a := by
-      have hDivLt : x / ((a + 1) * (a + 1)) < a + 1 :=
-        (Nat.div_lt_iff_lt_mul hsPos).2 (by
-          simpa [Nat.pow_succ, Nat.pow_zero, Nat.mul_assoc, Nat.mul_left_comm,
-            Nat.mul_comm] using hNextCube)
-      omega
-    unfold cbrtStepNat
-    rw [hzEq]
-    have hNum : x / ((a + 1) * (a + 1)) + (a + 1) + (a + 1) ≤
-        3 * (a + 1) := by omega
-    exact Nat.div_le_of_le_mul hNum
-
-private theorem cbrtIterNat_near_or_bound
-    (steps k x z : Nat) (hx : 0 < x) (hz : 0 < z)
-    (haGe : 6 ≤ natCbrt x)
-    (hFloor : natCbrt x ≤ z)
-    (hState :
-      z ≤ natCbrt x + 1 ∨
-        (z : ℝ) ≤ ((cbrtNewtonTailBoundRat k : ℚ) : ℝ) * realCbrtNat x) :
-    natCbrt x ≤ cbrtIterNat steps x z ∧
-      (cbrtIterNat steps x z ≤ natCbrt x + 1 ∨
-        (cbrtIterNat steps x z : ℝ) ≤
-          ((cbrtNewtonTailBoundRat (k + steps) : ℚ) : ℝ) * realCbrtNat x) := by
-  induction steps generalizing k z with
-  | zero =>
-      simpa using And.intro hFloor hState
-  | succ steps ih =>
-      let z1 := cbrtStepNat x z
-      have hz1Floor : natCbrt x ≤ z1 := by
-        simpa [z1] using cbrtStepNat_ge_floor x z hz
-      have hz1Pos : 0 < z1 := by
-        simpa [z1] using cbrtStepNat_pos x z hx hz
-      have hz1State :
-          z1 ≤ natCbrt x + 1 ∨
-            (z1 : ℝ) ≤ ((cbrtNewtonTailBoundRat (k + 1) : ℚ) : ℝ) *
-              realCbrtNat x := by
-        rcases hState with hNear | hBound
-        · left
-          simpa [z1] using cbrtStepNat_near_of_near x z haGe hFloor hNear
-        · by_cases hNear : z ≤ natCbrt x + 1
-          · left
-            simpa [z1] using cbrtStepNat_near_of_near x z haGe hFloor hNear
-          · right
-            let u : ℝ := ((cbrtNewtonTailBoundRat k : ℚ) : ℝ)
-            have hu : 1 ≤ u := by
-              simpa [u] using Rat.cast_le.2 (cbrtNewtonTailBoundRat_ge_one k)
-            have hAlphaPos : 0 < realCbrtNat x := realCbrtNat_pos hx
-            have hUpperRatio : (z : ℝ) / realCbrtNat x ≤ u := by
-              rw [div_le_iff₀ hAlphaPos]
-              simpa [u] using hBound
-            have hAlphaLtZ : realCbrtNat x < (z : ℝ) := by
-              have hAlphaSucc := realCbrtNat_lt_natCbrt_succ x
-              have hzGt : natCbrt x + 1 < z := Nat.lt_of_not_ge hNear
-              exact lt_trans hAlphaSucc (by exact_mod_cast hzGt)
-            have hLowerRatio : (1 : ℝ) ≤ (z : ℝ) / realCbrtNat x := by
-              rw [le_div_iff₀ hAlphaPos]
-              simpa [one_mul] using le_of_lt hAlphaLtZ
-            have hStepUpper := cbrtStepNat_real_ratio_upper_above
-              (x := x) (z := z) hx hz (u := u) hu hLowerRatio hUpperRatio
-            have hNext :
-                (z1 : ℝ) ≤ ((1 / (u * u) + u + u) / 3) * realCbrtNat x := by
-              simpa [z1] using hStepUpper
-            simpa [z1, u, cbrtNewtonTailBoundRat] using hNext
-      have hTail := ih (k + 1) z1 hz1Pos hz1Floor hz1State
-      have hIndex : k + 1 + steps = k + (steps + 1) := by omega
-      simpa [cbrtIterNat, z1, hIndex] using hTail
-
-private theorem cbrt_near_of_final_ratio_bound
-    (x z : Nat) (hx : 0 < x) (hxLt : x < 2 ^ 256)
-    (hBound :
-      (z : ℝ) ≤ ((cbrtNewtonTailBoundRat 6 : ℚ) : ℝ) * realCbrtNat x) :
-    z ≤ natCbrt x + 1 := by
-  let α := realCbrtNat x
-  have hαPos : 0 < α := by simpa [α] using realCbrtNat_pos hx
-  have hαCube : α ^ 3 = (x : ℝ) := by simpa [α] using realCbrtNat_cube x
-  have hαLtPow : α < (2 : ℝ) ^ 86 := by
-    by_contra hNot
-    have hGe : (2 : ℝ) ^ 86 ≤ α := le_of_not_gt hNot
-    have hCubeGe : ((2 : ℝ) ^ 86) ^ 3 ≤ α ^ 3 :=
-      pow_le_pow_left₀ (by positivity) hGe 3
-    have hxLtR : (x : ℝ) < (2 : ℝ) ^ 256 := by exact_mod_cast hxLt
-    have hPowGt : (2 : ℝ) ^ 256 < ((2 : ℝ) ^ 86) ^ 3 := by norm_num [pow_mul]
-    nlinarith
-  have hTight := cbrtNewtonTailBoundRat_six_real_tight
-  have hMulTight :
-      ((cbrtNewtonTailBoundRat 6 : ℚ) : ℝ) * α <
-        ((1 : ℝ) + 1 / ((2 : ℝ) ^ 86)) * α := by
-    exact mul_lt_mul_of_pos_right hTight hαPos
-  have hExtra : (1 / ((2 : ℝ) ^ 86)) * α < 1 := by
-    rw [one_div_mul_eq_div]
-    rw [div_lt_one (by positivity : 0 < (2 : ℝ) ^ 86)]
-    exact hαLtPow
-  have hZLt : (z : ℝ) < α + 1 := by
-    nlinarith [hBound, hMulTight, hExtra]
-  have hAlphaSucc := realCbrtNat_lt_natCbrt_succ x
-  have hZLtNat : (z : ℝ) < (natCbrt x + 2 : Nat) := by
-    have h : α + 1 < (natCbrt x : ℝ) + 2 := by nlinarith
-    simpa using lt_trans hZLt h
-  have hNat : z < natCbrt x + 2 := by exact_mod_cast hZLtNat
-  omega
-
-private theorem soladyCbrtBeforeCorrectionNat_near_floor
-    (x : Nat) (hx : 2 ^ 8 ≤ x) (hxLt : x < 2 ^ 256) :
-    natCbrt x ≤ soladyCbrtBeforeCorrectionNat x ∧
-      soladyCbrtBeforeCorrectionNat x ≤ natCbrt x + 1 := by
-  let z0 := soladyCbrtSeedNat x
-  let z1 := cbrtStepNat x z0
-  have hxPos : 0 < x := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hx
-  have haGe : 6 ≤ natCbrt x := natCbrt_ge_six_of_ge_256 hx
-  have hSeed := soladyCbrtSeedNat_real_bounds x hx hxLt
-  have hz0Pos : 0 < z0 := by simpa [z0] using hSeed.1
-  have hαPos : 0 < realCbrtNat x := realCbrtNat_pos hxPos
-  have hSeedLowerRatio : (7 : ℝ) / 12 ≤ (z0 : ℝ) / realCbrtNat x := by
-    rw [le_div_iff₀ hαPos]
-    simpa [z0] using hSeed.2.1
-  have hSeedUpperRatio : (z0 : ℝ) / realCbrtNat x ≤ (11 : ℝ) / 5 := by
-    rw [div_le_iff₀ hαPos]
-    simpa [z0] using hSeed.2.2
-  have hStepUpperRaw := cbrtStepNat_real_ratio_upper_seed
-    (x := x) (z := z0) hxPos hz0Pos hSeedLowerRatio hSeedUpperRatio
-  have hz1Bound :
-      (z1 : ℝ) ≤ ((cbrtNewtonTailBoundRat 0 : ℚ) : ℝ) * realCbrtNat x := by
-    simpa [z1, cbrtNewtonTailBoundRat] using hStepUpperRaw
-  have hz1Floor : natCbrt x ≤ z1 := by
-    simpa [z1] using cbrtStepNat_ge_floor x z0 hz0Pos
-  have hz1Pos : 0 < z1 := by
-    simpa [z1] using cbrtStepNat_pos x z0 hxPos hz0Pos
-  have hIter := cbrtIterNat_near_or_bound 6 0 x z1 hxPos hz1Pos haGe
-    hz1Floor (Or.inr hz1Bound)
-  have hBeforeEq :
-      soladyCbrtBeforeCorrectionNat x = cbrtIterNat 6 x z1 := by
-    simp [soladyCbrtBeforeCorrectionNat, z0, z1, cbrtIterNat]
-  constructor
-  · rw [hBeforeEq]
-    exact hIter.1
-  · rw [hBeforeEq]
-    rcases hIter.2 with hNear | hBound
-    · exact hNear
-    · simpa using cbrt_near_of_final_ratio_bound x (cbrtIterNat 6 x z1) hxPos hxLt hBound
-
-private theorem soladyCbrtNat_property (x : Nat) (hxLt : x < 2 ^ 256) :
-    soladyCbrtNat x * soladyCbrtNat x * soladyCbrtNat x ≤ x ∧
-      x < (soladyCbrtNat x + 1) * (soladyCbrtNat x + 1) *
-        (soladyCbrtNat x + 1) := by
-  by_cases hxSmall : x < 2 ^ 8
-  · exact soladyCbrtNat_property_of_lt_256 x (by simpa using hxSmall)
-  · have hxLarge : 2 ^ 8 ≤ x := Nat.le_of_not_gt hxSmall
-    let z := soladyCbrtBeforeCorrectionNat x
-    have hNear : natCbrt x ≤ z ∧ z ≤ natCbrt x + 1 := by
-      simpa [z] using soladyCbrtBeforeCorrectionNat_near_floor x hxLarge hxLt
-    have hzPos : 0 < z := by
-      have haGe : 6 ≤ natCbrt x := natCbrt_ge_six_of_ge_256 hxLarge
-      omega
-    have hBounds := cbrt_near_floor_property x z hNear.1 hNear.2
-    simpa [soladyCbrtNat, z] using
-      cbrtCorrectNat_property x z hzPos hBounds.1 hBounds.2
-
-private def cbrtIterUint : Nat → Uint256 → Uint256 → Uint256
-  | 0, _x, z => z
-  | steps + 1, x, z =>
-      cbrtIterUint steps x (div (add (add (div x (mul z z)) z) z) 3)
-
-private def cbrtFinishSeedUint (_x r seedBase : Uint256) : Uint256 :=
-  div (shl (div r 3) seedBase) (Contracts.bitXor 7 (mod r 3))
-
-private def cbrtBeforeCorrectionUint (x r seedBase : Uint256) : Uint256 :=
-  cbrtIterUint 7 x (cbrtFinishSeedUint x r seedBase)
-
-private def cbrtFinishUint (x r seedBase : Uint256) : Uint256 :=
-  let z := cbrtBeforeCorrectionUint x r seedBase
-  if div x (mul z z) < z then sub z 1 else z
-
-private def cbrtScanSourceUint (x : Uint256) : Uint256 :=
-  let r : Uint256 := 0
-  let r := if 340282366920938463463374607431768211455 < x then shl 7 1 else r
-  let r := if 18446744073709551615 < shr r x then Contracts.bitOr r (shl 6 1) else r
-  let r := if 4294967295 < shr r x then Contracts.bitOr r (shl 5 1) else r
-  let r := if 65535 < shr r x then Contracts.bitOr r (shl 4 1) else r
-  if 255 < shr r x then Contracts.bitOr r (shl 3 1) else r
-
-private def cbrtSeedBaseUint (x r : Uint256) : Uint256 :=
-  if 15 < shr r x then 30 else 15
-
-private def cbrtScan3Uint (x r : Uint256) : Uint256 :=
-  let r := if 255 < shr r x then Contracts.bitOr r (shl 3 1) else r
-  cbrtFinishUint x r (cbrtSeedBaseUint x r)
-
-private def cbrtScan4Uint (x r : Uint256) : Uint256 :=
-  if 65535 < shr r x then
-    cbrtScan3Uint x (Contracts.bitOr r (shl 4 1))
-  else
-    cbrtScan3Uint x r
-
-private def cbrtScan5Uint (x r : Uint256) : Uint256 :=
-  if 4294967295 < shr r x then
-    cbrtScan4Uint x (Contracts.bitOr r (shl 5 1))
-  else
-    cbrtScan4Uint x r
-
-private def cbrtScan6Uint (x r : Uint256) : Uint256 :=
-  if 18446744073709551615 < shr r x then
-    cbrtScan5Uint x (Contracts.bitOr r (shl 6 1))
-  else
-    cbrtScan5Uint x r
-
-private def cbrtSourceUint (x : Uint256) : Uint256 :=
-  let r : Uint256 := 0
-  if 340282366920938463463374607431768211455 < x then
-    cbrtScan6Uint x (shl 7 1)
-  else
-    cbrtScan6Uint x r
-
-private theorem cbrtScan3Uint_eq_finishScan (x r : Uint256) :
-    cbrtScan3Uint x r =
-      let r' := if 255 < shr r x then Contracts.bitOr r (shl 3 1) else r
-      cbrtFinishUint x r' (cbrtSeedBaseUint x r') := by
-  unfold cbrtScan3Uint
-  by_cases h : 255 < shr r x
-  · simp only [h, if_true]
-  · simp only [h, if_false]
-
-private theorem cbrtScan4Uint_eq_finishScan (x r : Uint256) :
-    cbrtScan4Uint x r =
-      let r1 := if 65535 < shr r x then Contracts.bitOr r (shl 4 1) else r
-      let r2 := if 255 < shr r1 x then Contracts.bitOr r1 (shl 3 1) else r1
-      cbrtFinishUint x r2 (cbrtSeedBaseUint x r2) := by
-  unfold cbrtScan4Uint
-  by_cases h : 65535 < shr r x
-  · simp only [h, if_true]
-    exact cbrtScan3Uint_eq_finishScan x (Contracts.bitOr r (shl 4 1))
-  · simp only [h, if_false]
-    exact cbrtScan3Uint_eq_finishScan x r
-
-private theorem cbrtScan5Uint_eq_finishScan (x r : Uint256) :
-    cbrtScan5Uint x r =
-      let r1 := if 4294967295 < shr r x then Contracts.bitOr r (shl 5 1) else r
-      let r2 := if 65535 < shr r1 x then Contracts.bitOr r1 (shl 4 1) else r1
-      let r3 := if 255 < shr r2 x then Contracts.bitOr r2 (shl 3 1) else r2
-      cbrtFinishUint x r3 (cbrtSeedBaseUint x r3) := by
-  unfold cbrtScan5Uint
-  by_cases h : 4294967295 < shr r x
-  · simp only [h, if_true]
-    exact cbrtScan4Uint_eq_finishScan x (Contracts.bitOr r (shl 5 1))
-  · simp only [h, if_false]
-    exact cbrtScan4Uint_eq_finishScan x r
-
-private theorem cbrtScan6Uint_eq_finishScan (x r : Uint256) :
-    cbrtScan6Uint x r =
-      let r1 := if 18446744073709551615 < shr r x then
-        Contracts.bitOr r (shl 6 1) else r
-      let r2 := if 4294967295 < shr r1 x then Contracts.bitOr r1 (shl 5 1) else r1
-      let r3 := if 65535 < shr r2 x then Contracts.bitOr r2 (shl 4 1) else r2
-      let r4 := if 255 < shr r3 x then Contracts.bitOr r3 (shl 3 1) else r3
-      cbrtFinishUint x r4 (cbrtSeedBaseUint x r4) := by
-  unfold cbrtScan6Uint
-  by_cases h : 18446744073709551615 < shr r x
-  · simp only [h, if_true]
-    exact cbrtScan5Uint_eq_finishScan x (Contracts.bitOr r (shl 6 1))
-  · simp only [h, if_false]
-    exact cbrtScan5Uint_eq_finishScan x r
-
-private theorem cbrtSourceUint_eq_finishScan (x : Uint256) :
-    cbrtSourceUint x =
-      cbrtFinishUint x (cbrtScanSourceUint x)
-        (cbrtSeedBaseUint x (cbrtScanSourceUint x)) := by
-  unfold cbrtSourceUint cbrtScanSourceUint
-  by_cases h : 340282366920938463463374607431768211455 < x
-  · simp only [h, if_true]
-    exact cbrtScan6Uint_eq_finishScan x (shl 7 1)
-  · simp only [h, if_false]
-    exact cbrtScan6Uint_eq_finishScan x 0
-
-private def cbrtFinishContract (x r seedBase : Uint256) : Contract Uint256 :=
-  let z := cbrtBeforeCorrectionUint x r seedBase
-  if div x (mul z z) < z then Verity.pure (sub z 1) else Verity.pure z
-
-private def cbrtSeedBaseContract (x r : Uint256) : Contract Uint256 :=
-  if 15 < shr r x then
-    let seedBase : Uint256 := 30
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtFinishContract x r seedBase
-  else
-    let seedBase : Uint256 := 15
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtFinishContract x r seedBase
-
-private def cbrtScan3Contract (x r : Uint256) : Contract Uint256 :=
-  if 255 < shr r x then
-    let r := Contracts.bitOr r (shl 3 1)
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtSeedBaseContract x r
-  else
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtSeedBaseContract x r
-
-private def cbrtScan4Contract (x r : Uint256) : Contract Uint256 :=
-  if 65535 < shr r x then
-    let r := Contracts.bitOr r (shl 4 1)
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtScan3Contract x r
-  else
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtScan3Contract x r
-
-private def cbrtScan5Contract (x r : Uint256) : Contract Uint256 :=
-  if 4294967295 < shr r x then
-    let r := Contracts.bitOr r (shl 5 1)
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtScan4Contract x r
-  else
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtScan4Contract x r
-
-private def cbrtScan6Contract (x r : Uint256) : Contract Uint256 :=
-  if 18446744073709551615 < shr r x then
-    let r := Contracts.bitOr r (shl 6 1)
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtScan5Contract x r
-  else
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtScan5Contract x r
-
-private def cbrtSourceContract (x : Uint256) : Contract Uint256 :=
-  let r : Uint256 := 0
-  if 340282366920938463463374607431768211455 < x then
-    let r := shl 7 1
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtScan6Contract x r
-  else
-    Verity.bind (Verity.pure PUnit.unit) fun _ => cbrtScan6Contract x r
-
-private theorem cbrtFinishIf_run_eq_uint (x z : Uint256) (s : ContractState) :
-    ((if div x (mul z z) < z then Verity.pure (sub z 1) else Verity.pure z).run s).fst =
-      if div x (mul z z) < z then sub z 1 else z := by
-  by_cases h : div x (mul z z) < z
-  · rw [if_pos h, if_pos h]
-    rfl
-  · rw [if_neg h, if_neg h]
-    rfl
-
-private theorem cbrtFinishContract_run_eq_uint
-    (x r seedBase : Uint256) (s : ContractState) :
-    ((cbrtFinishContract x r seedBase).run s).fst = cbrtFinishUint x r seedBase := by
-  unfold cbrtFinishContract cbrtFinishUint
-  exact cbrtFinishIf_run_eq_uint x (cbrtBeforeCorrectionUint x r seedBase) s
-
-private theorem cbrtSeedBaseContract_run_eq_uint
-    (x r : Uint256) (s : ContractState) :
-    ((cbrtSeedBaseContract x r).run s).fst =
-      cbrtFinishUint x r (cbrtSeedBaseUint x r) := by
-  unfold cbrtSeedBaseContract cbrtSeedBaseUint
-  by_cases h : 15 < shr r x
-  · simp only [h, if_true, bind_pure_contract, cbrtFinishContract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, cbrtFinishContract_run_eq_uint]
-
-private theorem cbrtScan3Contract_run_eq_uint
-    (x r : Uint256) (s : ContractState) :
-    ((cbrtScan3Contract x r).run s).fst = cbrtScan3Uint x r := by
-  unfold cbrtScan3Contract cbrtScan3Uint
-  by_cases h : 255 < shr r x
-  · simp only [h, if_true, bind_pure_contract, cbrtSeedBaseContract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, cbrtSeedBaseContract_run_eq_uint]
-
-private theorem cbrtScan4Contract_run_eq_uint
-    (x r : Uint256) (s : ContractState) :
-    ((cbrtScan4Contract x r).run s).fst = cbrtScan4Uint x r := by
-  unfold cbrtScan4Contract cbrtScan4Uint
-  by_cases h : 65535 < shr r x
-  · simp only [h, if_true, bind_pure_contract, cbrtScan3Contract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, cbrtScan3Contract_run_eq_uint]
-
-private theorem cbrtScan5Contract_run_eq_uint
-    (x r : Uint256) (s : ContractState) :
-    ((cbrtScan5Contract x r).run s).fst = cbrtScan5Uint x r := by
-  unfold cbrtScan5Contract cbrtScan5Uint
-  by_cases h : 4294967295 < shr r x
-  · simp only [h, if_true, bind_pure_contract, cbrtScan4Contract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, cbrtScan4Contract_run_eq_uint]
-
-private theorem cbrtScan6Contract_run_eq_uint
-    (x r : Uint256) (s : ContractState) :
-    ((cbrtScan6Contract x r).run s).fst = cbrtScan6Uint x r := by
-  unfold cbrtScan6Contract cbrtScan6Uint
-  by_cases h : 18446744073709551615 < shr r x
-  · simp only [h, if_true, bind_pure_contract, cbrtScan5Contract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, cbrtScan5Contract_run_eq_uint]
-
-private theorem cbrtSourceContract_run_eq_uint (x : Uint256) (s : ContractState) :
-    ((cbrtSourceContract x).run s).fst = cbrtSourceUint x := by
-  unfold cbrtSourceContract cbrtSourceUint
-  by_cases h : 340282366920938463463374607431768211455 < x
-  · simp only [h, if_true, bind_pure_contract, cbrtScan6Contract_run_eq_uint]
-  · simp only [h, if_false, bind_pure_contract, cbrtScan6Contract_run_eq_uint]
-
-private theorem cbrt_run_eq_sourceUint (x : Uint256) (s : ContractState) :
-    ((cbrt x).run s).fst = cbrtSourceUint x := by
-  rw [cbrt, Tamago.Utils.FixedPointMathLibBase.cbrt.eq_1]
-  unfold cbrtSourceUint
-  by_cases h : 340282366920938463463374607431768211455 < x
-  · simp only [h, if_true, bind_pure_contract]
-    change ((cbrtScan6Contract x (shl 7 1)).run s).fst =
-      cbrtScan6Uint x (shl 7 1)
-    exact cbrtScan6Contract_run_eq_uint x (shl 7 1) s
-  · simp only [h, if_false, bind_pure_contract]
-    change ((cbrtScan6Contract x 0).run s).fst = cbrtScan6Uint x 0
-    exact cbrtScan6Contract_run_eq_uint x 0 s
-
-private theorem cbrtSourceUint_val_small :
-    ∀ x : Fin 256,
-      (cbrtSourceUint (uintOfNat x.val)).val = soladyCbrtNat x.val := by
-  native_decide
-
-@[simp] private theorem cbrtThreshold128_val :
-    (340282366920938463463374607431768211455 : Uint256).val = 2 ^ 128 - 1 := by
-  native_decide
-
-@[simp] private theorem cbrtThreshold64_val :
-    (18446744073709551615 : Uint256).val = 2 ^ 64 - 1 := by
-  native_decide
-
-@[simp] private theorem cbrtThreshold32_val :
-    (4294967295 : Uint256).val = 2 ^ 32 - 1 := by
-  native_decide
-
-@[simp] private theorem cbrtThreshold16_val :
-    (65535 : Uint256).val = 2 ^ 16 - 1 := by
-  native_decide
-
-@[simp] private theorem cbrtThreshold8_val :
-    (255 : Uint256).val = 2 ^ 8 - 1 := by
-  native_decide
-
-@[simp] private theorem shl_3_1_val : (shl 3 1).val = 8 := by
-  native_decide
-
-private theorem cbrtScanStepUint_val
-    (x r shiftWord thresholdWord : Uint256) (rn shift : Nat)
-    (hr : r.val = rn)
-    (hThreshold : thresholdWord.val = 2 ^ shift - 1)
-    (hOr : (Contracts.bitOr r shiftWord).val = rn + shift) :
-    (if thresholdWord < shr r x then Contracts.bitOr r shiftWord else r).val =
-      cbrtScanStepNat x.val rn shift := by
-  unfold cbrtScanStepNat
-  have hBranch :
-      (thresholdWord < shr r x) ↔
-        2 ^ shift - 1 < x.val / 2 ^ rn := by
-    change thresholdWord.val < (shr r x).val ↔
-      2 ^ shift - 1 < x.val / 2 ^ rn
-    rw [shr_val, hr, hThreshold]
-  by_cases h : 2 ^ shift - 1 < x.val / 2 ^ rn
-  · have hUint := hBranch.mpr h
-    rw [if_pos hUint, if_pos h]
-    exact hOr
-  · have hUint : ¬ thresholdWord < shr r x := fun hh => h (hBranch.mp hh)
-    rw [if_neg hUint, if_neg h]
-    exact hr
-
-private theorem bitOr_shl_3_1_cbrtScan_val
-    (r : Uint256) {rn : Nat} (hr : r.val = rn)
-    (hrn :
-      rn = 0 ∨ rn = 128 ∨ rn = 64 ∨ rn = 192 ∨
-        rn = 32 ∨ rn = 160 ∨ rn = 96 ∨ rn = 224 ∨
-          rn = 16 ∨ rn = 144 ∨ rn = 80 ∨ rn = 208 ∨
-            rn = 48 ∨ rn = 176 ∨ rn = 112 ∨ rn = 240) :
-    (Contracts.bitOr r (shl 3 1)).val = rn + 8 := by
-  rcases hrn with
-    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
-      rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-    simp [bitOr_val, hr, Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] <;>
-    native_decide
-
-private theorem cbrtScanStepNat_128_possible (x : Nat) :
-    cbrtScanStepNat x 0 128 = 0 ∨ cbrtScanStepNat x 0 128 = 128 := by
-  unfold cbrtScanStepNat
-  split <;> omega
-
-private theorem cbrtScanStepNat_64_possible
-    (x rn : Nat) (hrn : rn = 0 ∨ rn = 128) :
-    cbrtScanStepNat x rn 64 = 0 ∨ cbrtScanStepNat x rn 64 = 128 ∨
-      cbrtScanStepNat x rn 64 = 64 ∨ cbrtScanStepNat x rn 64 = 192 := by
-  unfold cbrtScanStepNat
-  rcases hrn with rfl | rfl
-  all_goals
-    split <;> omega
-
-private theorem cbrtScanStepNat_32_possible
-    (x rn : Nat)
-    (hrn : rn = 0 ∨ rn = 128 ∨ rn = 64 ∨ rn = 192) :
-    cbrtScanStepNat x rn 32 = 0 ∨ cbrtScanStepNat x rn 32 = 128 ∨
-      cbrtScanStepNat x rn 32 = 64 ∨ cbrtScanStepNat x rn 32 = 192 ∨
-        cbrtScanStepNat x rn 32 = 32 ∨ cbrtScanStepNat x rn 32 = 160 ∨
-          cbrtScanStepNat x rn 32 = 96 ∨ cbrtScanStepNat x rn 32 = 224 := by
-  unfold cbrtScanStepNat
-  rcases hrn with rfl | rfl | rfl | rfl
-  all_goals
-    split <;> omega
-
-private theorem cbrtScanStepNat_16_possible
-    (x rn : Nat)
-    (hrn :
-      rn = 0 ∨ rn = 128 ∨ rn = 64 ∨ rn = 192 ∨
-        rn = 32 ∨ rn = 160 ∨ rn = 96 ∨ rn = 224) :
-    cbrtScanStepNat x rn 16 = 0 ∨ cbrtScanStepNat x rn 16 = 128 ∨
-      cbrtScanStepNat x rn 16 = 64 ∨ cbrtScanStepNat x rn 16 = 192 ∨
-        cbrtScanStepNat x rn 16 = 32 ∨ cbrtScanStepNat x rn 16 = 160 ∨
-          cbrtScanStepNat x rn 16 = 96 ∨ cbrtScanStepNat x rn 16 = 224 ∨
-            cbrtScanStepNat x rn 16 = 16 ∨ cbrtScanStepNat x rn 16 = 144 ∨
-              cbrtScanStepNat x rn 16 = 80 ∨ cbrtScanStepNat x rn 16 = 208 ∨
-                cbrtScanStepNat x rn 16 = 48 ∨ cbrtScanStepNat x rn 16 = 176 ∨
-                  cbrtScanStepNat x rn 16 = 112 ∨ cbrtScanStepNat x rn 16 = 240 := by
-  unfold cbrtScanStepNat
-  rcases hrn with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-  all_goals
-    split <;> omega
-
-private theorem cbrtScanSourceUint_val (x : Uint256) :
-    (cbrtScanSourceUint x).val = cbrtScanNat x.val := by
-  unfold cbrtScanSourceUint cbrtScanNat
-  let ru1 : Uint256 :=
-    if 340282366920938463463374607431768211455 < x then shl 7 1 else 0
-  let rn1 : Nat := cbrtScanStepNat x.val 0 128
-  have hru1 : ru1.val = rn1 := by
-    dsimp [ru1, rn1, cbrtScanStepNat]
-    have hBranch :
-        (340282366920938463463374607431768211455 < x) ↔
-          2 ^ 128 - 1 < x.val / 2 ^ 0 := by
-      change (340282366920938463463374607431768211455 : Uint256).val < x.val ↔
-        2 ^ 128 - 1 < x.val / 2 ^ 0
-      rw [cbrtThreshold128_val]
-      norm_num
-    by_cases h : 2 ^ 128 - 1 < x.val / 2 ^ 0
-    · have hUint := hBranch.mpr h
-      have hUintVal :
-          (340282366920938463463374607431768211455 : Uint256).val < x.val := hUint
-      have hNat : 340282366920938463463374607431768211455 < x.val / 1 := by
-        simpa using h
-      rw [if_pos hUintVal, if_pos hNat]
-      exact shl_7_1_val
-    · have hUint : ¬ 340282366920938463463374607431768211455 < x :=
-        fun hh => h (hBranch.mp hh)
-      have hUintVal :
-          ¬ (340282366920938463463374607431768211455 : Uint256).val < x.val := hUint
-      have hNat : ¬ 340282366920938463463374607431768211455 < x.val / 1 := by
-        simpa using h
-      rw [if_neg hUintVal, if_neg hNat]
-      rfl
-  let ru2 : Uint256 :=
-    if 18446744073709551615 < shr ru1 x then
-      Contracts.bitOr ru1 (shl 6 1)
-    else
-      ru1
-  let rn2 : Nat := cbrtScanStepNat x.val rn1 64
-  have hrn1 : rn1 = 0 ∨ rn1 = 128 := by
-    simpa [rn1] using cbrtScanStepNat_128_possible x.val
-  have hOr2 : (Contracts.bitOr ru1 (shl 6 1)).val = rn1 + 64 := by
-    exact bitOr_shl_6_1_sqrtScan_val ru1 hru1 hrn1
-  have hru2 : ru2.val = rn2 := by
-    dsimp [ru2, rn2]
-    exact cbrtScanStepUint_val x ru1 (shl 6 1) 18446744073709551615 rn1 64
-      hru1 (by norm_num) hOr2
-  let ru3 : Uint256 :=
-    if 4294967295 < shr ru2 x then
-      Contracts.bitOr ru2 (shl 5 1)
-    else
-      ru2
-  let rn3 : Nat := cbrtScanStepNat x.val rn2 32
-  have hrn2 : rn2 = 0 ∨ rn2 = 128 ∨ rn2 = 64 ∨ rn2 = 192 := by
-    simpa [rn2] using cbrtScanStepNat_64_possible x.val rn1 hrn1
-  have hOr3 : (Contracts.bitOr ru2 (shl 5 1)).val = rn2 + 32 := by
-    exact bitOr_shl_5_1_sqrtScan_val ru2 hru2 hrn2
-  have hru3 : ru3.val = rn3 := by
-    dsimp [ru3, rn3]
-    exact cbrtScanStepUint_val x ru2 (shl 5 1) 4294967295 rn2 32
-      hru2 (by norm_num) hOr3
-  let ru4 : Uint256 :=
-    if 65535 < shr ru3 x then
-      Contracts.bitOr ru3 (shl 4 1)
-    else
-      ru3
-  let rn4 : Nat := cbrtScanStepNat x.val rn3 16
-  have hrn3 :
-      rn3 = 0 ∨ rn3 = 128 ∨ rn3 = 64 ∨ rn3 = 192 ∨
-        rn3 = 32 ∨ rn3 = 160 ∨ rn3 = 96 ∨ rn3 = 224 := by
-    simpa [rn3] using cbrtScanStepNat_32_possible x.val rn2 hrn2
-  have hOr4 : (Contracts.bitOr ru3 (shl 4 1)).val = rn3 + 16 := by
-    exact bitOr_shl_4_1_sqrtScan_val ru3 hru3 hrn3
-  have hru4 : ru4.val = rn4 := by
-    dsimp [ru4, rn4]
-    exact cbrtScanStepUint_val x ru3 (shl 4 1) 65535 rn3 16
-      hru3 (by norm_num) hOr4
-  let ru5 : Uint256 :=
-    if 255 < shr ru4 x then
-      Contracts.bitOr ru4 (shl 3 1)
-    else
-      ru4
-  let rn5 : Nat := cbrtScanStepNat x.val rn4 8
-  have hrn4 :
-      rn4 = 0 ∨ rn4 = 128 ∨ rn4 = 64 ∨ rn4 = 192 ∨
-        rn4 = 32 ∨ rn4 = 160 ∨ rn4 = 96 ∨ rn4 = 224 ∨
-          rn4 = 16 ∨ rn4 = 144 ∨ rn4 = 80 ∨ rn4 = 208 ∨
-            rn4 = 48 ∨ rn4 = 176 ∨ rn4 = 112 ∨ rn4 = 240 := by
-    simpa [rn4] using cbrtScanStepNat_16_possible x.val rn3 hrn3
-  have hOr5 : (Contracts.bitOr ru4 (shl 3 1)).val = rn4 + 8 := by
-    exact bitOr_shl_3_1_cbrtScan_val ru4 hru4 hrn4
-  have hru5 : ru5.val = rn5 := by
-    dsimp [ru5, rn5]
-    exact cbrtScanStepUint_val x ru4 (shl 3 1) 255 rn4 8
-      hru4 (by norm_num) hOr5
-  change ru5.val = rn5
-  exact hru5
+  rw [sqrt_run_eq_floorSqrt x s]
+  have hxLt : x.val < 2 ^ 256 := by
+    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
+  exact floorSqrt_correct_u256 x.val hxLt
 
 private theorem uint3_val : (3 : Uint256).val = 3 := by
   native_decide
-
-private theorem uint7_val : (7 : Uint256).val = 7 := by
-  native_decide
-
-private theorem uint15_val : (15 : Uint256).val = 15 := by
-  native_decide
-
-private theorem uint30_val : (30 : Uint256).val = 30 := by
-  native_decide
-
-private theorem cbrtSeedBaseUint_val
-    (x rU : Uint256) {r : Nat} (hr : rU.val = r) :
-    (cbrtSeedBaseUint x rU).val =
-      if 15 < x.val / 2 ^ r then 30 else 15 := by
-  unfold cbrtSeedBaseUint
-  have hBranch :
-      (15 < shr rU x) ↔ 15 < x.val / 2 ^ r := by
-    change (15 : Uint256).val < (shr rU x).val ↔ 15 < x.val / 2 ^ r
-    rw [uint15_val, shr_val, hr]
-  by_cases h : 15 < x.val / 2 ^ r
-  · have hUint := hBranch.mpr h
-    rw [if_pos hUint, if_pos h]
-    exact uint30_val
-  · have hUint : ¬ 15 < shr rU x := fun hh => h (hBranch.mp hh)
-    rw [if_neg hUint, if_neg h]
-    exact uint15_val
-
-private theorem cbrtFinishSeedUint_val_large
-    (x : Uint256) (_hx : 2 ^ 8 ≤ x.val) :
-    (cbrtFinishSeedUint x (cbrtScanSourceUint x)
-      (cbrtSeedBaseUint x (cbrtScanSourceUint x))).val =
-      soladyCbrtSeedNat x.val := by
-  let rU := cbrtScanSourceUint x
-  let r := cbrtScanNat x.val
-  let seedBaseU := cbrtSeedBaseUint x rU
-  let seedBase := if 15 < x.val / 2 ^ r then 30 else 15
-  have hR : rU.val = r := by
-    simpa [rU, r] using cbrtScanSourceUint_val x
-  have hxLt : x.val < 2 ^ 256 := by
-    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
-  have hrLe : r ≤ 248 := by
-    simpa [r] using cbrtScanNat_le_248 x.val
-  have hrDivLe : r / 3 ≤ 82 := by omega
-  have hSeedBaseVal : seedBaseU.val = seedBase := by
-    simpa [seedBaseU, seedBase] using cbrtSeedBaseUint_val x rU hR
-  have hSeedBaseLe : seedBase ≤ 30 := by
-    by_cases h : 15 < x.val / 2 ^ r <;> simp [seedBase, h]
-  have hDivRVal : (div rU 3).val = r / 3 := by
-    rw [div_val rU 3 (by rw [uint3_val]; norm_num), hR, uint3_val]
-  have hModRVal : (mod rU 3).val = r % 3 := by
-    rw [mod_val rU 3 (by rw [uint3_val]; norm_num), hR, uint3_val]
-  have hShlLt : seedBaseU.val * 2 ^ (div rU 3).val <
-      Verity.Core.Uint256.modulus := by
-    rw [hSeedBaseVal, hDivRVal]
-    have hPow : 2 ^ (r / 3) ≤ 2 ^ 82 :=
-      Nat.pow_le_pow_right (by decide : 1 ≤ 2) hrDivLe
-    have hScaledLe : seedBase * 2 ^ (r / 3) ≤ 30 * 2 ^ 82 :=
-      Nat.mul_le_mul hSeedBaseLe hPow
-    have hBound : 30 * 2 ^ 82 < Verity.Core.Uint256.modulus := by
-      native_decide
-    exact lt_of_le_of_lt hScaledLe hBound
-  have hScaledVal :
-      (shl (div rU 3) seedBaseU).val = seedBase * 2 ^ (r / 3) := by
-    rw [shl_small_val _ _ hShlLt, hSeedBaseVal, hDivRVal]
-  have hModCases : r % 3 = 0 ∨ r % 3 = 1 ∨ r % 3 = 2 := by
-    have hModLt := Nat.mod_lt r (by decide : 0 < 3)
-    omega
-  have hXorVal :
-      (Contracts.bitXor 7 (mod rU 3)).val = Nat.xor 7 (r % 3) := by
-    rw [bitXor_val, uint7_val, hModRVal]
-    apply Nat.mod_eq_of_lt
-    rcases hModCases with hMod | hMod | hMod <;>
-      simp [hMod, Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] <;>
-      native_decide
-  have hXorNe : (Contracts.bitXor 7 (mod rU 3)).val ≠ 0 := by
-    rw [hXorVal]
-    rcases hModCases with hMod | hMod | hMod <;> simp [hMod]
-  have hDivSeedVal :
-      (div (shl (div rU 3) seedBaseU) (Contracts.bitXor 7 (mod rU 3))).val =
-        (seedBase * 2 ^ (r / 3)) / Nat.xor 7 (r % 3) := by
-    rw [div_val _ _ hXorNe, hScaledVal, hXorVal]
-  simpa [cbrtFinishSeedUint, soladyCbrtSeedNat, rU, r, seedBaseU, seedBase]
-    using hDivSeedVal
-
-private theorem realCbrtNat_lt_pow86 {x : Nat} (hxLt : x < 2 ^ 256) :
-    realCbrtNat x < (2 : ℝ) ^ 86 := by
-  let α := realCbrtNat x
-  have hαCube : α ^ 3 = (x : ℝ) := by simpa [α] using realCbrtNat_cube x
-  by_contra hNot
-  have hGe : (2 : ℝ) ^ 86 ≤ α := le_of_not_gt hNot
-  have hCubeGe : ((2 : ℝ) ^ 86) ^ 3 ≤ α ^ 3 :=
-    pow_le_pow_left₀ (by positivity) hGe 3
-  have hxLtR : (x : ℝ) < (2 : ℝ) ^ 256 := by exact_mod_cast hxLt
-  have hPowGt : (2 : ℝ) ^ 256 < ((2 : ℝ) ^ 86) ^ 3 := by norm_num [pow_mul]
-  nlinarith
-
-private theorem natCbrt_lt_pow86 {x : Nat} (hxLt : x < 2 ^ 256) :
-    natCbrt x < 2 ^ 86 := by
-  by_contra hNot
-  have hLe : 2 ^ 86 ≤ natCbrt x := Nat.le_of_not_gt hNot
-  have hCubeLe : (2 ^ 86 : Nat) ^ 3 ≤ natCbrt x ^ 3 :=
-    Nat.pow_le_pow_left hLe 3
-  have hFloor := natCbrt_cube_le x
-  have hPowGt : 2 ^ 256 < (2 ^ 86 : Nat) ^ 3 := by
-    native_decide
-  omega
 
 private theorem cbrt_square_no_overflow_of_le_three_pow86 {z : Nat}
     (hUpper : z ≤ 3 * 2 ^ 86) :
@@ -3510,138 +1110,13 @@ private theorem cbrt_square_no_overflow_of_le_three_pow86 {z : Nat}
     native_decide
   exact lt_of_le_of_lt hSq hBound
 
-private theorem div_le_cbrt_add_six
-    (x z : Nat) (haPos : 0 < natCbrt x) (hFloor : natCbrt x ≤ z) :
-    x / (z * z) ≤ natCbrt x + 6 := by
-  let a := natCbrt x
-  have haaPos : 0 < a * a := Nat.mul_pos (by simpa [a] using haPos)
-    (by simpa [a] using haPos)
-  have hzz : a * a ≤ z * z := Nat.mul_le_mul hFloor hFloor
-  have hDivMono : x / (z * z) ≤ x / (a * a) :=
-    Nat.div_le_div_left hzz (by simpa [a] using haaPos)
-  have hNextCube : x < (a + 1) ^ 3 := by
-    simpa [a] using natCbrt_next_cube_gt x
-  have hCubeBound : (a + 1) ^ 3 ≤ (a + 7) * (a * a) := by
-    nlinarith [haPos]
-  have hDivLt : x / (a * a) < a + 7 :=
-    (Nat.div_lt_iff_lt_mul (by simpa [a] using haaPos)).2
-      (lt_of_lt_of_le hNextCube hCubeBound)
-  omega
-
-private theorem cbrtStepNat_add_no_overflow
-    (x z : Nat) (hxLt : x < 2 ^ 256) (haPos : 0 < natCbrt x)
-    (hFloor : natCbrt x ≤ z) (hUpper : z ≤ 3 * 2 ^ 86) :
-    x / (z * z) + z + z < Verity.Core.Uint256.modulus := by
-  have hDivLe := div_le_cbrt_add_six x z haPos hFloor
-  have hCbrtLt := natCbrt_lt_pow86 (x := x) hxLt
-  have hNumLe : x / (z * z) + z + z ≤ 7 * 2 ^ 86 + 6 := by omega
-  have hBound : 7 * 2 ^ 86 + 6 < Verity.Core.Uint256.modulus := by
-    native_decide
-  exact lt_of_le_of_lt hNumLe hBound
-
-private theorem cbrtStepNat_le_three_pow86
-    (x z : Nat) (hxLt : x < 2 ^ 256) (haPos : 0 < natCbrt x)
-    (hFloor : natCbrt x ≤ z) (hUpper : z ≤ 3 * 2 ^ 86) :
-    cbrtStepNat x z ≤ 3 * 2 ^ 86 := by
-  unfold cbrtStepNat
-  have hDivLe := div_le_cbrt_add_six x z haPos hFloor
-  have hCbrtLt := natCbrt_lt_pow86 (x := x) hxLt
-  have hNumLe : x / (z * z) + z + z ≤ 7 * 2 ^ 86 + 6 := by omega
-  have hDiv : (x / (z * z) + z + z) / 3 ≤ (7 * 2 ^ 86 + 6) / 3 :=
-    Nat.div_le_div_right hNumLe
-  have hBound : (7 * 2 ^ 86 + 6) / 3 ≤ 3 * 2 ^ 86 := by
-    native_decide
-  exact le_trans hDiv hBound
-
-private theorem cbrtSeedNat_le_three_pow86
-    (x : Nat) (hx : 2 ^ 8 ≤ x) (hxLt : x < 2 ^ 256) :
-    soladyCbrtSeedNat x ≤ 3 * 2 ^ 86 := by
-  let z := soladyCbrtSeedNat x
-  let α := realCbrtNat x
-  have hxPos : 0 < x := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hx
-  have hSeed := soladyCbrtSeedNat_real_bounds x hx hxLt
-  have hαLt : α < (2 : ℝ) ^ 86 := by simpa [α] using realCbrtNat_lt_pow86 hxLt
-  have hzUpperR : (z : ℝ) < 3 * (2 : ℝ) ^ 86 := by
-    have h : (z : ℝ) ≤ ((11 : ℝ) / 5) * α := by
-      simpa [z, α] using hSeed.2.2
-    nlinarith
-  exact le_of_lt (by exact_mod_cast hzUpperR)
-
-private theorem cbrtSeedNat_add_no_overflow
-    (x : Nat) (hx : 2 ^ 8 ≤ x) (hxLt : x < 2 ^ 256) :
-    x / (soladyCbrtSeedNat x * soladyCbrtSeedNat x) +
-        soladyCbrtSeedNat x + soladyCbrtSeedNat x <
-      Verity.Core.Uint256.modulus := by
-  let z := soladyCbrtSeedNat x
-  let α := realCbrtNat x
-  have hxPos : 0 < x := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hx
-  have hSeed := soladyCbrtSeedNat_real_bounds x hx hxLt
-  have hzPos : 0 < z := by simpa [z] using hSeed.1
-  have hαPos : 0 < α := by simpa [α] using realCbrtNat_pos hxPos
-  have hαCube : α ^ 3 = (x : ℝ) := by simpa [α] using realCbrtNat_cube x
-  have hαLt : α < (2 : ℝ) ^ 86 := by simpa [α] using realCbrtNat_lt_pow86 hxLt
-  have hzUpper : z < 3 * 2 ^ 86 := by
-    have hzUpperR : (z : ℝ) < 3 * (2 : ℝ) ^ 86 := by
-      have h : (z : ℝ) ≤ ((11 : ℝ) / 5) * α := by
-        simpa [z, α] using hSeed.2.2
-      nlinarith
-    exact_mod_cast hzUpperR
-  have hDivUpperR :
-      ((x / (z * z) : Nat) : ℝ) < 3 * (2 : ℝ) ^ 86 := by
-    have hDivCast :
-        ((x / (z * z) : Nat) : ℝ) ≤ (x : ℝ) / ((z : ℝ) * (z : ℝ)) :=
-      by simpa using
-        (Nat.cast_div_le (m := x) (n := z * z) :
-          ((x / (z * z) : Nat) : ℝ) ≤ (x : ℝ) / (z * z : Nat))
-    have hzLower : ((7 : ℝ) / 12) * α ≤ (z : ℝ) := by
-      simpa [z, α] using hSeed.2.1
-    have hzPosR : 0 < (z : ℝ) := Nat.cast_pos.2 hzPos
-    have hDivReal :
-        (x : ℝ) / ((z : ℝ) * (z : ℝ)) ≤ ((144 : ℝ) / 49) * α := by
-      rw [← hαCube]
-      rw [div_le_iff₀ (mul_pos hzPosR hzPosR)]
-      have hLowerSq : (((7 : ℝ) / 12) * α) ^ 2 ≤ (z : ℝ) ^ 2 :=
-        pow_le_pow_left₀ (by positivity) hzLower 2
-      nlinarith [hLowerSq, hαPos]
-    have hBound : ((144 : ℝ) / 49) * α < 3 * (2 : ℝ) ^ 86 := by
-      nlinarith
-    exact lt_of_le_of_lt (le_trans hDivCast hDivReal) hBound
-  have hDivUpper : x / (z * z) < 3 * 2 ^ 86 := by
-    exact_mod_cast hDivUpperR
-  have hSum : x / (z * z) + z + z < 9 * 2 ^ 86 := by omega
-  have hBound : 9 * 2 ^ 86 < Verity.Core.Uint256.modulus := by
-    native_decide
-  simpa [z] using lt_trans hSum hBound
-
-private theorem cbrtSeedStepNat_le_three_pow86
-    (x : Nat) (hx : 2 ^ 8 ≤ x) (hxLt : x < 2 ^ 256) :
-    cbrtStepNat x (soladyCbrtSeedNat x) ≤ 3 * 2 ^ 86 := by
-  let z := soladyCbrtSeedNat x
-  let α := realCbrtNat x
-  have hxPos : 0 < x := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hx
-  have hSeed := soladyCbrtSeedNat_real_bounds x hx hxLt
-  have hzPos : 0 < z := by simpa [z] using hSeed.1
-  have hαPos : 0 < α := by simpa [α] using realCbrtNat_pos hxPos
-  have hαLt : α < (2 : ℝ) ^ 86 := by simpa [α] using realCbrtNat_lt_pow86 hxLt
-  have hSeedLowerRatio : (7 : ℝ) / 12 ≤ (z : ℝ) / α := by
-    rw [le_div_iff₀ hαPos]
-    simpa [z, α] using hSeed.2.1
-  have hSeedUpperRatio : (z : ℝ) / α ≤ (11 : ℝ) / 5 := by
-    rw [div_le_iff₀ hαPos]
-    simpa [z, α] using hSeed.2.2
-  have hStepUpper := cbrtStepNat_real_ratio_upper_seed
-    (x := x) (z := z) hxPos hzPos hSeedLowerRatio hSeedUpperRatio
-  have hStepR : (cbrtStepNat x z : ℝ) < 3 * (2 : ℝ) ^ 86 := by
-    nlinarith
-  exact le_of_lt (by exact_mod_cast hStepR)
-
 private theorem cbrtStepUint_val
     (x zU : Uint256) (z : Nat)
     (hzVal : zU.val = z) (hzPos : 0 < z)
     (hMulLt : z * z < Verity.Core.Uint256.modulus)
     (hAddLt : x.val / (z * z) + z + z < Verity.Core.Uint256.modulus) :
     (div (add (add (div x (mul zU zU)) zU) zU) 3).val =
-      cbrtStepNat x.val z := by
+      cbrtStep x.val z := by
   have hMulLtU : zU.val * zU.val < Verity.Core.Uint256.modulus := by
     simpa [hzVal] using hMulLt
   have hMulVal : (mul zU zU).val = z * z := by
@@ -3669,80 +1144,136 @@ private theorem cbrtStepUint_val
   have hThreeNe : (3 : Uint256).val ≠ 0 := by
     rw [uint3_val]
     norm_num
-  unfold cbrtStepNat
+  unfold cbrtStep
   rw [div_val _ 3 hThreeNe, hAdd2Val, uint3_val]
+  simp [two_mul, Nat.add_assoc]
 
-private theorem cbrtIterUint_val_of_nat_floor
-    (steps : Nat) (x zU : Uint256) (z : Nat)
-    (hxLt : x.val < 2 ^ 256) (haPos : 0 < natCbrt x.val)
-    (hzVal : zU.val = z)
-    (hFloor : natCbrt x.val ≤ z) (hUpper : z ≤ 3 * 2 ^ 86) :
-    (cbrtIterUint steps x zU).val = cbrtIterNat steps x.val z := by
-  induction steps generalizing zU z with
-  | zero =>
-      simpa [cbrtIterUint, cbrtIterNat] using hzVal
-  | succ steps ih =>
-      have hzPos : 0 < z := lt_of_lt_of_le haPos hFloor
-      have hMulLt := cbrt_square_no_overflow_of_le_three_pow86 hUpper
-      have hAddLt := cbrtStepNat_add_no_overflow x.val z hxLt haPos hFloor hUpper
-      have hStepVal :
-          (div (add (add (div x (mul zU zU)) zU) zU) 3).val =
-            cbrtStepNat x.val z :=
-        cbrtStepUint_val x zU z hzVal hzPos hMulLt hAddLt
-      have hNextFloor : natCbrt x.val ≤ cbrtStepNat x.val z :=
-        cbrtStepNat_ge_floor x.val z hzPos
-      have hNextUpper : cbrtStepNat x.val z ≤ 3 * 2 ^ 86 :=
-        cbrtStepNat_le_three_pow86 x.val z hxLt haPos hFloor hUpper
-      have hTail := ih
-        (div (add (add (div x (mul zU zU)) zU) zU) 3)
-        (cbrtStepNat x.val z) hStepVal hNextFloor hNextUpper
-      simpa [cbrtIterUint, cbrtIterNat] using hTail
+private theorem cbrtStepUint_zero_of_zero (zU : Uint256) (hz : zU.val = 0) :
+    (div (add (add (div (0 : Uint256) (mul zU zU)) zU) zU) 3).val = 0 := by
+  have hzEq : zU = 0 := by
+    apply Verity.Core.Uint256.ext
+    simpa using hz
+  subst zU
+  native_decide
 
-private theorem cbrtBeforeCorrectionUint_val_large
-    (x : Uint256) (hx : 2 ^ 8 ≤ x.val) :
-    (cbrtBeforeCorrectionUint x (cbrtScanSourceUint x)
-      (cbrtSeedBaseUint x (cbrtScanSourceUint x))).val =
-      soladyCbrtBeforeCorrectionNat x.val := by
-  let seedU := cbrtFinishSeedUint x (cbrtScanSourceUint x)
-    (cbrtSeedBaseUint x (cbrtScanSourceUint x))
-  let seed := soladyCbrtSeedNat x.val
-  let z1 := cbrtStepNat x.val seed
-  have hxLt : x.val < 2 ^ 256 := by
+private theorem cbrtSeedUint_val_of_ne (x : Uint256) (hx0 : x.val ≠ 0) :
+    (let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
+     let b := sub 257 xClz
+     let multiplier := add 90 (mul 26 (mod b 3))
+     shr 7 (shl (div b 3) multiplier)).val =
+      cbrtSeed x.val := by
+  let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
+  let bU := sub 257 xClz
+  let b := Nat.log2 x.val
+  have hxPos : 0 < x.val := Nat.pos_of_ne_zero hx0
+  have hx256 : x.val < 2 ^ 256 := by
     simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
-  have hCbrtPos : 0 < natCbrt x.val := by
-    have hGe : 6 ≤ natCbrt x.val := natCbrt_ge_six_of_ge_256 hx
+  have hClzVal : xClz.val = 255 - b := by
+    simpa [xClz, b, hx0] using Tamago.Proof.Utils.ClzProof.clzFormulaUint_val x
+  have hbLt256 : b < 256 := (Nat.log2_lt (Nat.ne_of_gt hxPos)).2 hx256
+  have h257 : (257 : Uint256).val = 257 := by native_decide
+  have hClzLe : xClz.val ≤ (257 : Uint256).val := by
+    rw [h257, hClzVal]
     omega
-  have hSeedVal : seedU.val = seed := by
-    simpa [seedU, seed] using cbrtFinishSeedUint_val_large x hx
-  have hSeedInfo := soladyCbrtSeedNat_real_bounds x.val hx hxLt
-  have hSeedPos : 0 < seed := by simpa [seed] using hSeedInfo.1
-  have hSeedUpper : seed ≤ 3 * 2 ^ 86 := by
-    simpa [seed] using cbrtSeedNat_le_three_pow86 x.val hx hxLt
-  have hSeedMulLt : seed * seed < Verity.Core.Uint256.modulus :=
-    cbrt_square_no_overflow_of_le_three_pow86 hSeedUpper
-  have hSeedAddLt :
-      x.val / (seed * seed) + seed + seed < Verity.Core.Uint256.modulus := by
-    simpa [seed] using cbrtSeedNat_add_no_overflow x.val hx hxLt
-  have hStepVal :
-      (div (add (add (div x (mul seedU seedU)) seedU) seedU) 3).val = z1 := by
-    simpa [z1] using
-      cbrtStepUint_val x seedU seed hSeedVal hSeedPos hSeedMulLt hSeedAddLt
-  have hZ1Floor : natCbrt x.val ≤ z1 := by
-    simpa [z1] using cbrtStepNat_ge_floor x.val seed hSeedPos
-  have hZ1Upper : z1 ≤ 3 * 2 ^ 86 := by
-    simpa [z1, seed] using cbrtSeedStepNat_le_three_pow86 x.val hx hxLt
-  have hTail := cbrtIterUint_val_of_nat_floor 6 x
-    (div (add (add (div x (mul seedU seedU)) seedU) seedU) 3) z1
-    hxLt hCbrtPos hStepVal hZ1Floor hZ1Upper
-  unfold cbrtBeforeCorrectionUint soladyCbrtBeforeCorrectionNat cbrtIterUint cbrtIterNat
-  simpa [seedU, seed, z1] using hTail
+  have hbVal : bU.val = b + 2 := by
+    have h := Verity.Core.Uint256.sub_eq_of_le (a := (257 : Uint256)) (b := xClz) hClzLe
+    have hRaw : (sub 257 xClz).val = (257 : Uint256).val - xClz.val := by
+      simpa [HSub.hSub] using h
+    change (sub 257 xClz).val = b + 2
+    rw [hRaw, h257, hClzVal]
+    omega
+  let multiplier := add 90 (mul 26 (mod bU 3))
+  have hSeedVal :
+      (shr 7 (shl (div bU 3) multiplier)).val =
+        (cbrtSeedMultiplier b * 2 ^ (b / 3)) / 2 ^ 7 := by
+    simpa [multiplier] using cbrtSeedExpr_val bU b hbVal hbLt256
+  unfold cbrtSeed
+  change (shr 7 (shl (div bU 3) multiplier)).val =
+    cbrtSeedMultiplier (Nat.log2 x.val) <<< (Nat.log2 x.val / 3) >>> 7
+  rw [hSeedVal]
+  simp [b, Nat.shiftLeft_eq, Nat.shiftRight_eq_div_pow]
+
+private theorem cbrtSeed_square_lt_word_cert (i : Fin 248) :
+    Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i < Verity.Core.Uint256.modulus := by
+  fin_cases i <;> native_decide
+
+private theorem cbrtSeed_step_add_lt_word_cert (i : Fin 248) :
+    2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset + 1) /
+          (Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i) +
+        Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i + Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i <
+      Verity.Core.Uint256.modulus := by
+  fin_cases i <;> native_decide
+
+private theorem cbrtD1_upper_three_pow86_cert (i : Fin 248) :
+    Tamago.Proof.Utils.Cbrt.OctaveCert.hiOf i + Tamago.Proof.Utils.Cbrt.OctaveCert.d1Of i ≤ 3 * 2 ^ 86 := by
+  fin_cases i <;> native_decide
+
+private theorem icbrt_lt_pow86 {x : Nat} (hxLt : x < 2 ^ 256) :
+    icbrt x < 2 ^ 86 := by
+  by_contra hNot
+  have hLe : 2 ^ 86 ≤ icbrt x := Nat.le_of_not_lt hNot
+  have hCubeGe :
+      (2 ^ 86 : Nat) * 2 ^ 86 * 2 ^ 86 ≤
+        icbrt x * icbrt x * icbrt x :=
+    Nat.mul_le_mul (Nat.mul_le_mul hLe hLe) hLe
+  have hPow : (2 ^ 86 : Nat) * 2 ^ 86 * 2 ^ 86 = 2 ^ (86 + 86 + 86) := by
+    rw [← Nat.pow_add, ← Nat.pow_add]
+  have hFloor := icbrt_cube_le x
+  have hGe : 2 ^ 256 ≤ x := by
+    have h256 : (2 ^ 256 : Nat) ≤ 2 ^ (86 + 86 + 86) :=
+      Nat.pow_le_pow_right (by decide : 1 ≤ (2 : Nat)) (by norm_num)
+    exact Nat.le_trans h256 (Nat.le_trans (by simpa [hPow] using hCubeGe) hFloor)
+  exact (Nat.not_lt_of_ge hGe) hxLt
+
+private theorem div_le_icbrt_add_six
+    (x z : Nat) (haPos : 0 < icbrt x) (hFloor : icbrt x ≤ z) :
+    x / (z * z) ≤ icbrt x + 6 := by
+  let a := icbrt x
+  have haaPos : 0 < a * a := Nat.mul_pos (by simpa [a] using haPos)
+    (by simpa [a] using haPos)
+  have hzz : a * a ≤ z * z := Nat.mul_le_mul hFloor hFloor
+  have hDivMono : x / (z * z) ≤ x / (a * a) :=
+    Nat.div_le_div_left hzz (by simpa [a] using haaPos)
+  have hNextCube : x < (a + 1) * (a + 1) * (a + 1) := by
+    simpa [a] using icbrt_lt_succ_cube x
+  have hCubeBound : (a + 1) * (a + 1) * (a + 1) ≤ (a + 7) * (a * a) := by
+    nlinarith [haPos]
+  have hDivLt : x / (a * a) < a + 7 :=
+    (Nat.div_lt_iff_lt_mul (by simpa [a] using haaPos)).2
+      (lt_of_lt_of_le hNextCube hCubeBound)
+  omega
+
+private theorem cbrtStep_add_no_overflow
+    (x z : Nat) (hxLt : x < 2 ^ 256) (haPos : 0 < icbrt x)
+    (hFloor : icbrt x ≤ z) (hUpper : z ≤ 3 * 2 ^ 86) :
+    x / (z * z) + z + z < Verity.Core.Uint256.modulus := by
+  have hDivLe := div_le_icbrt_add_six x z haPos hFloor
+  have hCbrtLt := icbrt_lt_pow86 (x := x) hxLt
+  have hNumLe : x / (z * z) + z + z ≤ 7 * 2 ^ 86 + 6 := by omega
+  have hBound : 7 * 2 ^ 86 + 6 < Verity.Core.Uint256.modulus := by
+    native_decide
+  exact lt_of_le_of_lt hNumLe hBound
+
+private theorem cbrtStep_le_three_pow86
+    (x z : Nat) (hxLt : x < 2 ^ 256) (haPos : 0 < icbrt x)
+    (hFloor : icbrt x ≤ z) (hUpper : z ≤ 3 * 2 ^ 86) :
+    cbrtStep x z ≤ 3 * 2 ^ 86 := by
+  unfold cbrtStep
+  have hDivLe := div_le_icbrt_add_six x z haPos hFloor
+  have hCbrtLt := icbrt_lt_pow86 (x := x) hxLt
+  have hNumLe : x / (z * z) + 2 * z ≤ 7 * 2 ^ 86 + 6 := by omega
+  have hDiv : (x / (z * z) + 2 * z) / 3 ≤ (7 * 2 ^ 86 + 6) / 3 :=
+    Nat.div_le_div_right hNumLe
+  have hBound : (7 * 2 ^ 86 + 6) / 3 ≤ 3 * 2 ^ 86 := by
+    native_decide
+  exact le_trans hDiv hBound
 
 private theorem cbrtFinishCorrectionUint_val
     (x zU : Uint256) (z : Nat)
     (hZVal : zU.val = z) (hzPos : 0 < z)
     (hMulLt : z * z < Verity.Core.Uint256.modulus) :
-    (if div x (mul zU zU) < zU then sub zU 1 else zU).val =
-      cbrtCorrectNat x.val z := by
+    (sub zU (boolToWord (div x (mul zU zU) < zU))).val =
+      z - if x.val / (z * z) < z then 1 else 0 := by
   have hMulLtU : zU.val * zU.val < Verity.Core.Uint256.modulus := by
     simpa [hZVal] using hMulLt
   have hMulVal : (mul zU zU).val = z * z := by
@@ -3755,10 +1286,9 @@ private theorem cbrtFinishCorrectionUint_val
   have hBranchIff : (div x (mul zU zU) < zU) ↔ x.val / (z * z) < z := by
     change (div x (mul zU zU)).val < zU.val ↔ x.val / (z * z) < z
     rw [hDivVal, hZVal]
-  unfold cbrtCorrectNat
   by_cases h : x.val / (z * z) < z
   · have hUint := hBranchIff.mpr h
-    rw [if_pos hUint, if_pos h]
+    simp [hUint, h, boolToWord]
     have hOne : (1 : Uint256).val = 1 := by simp
     have hSub : (sub zU 1).val = z - 1 := by
       have hLe : (1 : Uint256).val ≤ zU.val := by
@@ -3768,61 +1298,322 @@ private theorem cbrtFinishCorrectionUint_val
         Verity.Core.Uint256.sub_eq_of_le (a := zU) (b := (1 : Uint256)) hLe
     exact hSub
   · have hUint : ¬ div x (mul zU zU) < zU := fun hh => h (hBranchIff.mp hh)
-    rw [if_neg hUint, if_neg h]
-    exact hZVal
+    have hFlag : boolToWord (div x (mul zU zU) < zU) = (0 : Uint256) := by
+      simp [boolToWord, hUint]
+    rw [hFlag, sub_zero_val]
+    simp [h, hZVal]
 
-private theorem cbrtFinishUint_val_large
-    (x : Uint256) (hx : 2 ^ 8 ≤ x.val) :
-    (cbrtFinishUint x (cbrtScanSourceUint x)
-      (cbrtSeedBaseUint x (cbrtScanSourceUint x))).val =
-      soladyCbrtNat x.val := by
-  have hZVal :
-      (cbrtBeforeCorrectionUint x (cbrtScanSourceUint x)
-        (cbrtSeedBaseUint x (cbrtScanSourceUint x))).val =
-        soladyCbrtBeforeCorrectionNat x.val :=
-    cbrtBeforeCorrectionUint_val_large x hx
+private def cbrtVerityRunVal (n : Nat) : Nat :=
+  ((cbrt (uintOfNat n)).run defaultState).fst.val
+
+private theorem cbrt_run_val_eq_cbrtVerityRunVal (n : Nat) (s : ContractState) :
+    ((cbrt (uintOfNat n)).run s).fst.val = cbrtVerityRunVal n := rfl
+
+private theorem cbrtVerityRunVal_small_eq_floorCbrt :
+    ∀ v : Fin 256, v.val ≠ 0 → cbrtVerityRunVal v.val = floorCbrt v.val := by
+  native_decide
+
+private theorem cbrt_run_eq_floorCbrt_small_ne_zero
+    (x : Fin 256) (hx0 : x.val ≠ 0) (s : ContractState) :
+    ((cbrt (uintOfNat x.val)).run s).fst.val = floorCbrt x.val := by
+  rw [cbrt_run_val_eq_cbrtVerityRunVal]
+  exact cbrtVerityRunVal_small_eq_floorCbrt x hx0
+
+private theorem cbrt_run_eq_floorCbrt_large
+    (x : Uint256) (s : ContractState) (hxLarge : 2 ^ 8 ≤ x.val) :
+    ((cbrt x).run s).fst.val = floorCbrt x.val := by
+  have hxPos : 0 < x.val := lt_of_lt_of_le (by norm_num : 0 < 2 ^ 8) hxLarge
+  have hx0 : x.val ≠ 0 := Nat.ne_of_gt hxPos
   have hxLt : x.val < 2 ^ 256 := by
     simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
-  have hNear := soladyCbrtBeforeCorrectionNat_near_floor x.val hx hxLt
-  have hzPos : 0 < soladyCbrtBeforeCorrectionNat x.val := by
-    have haGe : 6 ≤ natCbrt x.val := natCbrt_ge_six_of_ge_256 hx
-    exact lt_of_lt_of_le (by omega : 0 < natCbrt x.val) hNear.1
-  have hZUpper : soladyCbrtBeforeCorrectionNat x.val ≤ 3 * 2 ^ 86 := by
-    have hCbrtLt := natCbrt_lt_pow86 (x := x.val) hxLt
-    omega
-  have hMulLt :
-      soladyCbrtBeforeCorrectionNat x.val *
-          soladyCbrtBeforeCorrectionNat x.val <
-        Verity.Core.Uint256.modulus :=
-    cbrt_square_no_overflow_of_le_three_pow86 hZUpper
-  simpa [cbrtFinishUint, soladyCbrtNat] using
-    cbrtFinishCorrectionUint_val x
-      (cbrtBeforeCorrectionUint x (cbrtScanSourceUint x)
-        (cbrtSeedBaseUint x (cbrtScanSourceUint x)))
-      (soladyCbrtBeforeCorrectionNat x.val) hZVal hzPos hMulLt
-
-private theorem soladyCbrt_run_eq_model (x : Uint256) (s : ContractState) :
-    ((cbrt x).run s).fst.val = soladyCbrtNat x.val := by
-  rw [cbrt_run_eq_sourceUint x s]
-  by_cases hxSmall : x.val < 256
-  · have hxEq : x = uintOfNat x.val := by
-      apply Verity.Core.Uint256.ext
-      have hLt : x.val < Verity.Core.Uint256.modulus := x.isLt
-      simp [uintOfNat_val_of_lt hLt]
-    rw [hxEq]
-    simpa [uintOfNat_val_of_lt x.isLt] using
-      cbrtSourceUint_val_small ⟨x.val, hxSmall⟩
-  · have hxLarge : 2 ^ 8 ≤ x.val := by
-      norm_num at hxSmall
+  have hLogLower : 8 ≤ Nat.log2 x.val := by
+    by_cases h : 8 ≤ Nat.log2 x.val
+    · exact h
+    · have hlt : Nat.log2 x.val + 1 ≤ 8 := by omega
+      have hOctHi : x.val < 2 ^ (Nat.log2 x.val + 1) := by
+        simpa [Nat.log2_eq_log_two, Nat.succ_eq_add_one] using
+          Nat.lt_pow_succ_log_self (by decide : 1 < 2) x.val
+      have hPow : 2 ^ (Nat.log2 x.val + 1) ≤ 2 ^ 8 :=
+        Nat.pow_le_pow_right (by decide : 1 ≤ (2 : Nat)) hlt
+      have : x.val < 2 ^ 8 := Nat.lt_of_lt_of_le hOctHi hPow
       omega
-    simpa [cbrtSourceUint_eq_finishScan x] using cbrtFinishUint_val_large x hxLarge
+  have hLogLt : Nat.log2 x.val < 256 :=
+    (Nat.log2_lt (Nat.ne_of_gt hxPos)).2 hxLt
+  let i : Fin 248 := ⟨Nat.log2 x.val - Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset, by
+    dsimp [Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset]
+    omega⟩
+  have hIdx : i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset = Nat.log2 x.val := by
+    dsimp [i, Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset]
+    omega
+  have hOct :
+      2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset) ≤ x.val ∧
+        x.val < 2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset + 1) := by
+    rw [hIdx]
+    constructor
+    · simpa [Nat.log2_eq_log_two] using
+        Nat.pow_log_le_self 2 (Nat.ne_of_gt hxPos)
+    · simpa [Nat.log2_eq_log_two, Nat.succ_eq_add_one] using
+        Nat.lt_pow_succ_log_self (by decide : 1 < 2) x.val
+  let m := icbrt x.val
+  have hmlo : m * m * m ≤ x.val := by
+    simpa [m] using icbrt_cube_le x.val
+  have hmhi : x.val < (m + 1) * (m + 1) * (m + 1) := by
+    simpa [m] using icbrt_lt_succ_cube x.val
+  have hInterval := Tamago.Proof.Utils.Cbrt.Wiring.m_within_cert_interval i x.val m hmlo hmhi hOct
+  have hmPos : 0 < m := lt_of_lt_of_le (Tamago.Proof.Utils.Cbrt.OctaveCert.lo_pos i) hInterval.1
+  have hm2 : 2 ≤ m := Nat.le_trans (Tamago.Proof.Utils.Cbrt.OctaveCert.lo_ge_two i) hInterval.1
+  have hSeedEq : cbrtSeed x.val = Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i :=
+    Tamago.Proof.Utils.Cbrt.Wiring.cbrtSeed_eq_octaveSeed i x.val hOct
+  rw [cbrt, Tamago.Utils.FixedPointMathLibBase.cbrt.eq_1]
+  rw [monad_bind_success_run_fst _ _ (Tamago.Proof.Utils.ClzProof.clzFormulaUint x) s s
+    (Tamago.Proof.Utils.ClzProof.clz_apply_eq_success x s)]
+  let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint x
+  let bU := sub 257 xClz
+  let multiplier := add 90 (mul 26 (mod bU 3))
+  let z0U := shr 7 (shl (div bU 3) multiplier)
+  let stepU : Uint256 → Uint256 := fun z =>
+    div (add (add (div x (mul z z)) z) z) 3
+  let z1U := stepU z0U
+  let z2U := stepU z1U
+  let z3U := stepU z2U
+  let z4U := stepU z3U
+  let z5U := stepU z4U
+  let z0 := cbrtSeed x.val
+  let z1 := cbrtStep x.val z0
+  let z2 := cbrtStep x.val z1
+  let z3 := cbrtStep x.val z2
+  let z4 := cbrtStep x.val z3
+  let z5 := cbrtStep x.val z4
+  have hz0Val : z0U.val = z0 := by
+    simpa [xClz, bU, multiplier, z0U, z0] using
+      cbrtSeedUint_val_of_ne x hx0
+  have hz0Pos : 0 < z0 := by
+    simpa [z0] using cbrtSeed_pos x.val
+  have hz0MulLt : z0 * z0 < Verity.Core.Uint256.modulus := by
+    simpa [z0, hSeedEq] using cbrtSeed_square_lt_word_cert i
+  have hz0AddLt : x.val / (z0 * z0) + z0 + z0 <
+      Verity.Core.Uint256.modulus := by
+    have hDivLe :
+        x.val / (z0 * z0) ≤
+          2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset + 1) /
+            (Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i * Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i) := by
+      have hxLe : x.val ≤ 2 ^ (i.val + Tamago.Proof.Utils.Cbrt.OctaveCert.certOffset + 1) :=
+        Nat.le_of_lt hOct.2
+      simpa [z0, hSeedEq] using Nat.div_le_div_right hxLe
+    have hCert := cbrtSeed_step_add_lt_word_cert i
+    omega
+  have hz1Val : z1U.val = z1 := by
+    simpa [stepU, z1U, z0U, z0, z1] using
+      cbrtStepUint_val x z0U z0 hz0Val hz0Pos hz0MulLt hz0AddLt
+  have hz1Floor : m ≤ z1 := by
+    simpa [m, z0, z1] using
+      cbrt_step_floor_bound x.val z0 m hz0Pos hmlo
+  have hz1D : z1 - m ≤ Tamago.Proof.Utils.Cbrt.OctaveCert.d1Of i := by
+    have h := Tamago.Proof.Utils.Cbrt.ErrorChain.cbrt_d1_bound x.val m (Tamago.Proof.Utils.Cbrt.OctaveCert.seedOf i)
+      (Tamago.Proof.Utils.Cbrt.OctaveCert.loOf i) (Tamago.Proof.Utils.Cbrt.OctaveCert.hiOf i)
+      (Tamago.Proof.Utils.Cbrt.OctaveCert.seed_pos i) hmlo hmhi hInterval.1 hInterval.2
+    simp only at h
+    have hd1eq := Tamago.Proof.Utils.Cbrt.OctaveCert.d1_eq i
+    have hmaxeq := Tamago.Proof.Utils.Cbrt.OctaveCert.maxabs_eq i
+    rw [hmaxeq] at hd1eq
+    rw [← hd1eq] at h
+    simpa [z1, z0, hSeedEq] using h
+  have hz1Upper : z1 ≤ 3 * 2 ^ 86 := by
+    have hle : z1 ≤ m + Tamago.Proof.Utils.Cbrt.OctaveCert.d1Of i := (Nat.sub_le_iff_le_add').1 hz1D
+    have hCert := cbrtD1_upper_three_pow86_cert i
+    omega
+  have hicbrtPos : 0 < icbrt x.val := by simpa [m] using hmPos
+  have hz1Pos : 0 < z1 := lt_of_lt_of_le hmPos hz1Floor
+  have hz1MulLt : z1 * z1 < Verity.Core.Uint256.modulus :=
+    cbrt_square_no_overflow_of_le_three_pow86 hz1Upper
+  have hz1AddLt : x.val / (z1 * z1) + z1 + z1 < Verity.Core.Uint256.modulus :=
+    cbrtStep_add_no_overflow x.val z1 hxLt hicbrtPos (by simpa [m] using hz1Floor) hz1Upper
+  have hz2Val : z2U.val = z2 := by
+    simpa [stepU, z2U, z1U, z1, z2] using
+      cbrtStepUint_val x z1U z1 hz1Val hz1Pos hz1MulLt hz1AddLt
+  have hz2Floor : m ≤ z2 := by
+    simpa [m, z1, z2] using
+      cbrt_step_floor_bound x.val z1 m hz1Pos hmlo
+  have hz2Upper : z2 ≤ 3 * 2 ^ 86 :=
+    cbrtStep_le_three_pow86 x.val z1 hxLt hicbrtPos (by simpa [m] using hz1Floor) hz1Upper
+  have hz2Pos : 0 < z2 := lt_of_lt_of_le hmPos hz2Floor
+  have hz2MulLt : z2 * z2 < Verity.Core.Uint256.modulus :=
+    cbrt_square_no_overflow_of_le_three_pow86 hz2Upper
+  have hz2AddLt : x.val / (z2 * z2) + z2 + z2 < Verity.Core.Uint256.modulus :=
+    cbrtStep_add_no_overflow x.val z2 hxLt hicbrtPos (by simpa [m] using hz2Floor) hz2Upper
+  have hz3Val : z3U.val = z3 := by
+    simpa [stepU, z3U, z2U, z2, z3] using
+      cbrtStepUint_val x z2U z2 hz2Val hz2Pos hz2MulLt hz2AddLt
+  have hz3Floor : m ≤ z3 := by
+    simpa [m, z2, z3] using
+      cbrt_step_floor_bound x.val z2 m hz2Pos hmlo
+  have hz3Upper : z3 ≤ 3 * 2 ^ 86 :=
+    cbrtStep_le_three_pow86 x.val z2 hxLt hicbrtPos (by simpa [m] using hz2Floor) hz2Upper
+  have hz3Pos : 0 < z3 := lt_of_lt_of_le hmPos hz3Floor
+  have hz3MulLt : z3 * z3 < Verity.Core.Uint256.modulus :=
+    cbrt_square_no_overflow_of_le_three_pow86 hz3Upper
+  have hz3AddLt : x.val / (z3 * z3) + z3 + z3 < Verity.Core.Uint256.modulus :=
+    cbrtStep_add_no_overflow x.val z3 hxLt hicbrtPos (by simpa [m] using hz3Floor) hz3Upper
+  have hz4Val : z4U.val = z4 := by
+    simpa [stepU, z4U, z3U, z3, z4] using
+      cbrtStepUint_val x z3U z3 hz3Val hz3Pos hz3MulLt hz3AddLt
+  have hz4Floor : m ≤ z4 := by
+    simpa [m, z3, z4] using
+      cbrt_step_floor_bound x.val z3 m hz3Pos hmlo
+  have hz4Upper : z4 ≤ 3 * 2 ^ 86 :=
+    cbrtStep_le_three_pow86 x.val z3 hxLt hicbrtPos (by simpa [m] using hz3Floor) hz3Upper
+  have hz4Pos : 0 < z4 := lt_of_lt_of_le hmPos hz4Floor
+  have hz4MulLt : z4 * z4 < Verity.Core.Uint256.modulus :=
+    cbrt_square_no_overflow_of_le_three_pow86 hz4Upper
+  have hz4AddLt : x.val / (z4 * z4) + z4 + z4 < Verity.Core.Uint256.modulus :=
+    cbrtStep_add_no_overflow x.val z4 hxLt hicbrtPos (by simpa [m] using hz4Floor) hz4Upper
+  have hz5Val : z5U.val = z5 := by
+    simpa [stepU, z5U, z4U, z4, z5] using
+      cbrtStepUint_val x z4U z4 hz4Val hz4Pos hz4MulLt hz4AddLt
+  have hInner : innerCbrt x.val = z5 := by
+    unfold innerCbrt
+    simp [z0, z1, z2, z3, z4, z5]
+  have hz5ValInner : z5U.val = innerCbrt x.val := by
+    rw [hz5Val, ← hInner]
+  have hz5Pos : 0 < innerCbrt x.val := innerCbrt_pos x.val hxPos
+  have hz5MulLt : innerCbrt x.val * innerCbrt x.val < Verity.Core.Uint256.modulus := by
+    have hCube := Tamago.Proof.Utils.Cbrt.OverflowSafety.innerCbrt_cube_lt_word x.val hxPos hxLt
+    have hOne : 1 ≤ innerCbrt x.val := Nat.succ_le_of_lt hz5Pos
+    have hSqLeCube :
+        innerCbrt x.val * innerCbrt x.val ≤
+          innerCbrt x.val * (innerCbrt x.val * innerCbrt x.val) := by
+      calc
+        innerCbrt x.val * innerCbrt x.val =
+            1 * (innerCbrt x.val * innerCbrt x.val) := by rw [Nat.one_mul]
+        _ ≤ innerCbrt x.val * (innerCbrt x.val * innerCbrt x.val) :=
+            Nat.mul_le_mul_right _ hOne
+    exact lt_of_le_of_lt hSqLeCube
+      (by simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using hCube)
+  change
+      ((Verity.pure
+          (sub z5U (boolToWord (div x (mul z5U z5U) < z5U)))).run s).fst.val =
+        floorCbrt x.val
+  have hFinish := cbrtFinishCorrectionUint_val x z5U (innerCbrt x.val)
+    hz5ValInner hz5Pos hz5MulLt
+  unfold floorCbrt
+  simpa [Verity.pure, Pure.pure] using hFinish
+
+private theorem cbrt_run_eq_floorCbrt (x : Uint256) (s : ContractState) :
+    ((cbrt x).run s).fst.val = floorCbrt x.val := by
+  by_cases hx0 : x.val = 0
+  · have hxEq : x = 0 := by
+      apply Verity.Core.Uint256.ext
+      simpa using hx0
+    rw [hxEq]
+    rw [cbrt, Tamago.Utils.FixedPointMathLibBase.cbrt.eq_1]
+    rw [monad_bind_success_run_fst _ _
+      (Tamago.Proof.Utils.ClzProof.clzFormulaUint (0 : Uint256)) s s
+      (Tamago.Proof.Utils.ClzProof.clz_apply_eq_success (0 : Uint256) s)]
+    let xU : Uint256 := 0
+    let xClz := Tamago.Proof.Utils.ClzProof.clzFormulaUint xU
+    let bU := sub 257 xClz
+    let multiplier := add 90 (mul 26 (mod bU 3))
+    let z0U := shr 7 (shl (div bU 3) multiplier)
+    let stepU : Uint256 → Uint256 := fun z =>
+      div (add (add (div xU (mul z z)) z) z) 3
+    let z1U := stepU z0U
+    let z2U := stepU z1U
+    let z3U := stepU z2U
+    let z4U := stepU z3U
+    let z5U := stepU z4U
+    change
+        ((Verity.pure
+            (sub z5U (boolToWord (div xU (mul z5U z5U) < z5U)))).run s).fst.val =
+          floorCbrt 0
+    have hClzVal : xClz.val = 256 := by
+      simpa [xU] using Tamago.Proof.Utils.ClzProof.clzFormulaUint_val (0 : Uint256)
+    have h257 : (257 : Uint256).val = 257 := by native_decide
+    have hClzLe : xClz.val ≤ (257 : Uint256).val := by
+      rw [hClzVal, h257]
+      norm_num
+    have hBVal : bU.val = 1 := by
+      have h := Verity.Core.Uint256.sub_eq_of_le (a := (257 : Uint256)) (b := xClz) hClzLe
+      have hRaw : (sub 257 xClz).val = (257 : Uint256).val - xClz.val := by
+        simpa [HSub.hSub] using h
+      rw [show bU = sub 257 xClz by rfl, hRaw, h257, hClzVal]
+    have hThree : (3 : Uint256).val = 3 := by native_decide
+    have hDivBVal : (div bU 3).val = 0 := by
+      rw [div_val bU 3 (by rw [hThree]; norm_num), hThree, hBVal]
+    have hModBVal : (mod bU 3).val = 1 := by
+      rw [mod_val bU 3 (by rw [hThree]; norm_num), hThree, hBVal]
+    have h26 : (26 : Uint256).val = 26 := by native_decide
+    have hMulLt :
+        (26 : Uint256).val * (mod bU 3).val < Verity.Core.Uint256.modulus := by
+      rw [h26, hModBVal]
+      native_decide
+    have hMulVal : (mul 26 (mod bU 3)).val = 26 := by
+      have h := Verity.Core.Uint256.mul_eq_of_lt
+        (a := (26 : Uint256)) (b := mod bU 3) hMulLt
+      simpa [HMul.hMul, h26, hModBVal] using h
+    have h90 : (90 : Uint256).val = 90 := by native_decide
+    have hAddLt :
+        (90 : Uint256).val + (mul 26 (mod bU 3)).val <
+          Verity.Core.Uint256.modulus := by
+      rw [h90, hMulVal]
+      native_decide
+    have hMultiplierVal : multiplier.val = 116 := by
+      rw [show multiplier = add 90 (mul 26 (mod bU 3)) by rfl]
+      rw [add_val_of_lt _ _ hAddLt, h90, hMulVal]
+    have hShlVal : (shl (div bU 3) multiplier).val = 116 := by
+      rw [shl_val, hDivBVal, hMultiplierVal]
+      norm_num
+      exact Nat.mod_eq_of_lt (by native_decide : 116 < Verity.Core.Uint256.modulus)
+    have hSeven : (7 : Uint256).val = 7 := by native_decide
+    have hShrZero : (shr 7 (shl (div bU 3) multiplier)).val = 0 := by
+      rw [shr_val, hShlVal, hSeven]
+      norm_num
+    have hz0Val : z0U.val = 0 := by
+      rw [show z0U = shr 7 (shl (div bU 3) multiplier) by rfl]
+      rw [hShrZero]
+    have hz1Val : z1U.val = 0 := by
+      simpa [stepU, z1U, xU] using cbrtStepUint_zero_of_zero z0U hz0Val
+    have hz2Val : z2U.val = 0 := by
+      simpa [stepU, z2U, z1U, xU] using cbrtStepUint_zero_of_zero z1U hz1Val
+    have hz3Val : z3U.val = 0 := by
+      simpa [stepU, z3U, z2U, xU] using cbrtStepUint_zero_of_zero z2U hz2Val
+    have hz4Val : z4U.val = 0 := by
+      simpa [stepU, z4U, z3U, xU] using cbrtStepUint_zero_of_zero z3U hz3Val
+    have hz5Val : z5U.val = 0 := by
+      simpa [stepU, z5U, z4U, xU] using cbrtStepUint_zero_of_zero z4U hz4Val
+    have hNot : ¬ div xU (mul z5U z5U) < z5U := by
+      change ¬ (div xU (mul z5U z5U)).val < z5U.val
+      rw [hz5Val]
+      exact Nat.not_lt_zero _
+    have hFloor0 : floorCbrt 0 = 0 := by native_decide
+    rw [hFloor0]
+    have hFlag : boolToWord (div xU (mul z5U z5U) < z5U) = (0 : Uint256) := by
+      simp [boolToWord, hNot]
+    rw [hFlag]
+    have hpure (a : Uint256) : ((Verity.pure a).run s).fst.val = a.val := rfl
+    rw [hpure]
+    rw [sub_zero_val, hz5Val]
+  · by_cases hxSmall : x.val < 256
+    · have hxEq : x = uintOfNat x.val := by
+        apply Verity.Core.Uint256.ext
+        simp [uintOfNat_val_of_lt x.isLt]
+      calc
+        ((cbrt x).run s).fst.val =
+            ((cbrt (uintOfNat x.val)).run s).fst.val :=
+              congrArg (fun y : Uint256 => ((cbrt y).run s).fst.val) hxEq
+        _ = floorCbrt x.val :=
+            cbrt_run_eq_floorCbrt_small_ne_zero ⟨x.val, hxSmall⟩ hx0 s
+    · have hxLarge : 2 ^ 8 ≤ x.val := by
+        norm_num at hxSmall
+        omega
+      exact cbrt_run_eq_floorCbrt_large x s hxLarge
 
 theorem cbrt_returns_math_floor (x : Uint256) (s : ContractState) :
     cbrt_property x ((cbrt x).run s).fst := by
   unfold cbrt_property
-  rw [soladyCbrt_run_eq_model x s]
-  exact soladyCbrtNat_property x.val (by
-    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt)
+  rw [cbrt_run_eq_floorCbrt x s]
+  have hxLt : x.val < 2 ^ 256 := by
+    simpa [Verity.Core.Uint256.modulus, Verity.Core.UINT256_MODULUS] using x.isLt
+  exact Tamago.Proof.Utils.Cbrt.Correctness.floorCbrt_correct_u256_all x.val hxLt
 
 private def log2Search : Nat → Nat → Nat → Nat
   | 0, r, value => if 1 < value then r + 1 else r
@@ -4127,7 +1918,7 @@ private theorem log2UpSearchContract_val
               omega), hAdd]
           simp [log2UpSearchContract, log2UpSearch, log2Search, Contract.run,
             Bind.bind, Pure.pure, Verity.pure, hBranch, hNatBranch, hRound,
-            hNatRound, hAdd, hAddRound]
+            hNatRound, hAddRound]
         · have hNatRound : ¬ 2 ^ (r.val + 1) < x.val := by simpa [hShl] using hRound
           simp [log2UpSearchContract, log2UpSearch, log2Search, Contract.run,
             Bind.bind, Pure.pure, Verity.pure, hBranch, hNatBranch, hRound,
@@ -4315,33 +2106,33 @@ private theorem log10Final_bounds
     simp [log10Final, h1, h2, h3, h4]
     constructor
     · intro _hn
-      convert lower_of (k := 4) (by norm_num at h4 ⊢; omega) using 1 <;> omega
-    · convert upper_of (k := 5) (by norm_num at hBound ⊢; omega) using 1 <;> omega
+      convert lower_of (k := 4) (by norm_num at h4 ⊢; omega) using 1
+    · convert upper_of (k := 5) (by norm_num at hBound ⊢; omega) using 1
   · by_cases h3 : 999 < value
     · have h1 : 9 < value := by omega
       have h2 : 99 < value := by omega
       simp [log10Final, h1, h2, h3, h4]
       constructor
       · intro _hn
-        convert lower_of (k := 3) (by norm_num at h3 ⊢; omega) using 1 <;> omega
-      · convert upper_of (k := 4) (by norm_num at h4 ⊢; omega) using 1 <;> omega
+        convert lower_of (k := 3) (by norm_num at h3 ⊢; omega) using 1
+      · convert upper_of (k := 4) (by norm_num at h4 ⊢; omega) using 1
     · by_cases h2 : 99 < value
       · have h1 : 9 < value := by omega
         simp [log10Final, h1, h2, h3, h4]
         constructor
         · intro _hn
-          convert lower_of (k := 2) (by norm_num at h2 ⊢; omega) using 1 <;> omega
-        · convert upper_of (k := 3) (by norm_num at h3 ⊢; omega) using 1 <;> omega
+          convert lower_of (k := 2) (by norm_num at h2 ⊢; omega) using 1
+        · convert upper_of (k := 3) (by norm_num at h3 ⊢; omega) using 1
       · by_cases h1 : 9 < value
         · simp [log10Final, h1, h2, h3, h4]
           constructor
           · intro _hn
-            convert lower_of (k := 1) (by norm_num at h1 ⊢; omega) using 1 <;> omega
-          · convert upper_of (k := 2) (by norm_num at h2 ⊢; omega) using 1 <;> omega
+            convert lower_of (k := 1) (by norm_num at h1 ⊢; omega) using 1
+          · convert upper_of (k := 2) (by norm_num at h2 ⊢; omega) using 1
         · simp [log10Final, h1, h2, h3, h4]
           constructor
           · exact hLower
-          · convert upper_of (k := 1) (by norm_num at h1 ⊢; omega) using 1 <;> omega
+          · convert upper_of (k := 1) (by norm_num at h1 ⊢; omega) using 1
 
 private def log10Search0 (r value : Nat) : Nat :=
   log10Final r value
@@ -4621,9 +2412,8 @@ private theorem log10FinalContract_success
     (log10FinalContract r value).run s =
       ContractResult.success ((log10FinalContract r value).run s).fst s := by
   simp [log10FinalContract, log10FinalContract1, log10FinalContract2,
-    log10FinalContract3, Contract.run, Bind.bind, Pure.pure, Verity.pure,
-    bind_pure_contract]
-  split_ifs <;> simp [Contract.run, Pure.pure, Verity.pure, ContractResult.fst]
+    log10FinalContract3, Contract.run, Bind.bind, Pure.pure]
+  split_ifs <;> simp [Verity.pure, ContractResult.fst]
 
 private theorem log10SearchContract1_success
     (r value : Uint256) (s : ContractState) :
@@ -4701,15 +2491,11 @@ private theorem log10FinalContract_val
               (by rw [hAdd3]; omega), hAdd3]
           simp [log10FinalContract, log10FinalContract1, log10FinalContract2,
             log10FinalContract3, log10Final, Contract.run, Bind.bind, Pure.pure,
-            bind_pure_contract,
-            Verity.pure, h1, h2, h3, h4, hn1, hn2, hn3, hn4, hAdd1, hAdd2,
-            hAdd3, hAdd4]
+            Verity.pure, h1, h2, h3, h4, hn1, hn2, hn3, hn4, hAdd4]
         · have hn4 : ¬ 9999 < value.val := by simpa [h9999Val] using h4
           simp [log10FinalContract, log10FinalContract1, log10FinalContract2,
             log10FinalContract3, log10Final, Contract.run, Bind.bind, Pure.pure,
-            bind_pure_contract,
-            Verity.pure, h1, h2, h3, h4, hn1, hn2, hn3, hn4, hAdd1, hAdd2,
-            hAdd3]
+            Verity.pure, h1, h2, h3, h4, hn1, hn2, hn3, hn4, hAdd3]
       · have hn3 : ¬ 999 < value.val := by simpa [h999Val] using h3
         have hn4 : ¬ 9999 < value.val := by omega
         by_cases h4 : (uintOfNat 9999).val < value.val
@@ -4717,8 +2503,7 @@ private theorem log10FinalContract_val
           exact False.elim (hn4 hn4')
         · simp [log10FinalContract, log10FinalContract1, log10FinalContract2,
             log10FinalContract3, log10Final, Contract.run, Bind.bind, Pure.pure,
-            bind_pure_contract,
-            Verity.pure, h1, h2, h3, h4, hn1, hn2, hn3, hn4, hAdd1, hAdd2]
+            Verity.pure, h1, h2, h3, h4, hn1, hn2, hn3, hn4, hAdd2]
     · have hn2 : ¬ 99 < value.val := by simpa [h99Val] using h2
       have hn3 : ¬ 999 < value.val := by omega
       have hn4 : ¬ 9999 < value.val := by omega
@@ -4730,7 +2515,6 @@ private theorem log10FinalContract_val
           exact False.elim (hn4 hn4')
         · simp [log10FinalContract, log10FinalContract1, log10FinalContract2,
             log10FinalContract3, log10Final, Contract.run, Bind.bind, Pure.pure,
-            bind_pure_contract,
             Verity.pure, h1, h2, h3, h4, hn1, hn2, hn3, hn4, hAdd1]
   · have hn1 : ¬ 9 < value.val := by simpa [h9Val] using h1
     have hn2 : ¬ 99 < value.val := by omega
@@ -4747,7 +2531,6 @@ private theorem log10FinalContract_val
           exact False.elim (hn4 hn4')
         · simp [log10FinalContract, log10FinalContract1, log10FinalContract2,
             log10FinalContract3, log10Final, Contract.run, Bind.bind, Pure.pure,
-            bind_pure_contract,
             Verity.pure, h1, h2, h3, h4, hn1, hn2, hn3, hn4]
 
 private theorem div_uintOfNat_val (value : Uint256) {n : Nat}
@@ -4781,8 +2564,7 @@ private theorem log10SearchContract1_val
       norm_num [div_uintOfNat_val value hDivisorLt (by norm_num)]
     have hFinal := log10FinalContract_val
       (add r (uintOfNat 5)) (div value (uintOfNat 100000)) s (by rw [hAdd]; omega)
-    simp only [log10SearchContract1, log10Search1, log10Search0, hBranch,
-      hNatBranch, if_true]
+    simp only [log10SearchContract1, log10Search1, log10Search0, hBranch, if_true]
     simpa [log10SearchContract0, hAdd, hDiv, hNatBranch, hNatBranchRaw] using hFinal
   · have hValBranch : ¬ (uintOfNat (10 ^ 5 - 1)).val < value.val := by
       simpa using hBranch
@@ -4791,8 +2573,7 @@ private theorem log10SearchContract1_val
       norm_num at hNatBranch ⊢
       exact hNatBranch
     have hFinal := log10FinalContract_val r value s (by omega)
-    simp only [log10SearchContract1, log10Search1, log10Search0, hBranch,
-      hNatBranch, if_false]
+    simp only [log10SearchContract1, log10Search1, log10Search0, hBranch, if_false]
     simpa [log10SearchContract0, hNatBranch, hNatBranchRaw] using hFinal
 
 private theorem log10SearchContract2_val
@@ -4821,7 +2602,7 @@ private theorem log10SearchContract2_val
     have hRec := log10SearchContract1_val
       (add r (uintOfNat 10)) (div value (uintOfNat 10000000000)) s
       (by rw [hAdd]; omega)
-    simp only [log10SearchContract2, log10Search2, hBranch, hNatBranch, if_true]
+    simp only [log10SearchContract2, log10Search2, hBranch, if_true]
     simpa [hAdd, hDiv, hNatBranch, hNatBranchRaw] using hRec
   · have hValBranch : ¬ (uintOfNat (10 ^ 10 - 1)).val < value.val := by
       simpa using hBranch
@@ -4830,7 +2611,7 @@ private theorem log10SearchContract2_val
       norm_num at hNatBranch ⊢
       exact hNatBranch
     have hRec := log10SearchContract1_val r value s (by omega)
-    simp only [log10SearchContract2, log10Search2, hBranch, hNatBranch, if_false]
+    simp only [log10SearchContract2, log10Search2, hBranch, if_false]
     simpa [hNatBranch, hNatBranchRaw] using hRec
 
 private theorem log10SearchContract3_val
@@ -4863,7 +2644,7 @@ private theorem log10SearchContract3_val
     have hRec := log10SearchContract2_val
       (add r (uintOfNat 20)) (div value (uintOfNat 100000000000000000000)) s
       (by rw [hAdd]; omega)
-    simp only [log10SearchContract3, log10Search3, hBranch, hNatBranch, if_true]
+    simp only [log10SearchContract3, log10Search3, hBranch, if_true]
     simpa [hAdd, hDiv, hNatBranch, hNatBranchRaw] using hRec
   · have hNatBranch : ¬ 99999999999999999999 < value.val := by
       have hValBranch : ¬ (uintOfNat (10 ^ 20 - 1)).val < value.val := by
@@ -4873,7 +2654,7 @@ private theorem log10SearchContract3_val
       norm_num at hNatBranch ⊢
       exact hNatBranch
     have hRec := log10SearchContract2_val r value s (by omega)
-    simp only [log10SearchContract3, log10Search3, hBranch, hNatBranch, if_false]
+    simp only [log10SearchContract3, log10Search3, hBranch, if_false]
     simpa [hNatBranch, hNatBranchRaw] using hRec
 
 private theorem log10SearchContract4_val
@@ -4910,7 +2691,7 @@ private theorem log10SearchContract4_val
       (add r (uintOfNat 38))
         (div value (uintOfNat 100000000000000000000000000000000000000)) s
       (by rw [hAdd]; omega)
-    simp only [log10SearchContract4, log10Search4, hBranch, hNatBranch, if_true]
+    simp only [log10SearchContract4, log10Search4, hBranch, if_true]
     simpa [hAdd, hDiv, hNatBranch, hNatBranchRaw] using hRec
   · have hNatBranch :
         ¬ 99999999999999999999999999999999999999 < value.val := by
@@ -4921,7 +2702,7 @@ private theorem log10SearchContract4_val
       norm_num at hNatBranch ⊢
       exact hNatBranch
     have hRec := log10SearchContract3_val r value s (by omega)
-    simp only [log10SearchContract4, log10Search4, hBranch, hNatBranch, if_false]
+    simp only [log10SearchContract4, log10Search4, hBranch, if_false]
     simpa [hNatBranch, hNatBranchRaw] using hRec
 
 private theorem log10_run_eq_search (x : Uint256) (s : ContractState) :
@@ -5353,8 +3134,8 @@ private theorem log10ScaleFinalLoopThenContract_eq_bind
   | nil =>
       unfold log10ScaleFinalLoopThenContract log10ScaleFinalLoopContract
       by_cases hBranch : uintOfNat 0 < exponent
-      · simp [hBranch, Bind.bind, Pure.pure, bind_pure_contract]
-      · simp [hBranch, Bind.bind, Pure.pure, bind_pure_contract]
+      · simp [hBranch, Bind.bind, Pure.pure]
+      · simp [hBranch, Bind.bind, Pure.pure]
   | cons chunk rest ih =>
       unfold log10ScaleFinalLoopThenContract log10ScaleFinalLoopContract
       by_cases hBranch : uintOfNat (chunk.1 - 1) < exponent
@@ -5539,7 +3320,6 @@ private theorem log10Up_run_eq_search (x : Uint256) (s : ContractState) :
     log10UpSearch x.val
   unfold Contract.run Verity.bind
   rw [hLogSuccessRaw']
-  simp only [ContractResult.fst_success]
   have hRound := log10UpRoundInlineContract_val x
     ((Tamago.Utils.FixedPointMathLibBase.log10 x).run s).fst s
     (by rw [log10_run_eq_search x s]; exact log10Search_initial_le_77 x)
@@ -5700,7 +3480,7 @@ private theorem log256Base_run_success_fst (x : Uint256) (s : ContractState) :
     Bind.bind, Pure.pure, shr_val, add, Verity.Core.Uint256.add,
     Verity.Core.Uint256.ofNat, OfNat.ofNat, Verity.Core.Uint256.modulus,
     Verity.Core.UINT256_MODULUS]
-  split_ifs <;> simp [Verity.pure, Contract.run, ContractResult.fst]
+  split_ifs <;> simp [Verity.pure, ContractResult.fst]
 
 private theorem log256_input_lt_next_power (x : Uint256) (s : ContractState) :
     x.val < 256 ^ (((log256 x).run s).fst.val + 1) := by
@@ -5764,8 +3544,7 @@ theorem log256Up_returns_math_ceil (x : Uint256) (s : ContractState) :
     have hx : x = 0 := Verity.Core.Uint256.ext (by simpa using hZero)
     subst x
     simp [log256Up, Tamago.Utils.FixedPointMathLibBase.log256Up,
-      Tamago.Utils.FixedPointMathLibBase.log256, Contract.run, Bind.bind,
-      Pure.pure, Verity.pure]
+      Contract.run, Bind.bind, Pure.pure, Verity.pure]
   · exact log256Up_input_le_power x s
   · exact log256Up_prev_power_lt_input x s
 
@@ -5778,8 +3557,7 @@ theorem clamp_stays_within_bounds (x minValue maxValue : Uint256) (s : ContractS
     · have hMinAboveMax : ¬ minValue.val ≤ maxValue.val := Nat.not_le_of_gt hInvalid
       refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro _h
-        simp [clamp, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hMaxChoosesMin, hMinAboveMax]
+        simp [clamp, Contract.run, Verity.pure, Pure.pure, hMaxChoosesMin, hMinAboveMax]
       · intro hValid
         exact False.elim (by omega)
       · intro hRange
@@ -5787,20 +3565,17 @@ theorem clamp_stays_within_bounds (x minValue maxValue : Uint256) (s : ContractS
       · intro hLow
         exact False.elim (by omega)
       · intro _h
-        simp [clamp, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hMaxChoosesMin, hMinAboveMax]
+        simp [clamp, Contract.run, Verity.pure, Pure.pure, hMaxChoosesMin, hMinAboveMax]
     · have hValid : minValue.val ≤ maxValue.val := by omega
       refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro h
         exact False.elim (hInvalid h)
       · intro _h
-        simp [clamp, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hMaxChoosesMin, hValid]
+        simp [clamp, Contract.run, Verity.pure, Pure.pure, hMaxChoosesMin, hValid]
       · intro hRange
         exact False.elim (by omega)
       · intro _h
-        simp [clamp, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hMaxChoosesMin, hValid]
+        simp [clamp, Contract.run, Verity.pure, Pure.pure, hMaxChoosesMin, hValid]
       · intro hAbove
         exact False.elim (by omega)
   · have hMinLeX : minValue.val ≤ x.val := by omega
@@ -5808,29 +3583,24 @@ theorem clamp_stays_within_bounds (x minValue maxValue : Uint256) (s : ContractS
     · have hXAboveMax : ¬ x.val ≤ maxValue.val := Nat.not_le_of_gt hAbove
       refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro _h
-        simp [clamp, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hMinLeX, hXAboveMax]
+        simp [clamp, Contract.run, Verity.pure, Pure.pure, hMinLeX, hXAboveMax]
       · intro hValid
-        simp [clamp, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hMinLeX, hXAboveMax]
+        simp [clamp, Contract.run, Verity.pure, Pure.pure, hMinLeX, hXAboveMax]
         exact hValid
       · intro hRange
         exact False.elim (by omega)
       · intro hLow
         exact False.elim (by omega)
       · intro _h
-        simp [clamp, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hMinLeX, hXAboveMax]
+        simp [clamp, Contract.run, Verity.pure, Pure.pure, hMinLeX, hXAboveMax]
     · have hXLeMax : x.val ≤ maxValue.val := by omega
       refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro hInvalid
         exact False.elim (by omega)
       · intro _h
-        simp [clamp, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hMinLeX, hXLeMax]
+        simp [clamp, Contract.run, Verity.pure, Pure.pure, hMinLeX, hXLeMax]
       · intro _h
-        simp [clamp, Contract.run, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, hMinLeX, hXLeMax]
+        simp [clamp, Contract.run, Verity.pure, Pure.pure, hMinLeX, hXLeMax]
       · intro hLow
         exact False.elim (by omega)
       · intro h
@@ -5974,6 +3744,21 @@ theorem fixedPointMathLib_cbrt_input_lt_next_cube_holds (x : Uint256) (s : Contr
   simpa [fixedPointMathLib_cbrt_input_lt_next_cube, cbrt_property] using
     (cbrt_returns_math_floor x s).2
 
+-- tama: discharges=fixedPointMathLib_clz_zero_returns_256
+theorem fixedPointMathLib_clz_zero_returns_256_holds (x : Uint256) (s : ContractState) :
+    fixedPointMathLib_clz_zero_returns_256 x ((clz x).run s).fst := by
+  intro hZero
+  rw [Tamago.Proof.Utils.ClzProof.clz_run_val x s]
+  simp [hZero]
+
+-- tama: discharges=fixedPointMathLib_clz_nonzero_returns_leading_zero_count
+theorem fixedPointMathLib_clz_nonzero_returns_leading_zero_count_holds
+    (x : Uint256) (s : ContractState) :
+    fixedPointMathLib_clz_nonzero_returns_leading_zero_count x ((clz x).run s).fst := by
+  intro hNonzero
+  rw [Tamago.Proof.Utils.ClzProof.clz_run_val x s]
+  simp [hNonzero]
+
 -- tama: discharges=fixedPointMathLib_log2_zero_returns_zero
 theorem fixedPointMathLib_log2_zero_returns_zero_holds (x : Uint256) (s : ContractState) :
     fixedPointMathLib_log2_zero_returns_zero x ((log2 x).run s).fst := by
@@ -5981,11 +3766,8 @@ theorem fixedPointMathLib_log2_zero_returns_zero_holds (x : Uint256) (s : Contra
   have hx : x = 0 := Verity.Core.Uint256.ext (by simpa using hZero)
   subst x
   apply Verity.Core.Uint256.ext
-  simp [fixedPointMathLib_log2_zero_returns_zero, log2, Contract.run,
-    Tamago.Utils.FixedPointMathLibBase.log2, Tamago.Utils.FixedPointMathLibBase.log256,
-    Verity.bind, Bind.bind, Verity.pure, Pure.pure, shl, shr,
-    Verity.Core.Uint256.shl, Verity.Core.Uint256.shr, Verity.Core.Uint256.ofNat,
-    Nat.shiftLeft_eq, Nat.shiftRight_eq_div_pow]
+  simp [log2, Contract.run, Tamago.Utils.FixedPointMathLibBase.log2,
+    Bind.bind, Verity.pure, Pure.pure]
 
 -- tama: discharges=fixedPointMathLib_log2_power_le_input
 theorem fixedPointMathLib_log2_power_le_input_holds (x : Uint256) (s : ContractState) :
@@ -6006,11 +3788,9 @@ theorem fixedPointMathLib_log2Up_zero_returns_zero_holds (x : Uint256) (s : Cont
   have hx : x = 0 := Verity.Core.Uint256.ext (by simpa using hZero)
   subst x
   apply Verity.Core.Uint256.ext
-  simp [fixedPointMathLib_log2Up_zero_returns_zero, log2Up, Contract.run,
-    Tamago.Utils.FixedPointMathLibBase.log2Up, Tamago.Utils.FixedPointMathLibBase.log2,
-    Tamago.Utils.FixedPointMathLibBase.log256, Verity.bind, Bind.bind, Verity.pure,
-    Pure.pure, shl, shr, Verity.Core.Uint256.shl, Verity.Core.Uint256.shr,
-    Verity.Core.Uint256.ofNat, Nat.shiftLeft_eq, Nat.shiftRight_eq_div_pow]
+  simp [log2Up, Contract.run, Tamago.Utils.FixedPointMathLibBase.log2Up,
+    Bind.bind, Verity.pure, Pure.pure, shl, Verity.Core.Uint256.shl,
+    Verity.Core.Uint256.ofNat, Nat.shiftLeft_eq]
 
 -- tama: discharges=fixedPointMathLib_log2Up_input_le_power
 theorem fixedPointMathLib_log2Up_input_le_power_holds (x : Uint256) (s : ContractState) :
@@ -6030,9 +3810,8 @@ theorem fixedPointMathLib_log10_zero_returns_zero_holds (x : Uint256) (s : Contr
   intro hZero
   have hx : x = 0 := Verity.Core.Uint256.ext (by simpa using hZero)
   subst x
-  simp [fixedPointMathLib_log10_zero_returns_zero, log10, Contract.run,
-    Tamago.Utils.FixedPointMathLibBase.log10, Verity.bind, Bind.bind, Verity.pure,
-    Pure.pure]
+  simp [log10, Contract.run, Tamago.Utils.FixedPointMathLibBase.log10, Bind.bind,
+    Verity.pure, Pure.pure]
 
 -- tama: discharges=fixedPointMathLib_log10_power_le_input
 theorem fixedPointMathLib_log10_power_le_input_holds (x : Uint256) (s : ContractState) :
@@ -6052,7 +3831,7 @@ theorem fixedPointMathLib_log10Up_zero_returns_zero_holds (x : Uint256) (s : Con
   intro hZero
   have hx : x = 0 := Verity.Core.Uint256.ext (by simpa using hZero)
   subst x
-  simp [fixedPointMathLib_log10Up_zero_returns_zero, log10Up, Contract.run,
+  simp [log10Up, Contract.run,
     Tamago.Utils.FixedPointMathLibBase.log10Up, Tamago.Utils.FixedPointMathLibBase.log10,
     Verity.bind, Bind.bind, Verity.pure, Pure.pure]
 
@@ -6074,9 +3853,8 @@ theorem fixedPointMathLib_log256_zero_returns_zero_holds (x : Uint256) (s : Cont
   intro hZero
   have hx : x = 0 := Verity.Core.Uint256.ext (by simpa using hZero)
   subst x
-  simp [fixedPointMathLib_log256_zero_returns_zero, log256, Contract.run,
-    Tamago.Utils.FixedPointMathLibBase.log256, Verity.bind, Bind.bind, Verity.pure,
-    Pure.pure]
+  simp [log256, Contract.run, Tamago.Utils.FixedPointMathLibBase.log256, Bind.bind,
+    Verity.pure, Pure.pure]
 
 -- tama: discharges=fixedPointMathLib_log256_power_le_input
 theorem fixedPointMathLib_log256_power_le_input_holds (x : Uint256) (s : ContractState) :
@@ -6096,9 +3874,8 @@ theorem fixedPointMathLib_log256Up_zero_returns_zero_holds (x : Uint256) (s : Co
   intro hZero
   have hx : x = 0 := Verity.Core.Uint256.ext (by simpa using hZero)
   subst x
-  simp [fixedPointMathLib_log256Up_zero_returns_zero, log256Up, Contract.run,
-    Tamago.Utils.FixedPointMathLibBase.log256Up, Tamago.Utils.FixedPointMathLibBase.log256,
-    Verity.bind, Bind.bind, Verity.pure, Pure.pure]
+  simp [log256Up, Contract.run, Tamago.Utils.FixedPointMathLibBase.log256Up,
+    Bind.bind, Verity.pure, Pure.pure]
 
 -- tama: discharges=fixedPointMathLib_log256Up_input_le_power
 theorem fixedPointMathLib_log256Up_input_le_power_holds (x : Uint256) (s : ContractState) :

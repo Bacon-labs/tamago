@@ -1,4 +1,5 @@
 import Tamago.Spec.Auth.OwnableSpec
+import Tamago.Proof.EventSimp
 import Verity.Proofs.Stdlib.Automation
 
 namespace Tamago.Proof.Auth.OwnableProof
@@ -11,7 +12,7 @@ open Tamago.Auth.Ownable
 
 attribute [local simp] contractOwner Tamago.Auth.OwnableBase.contractOwner
   Tamago.Auth.OwnableBase.owner Tamago.Auth.OwnableBase.transferOwnership Tamago.Auth.OwnableBase.renounceOwnership
-  Contracts.emit emitEvent
+  Contracts.emit Contracts.EventArg.toWord emitEvent
 
 -- tama: discharges=ownable_owner_spec
 theorem owner_returns_storage_owner (s : ContractState) :

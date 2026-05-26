@@ -1,6 +1,6 @@
 [project]
 name = "tamago"
-verity = "9b0114efcc0af589af63dd3f2eafcdf1a24dbf1e"
+verity = "046b701120b3e0d8882d6ad2e88a1fde2f2dc4b8"
 
 [paths]
 src = "verity/src"
@@ -32,3 +32,6 @@ metadata_bytecode_hash = "none"
 "erc20_transferFrom_interface" = "ERC4626 uses Verity's ERC-20 safeTransferFrom ECM and assumes the configured asset implements transferFrom(address,address,uint256) with standard or optional-bool ERC-20 behavior"
 "native_eth_transfer_interface" = "WETH uses a named ECM for native ETH value transfer and assumes EVM call-value semantics for the compiled helper"
 "self_address_interface" = "ERC4626 uses a named ECM for address() and assumes it returns the current contract address"
+
+[trust.allow_surfaces]
+"selfBalance" = "WETH's withdraw and internal_withdraw read the contract's own ETH balance (SELFBALANCE) as a partially modeled runtime introspection surface; this trusts that the EVM reports the live native balance for the withdrawal accounting"
