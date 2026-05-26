@@ -5,6 +5,7 @@ namespace Tamago.Utils
 open Verity hiding pure bind
 open Contracts
 open Verity.EVM.Uint256 hiding byte
+open Verity.Stdlib.Math
 
 /-
 @title FixedPointMathLib
@@ -424,6 +425,12 @@ verity_contract FixedPointMathLibBase where
     let boundedBelow := max x minValue
     return (min boundedBelow maxValue)
 
+  function pure mulDiv (a : Uint256, b : Uint256, c : Uint256) : Uint256 := do
+    return (mulDiv512Down a b c)
+
+  function pure mulDivUp (a : Uint256, b : Uint256, c : Uint256) : Uint256 := do
+    return (mulDiv512Up a b c)
+
 namespace FixedPointMathLib
 
 abbrev maxUint256 := FixedPointMathLibBase.maxUint256
@@ -443,6 +450,8 @@ abbrev log10Up := FixedPointMathLibBase.log10Up
 abbrev log256 := FixedPointMathLibBase.log256
 abbrev log256Up := FixedPointMathLibBase.log256Up
 abbrev clamp := FixedPointMathLibBase.clamp
+abbrev mulDiv := FixedPointMathLibBase.mulDiv
+abbrev mulDivUp := FixedPointMathLibBase.mulDivUp
 
 def spec : Compiler.CompilationModel.CompilationModel :=
   { FixedPointMathLibBase.spec with

@@ -472,4 +472,44 @@ contract FixedPointMathLibTest is Test {
             assertEq(result, maxValue);
         }
     }
+
+    uint256 internal constant MAX_UINT256 = type(uint256).max;
+
+    // tama: mirrors=fixedPointMathLib_mulDiv_returns_floor_when_fits
+    function testFuzzMulDivReturnsFloorWhenFits(uint128 a, uint128 b, uint128 cRaw) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        uint256 c = uint256(cRaw) + 1;
+
+        assertEq(lib_.mulDiv(a, b, c), (uint256(a) * b) / c);
+        assertEq(lib_.mulDiv(MAX_UINT256, 2, 2), MAX_UINT256);
+    }
+
+    // tama: mirrors=fixedPointMathLib_mulDiv_zero_on_failure
+    function testFuzzMulDivRevertsOnFailure(uint256 a, uint256 b) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        vm.expectRevert();
+        lib_.mulDiv(a, b, 0);
+
+        vm.expectRevert();
+        lib_.mulDiv(MAX_UINT256, 2, 1);
+    }
+
+    // tama: mirrors=fixedPointMathLib_mulDivUp_returns_ceil_when_fits
+    function testFuzzMulDivUpReturnsCeilWhenFits(uint128 a, uint128 b, uint128 cRaw) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        uint256 c = uint256(cRaw) + 1;
+
+        assertEq(lib_.mulDivUp(a, b, c), ((uint256(a) * b) + c - 1) / c);
+        assertEq(lib_.mulDivUp(MAX_UINT256 - 1, 2, 2), MAX_UINT256 - 1);
+    }
+
+    // tama: mirrors=fixedPointMathLib_mulDivUp_zero_on_failure
+    function testFuzzMulDivUpRevertsOnFailure(uint256 a, uint256 b) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        vm.expectRevert();
+        lib_.mulDivUp(a, b, 0);
+
+        vm.expectRevert();
+        lib_.mulDivUp(MAX_UINT256, 2, 1);
+    }
 }

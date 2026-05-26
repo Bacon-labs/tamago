@@ -21,7 +21,8 @@ Tamago claims the **first ever** formally verified EVM implementations of `sqrt(
 - `ERC4626`: tokenized vault accounting with share/asset conversion previews,
   deposits, minting, withdrawals, redemptions, and ERC20 share behavior.
 - `FixedPointMathLib`: reusable unsigned integer math helpers, including
-  saturating arithmetic, distance, averages, roots, logs, and clamping.
+  saturating arithmetic, distance, averages, roots, logs, clamping, and
+  full-precision multiply-divide.
 
 Each component has a Verity implementation, a property spec, a Lean proof file,
 and mirror tests that connect the proved properties to generated EVM artifacts.

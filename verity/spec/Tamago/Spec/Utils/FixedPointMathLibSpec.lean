@@ -293,4 +293,28 @@ def fixedPointMathLib_clamp_above_max_returns_max
     (x _minValue maxValue result : Uint256) : Prop :=
   maxValue.val < x.val → result = maxValue
 
+def fixedPointMathLib_mulDiv_returns_floor_when_fits
+    (a b c result : Uint256) : Prop :=
+  (c : Nat) ≠ 0 →
+    ((a : Nat) * (b : Nat)) / (c : Nat) ≤ Verity.Stdlib.Math.MAX_UINT256 →
+      (result : Nat) = ((a : Nat) * (b : Nat)) / (c : Nat)
+
+def fixedPointMathLib_mulDiv_zero_on_failure
+    (a b c result : Uint256) : Prop :=
+  (c : Nat) = 0 ∨
+    Verity.Stdlib.Math.MAX_UINT256 < ((a : Nat) * (b : Nat)) / (c : Nat) →
+      result = 0
+
+def fixedPointMathLib_mulDivUp_returns_ceil_when_fits
+    (a b c result : Uint256) : Prop :=
+  (c : Nat) ≠ 0 →
+    (((a : Nat) * (b : Nat)) + ((c : Nat) - 1)) / (c : Nat) ≤ Verity.Stdlib.Math.MAX_UINT256 →
+      (result : Nat) = (((a : Nat) * (b : Nat)) + ((c : Nat) - 1)) / (c : Nat)
+
+def fixedPointMathLib_mulDivUp_zero_on_failure
+    (a b c result : Uint256) : Prop :=
+  (c : Nat) = 0 ∨
+    Verity.Stdlib.Math.MAX_UINT256 < (((a : Nat) * (b : Nat)) + ((c : Nat) - 1)) / (c : Nat) →
+      result = 0
+
 end Tamago.Spec.Utils.FixedPointMathLibSpec

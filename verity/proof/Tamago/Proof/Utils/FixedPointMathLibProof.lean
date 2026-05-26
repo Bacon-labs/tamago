@@ -6,6 +6,7 @@ import Tamago.Proof.Utils.Cbrt.OverflowSafety
 import Tamago.Proof.Utils.ClzProof
 import Tamago.Spec.Utils.FixedPointMathLibSpec
 import Verity.Proofs.Stdlib.Automation
+import Verity.Proofs.Stdlib.Math
 
 namespace Tamago.Proof.Utils.FixedPointMathLibProof
 
@@ -3928,5 +3929,55 @@ theorem fixedPointMathLib_clamp_above_max_returns_max_holds
       x minValue maxValue ((clamp x minValue maxValue).run s).fst := by
   simpa [fixedPointMathLib_clamp_above_max_returns_max, clamp_property] using
     (clamp_stays_within_bounds x minValue maxValue s).2.2.2.2
+
+-- tama: discharges=fixedPointMathLib_mulDiv_returns_floor_when_fits
+theorem fixedPointMathLib_mulDiv_returns_floor_when_fits_holds
+    (a b c : Uint256) (s : ContractState) :
+    fixedPointMathLib_mulDiv_returns_floor_when_fits a b c
+      ((mulDiv a b c).run s).fst := by
+  intro hc hfits
+  simp [Tamago.Utils.FixedPointMathLib.mulDiv, Tamago.Utils.FixedPointMathLibBase.mulDiv,
+    Contract.run, ContractResult.fst, Verity.pure, Pure.pure]
+  unfold Verity.Stdlib.Math.mulDiv512Down
+  rw [Verity.Proofs.Stdlib.Math.mulDiv512Down?_some a b c hc hfits]
+  simp [Verity.Core.Uint256.val_ofNat,
+    Nat.mod_eq_of_lt (Verity.Proofs.Stdlib.Automation.lt_modulus_of_le_max_uint256 _ hfits)]
+
+-- tama: discharges=fixedPointMathLib_mulDiv_zero_on_failure
+theorem fixedPointMathLib_mulDiv_zero_on_failure_holds
+    (a b c : Uint256) (s : ContractState) :
+    fixedPointMathLib_mulDiv_zero_on_failure a b c
+      ((mulDiv a b c).run s).fst := by
+  intro hfail
+  simp [Tamago.Utils.FixedPointMathLib.mulDiv, Tamago.Utils.FixedPointMathLibBase.mulDiv,
+    Contract.run, ContractResult.fst, Verity.pure, Pure.pure]
+  unfold Verity.Stdlib.Math.mulDiv512Down
+  rw [Option.isNone_iff_eq_none.mp
+    ((Verity.Proofs.Stdlib.Automation.mulDiv512Down?_none_iff a b c).mpr hfail)]
+
+-- tama: discharges=fixedPointMathLib_mulDivUp_returns_ceil_when_fits
+theorem fixedPointMathLib_mulDivUp_returns_ceil_when_fits_holds
+    (a b c : Uint256) (s : ContractState) :
+    fixedPointMathLib_mulDivUp_returns_ceil_when_fits a b c
+      ((mulDivUp a b c).run s).fst := by
+  intro hc hfits
+  simp [Tamago.Utils.FixedPointMathLib.mulDivUp, Tamago.Utils.FixedPointMathLibBase.mulDivUp,
+    Contract.run, ContractResult.fst, Verity.pure, Pure.pure]
+  unfold Verity.Stdlib.Math.mulDiv512Up
+  rw [Verity.Proofs.Stdlib.Math.mulDiv512Up?_some a b c hc hfits]
+  simp [Verity.Core.Uint256.val_ofNat,
+    Nat.mod_eq_of_lt (Verity.Proofs.Stdlib.Automation.lt_modulus_of_le_max_uint256 _ hfits)]
+
+-- tama: discharges=fixedPointMathLib_mulDivUp_zero_on_failure
+theorem fixedPointMathLib_mulDivUp_zero_on_failure_holds
+    (a b c : Uint256) (s : ContractState) :
+    fixedPointMathLib_mulDivUp_zero_on_failure a b c
+      ((mulDivUp a b c).run s).fst := by
+  intro hfail
+  simp [Tamago.Utils.FixedPointMathLib.mulDivUp, Tamago.Utils.FixedPointMathLibBase.mulDivUp,
+    Contract.run, ContractResult.fst, Verity.pure, Pure.pure]
+  unfold Verity.Stdlib.Math.mulDiv512Up
+  rw [Option.isNone_iff_eq_none.mp
+    ((Verity.Proofs.Stdlib.Automation.mulDiv512Up?_none_iff a b c).mpr hfail)]
 
 end Tamago.Proof.Utils.FixedPointMathLibProof
