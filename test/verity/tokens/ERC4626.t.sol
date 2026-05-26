@@ -19,7 +19,7 @@ contract ERC4626Test is Test {
     event Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
 
     function deployPair() internal returns (ERC20Iface assetToken, ERC4626Iface vault) {
-        assetToken = ERC20Deployer.deploy(address(this));
+        assetToken = ERC20Deployer.deploy(address(this), 18);
         vault = ERC4626Deployer.deploy(address(assetToken));
     }
 

@@ -12,9 +12,12 @@ open Verity.Stdlib.Math
 /-
 @title ERC20
 @notice Fungible token with allowances, owner-controlled minting and burning,
-and 18-decimal accounting.
+and caller-chosen decimal precision.
 @dev This contract implements the core ERC20 balance, allowance, transfer,
 approval, mint, and burn flows. It also includes Ownable-style owner management.
+The decimal precision is supplied at construction and immutable thereafter, so
+deployments can match the precision of integrating ecosystems (e.g. 6 for
+USDC-style accounting, 18 for ETH-style).
 Limitations: metadata accessors `name()` and `symbol()` are intentionally not
 implemented.
 -/
@@ -28,20 +31,25 @@ verity_contract ERC20Base where
   constants
     maxUint256 : Uint256 := (sub 0 1)
 
+  immutables
+    tokenDecimals : Uint256 := initialDecimals
+
   /-
-  @notice Initializes token ownership and zero supply.
+  @notice Initializes token ownership, zero supply, and decimal precision.
   @param initialOwner Address that receives ownership at deployment.
+  @param initialDecimals Token decimal precision, fixed for the lifetime of
+  the deployment.
   -/
-  constructor (initialOwner : Address) := do
+  constructor (initialOwner : Address, initialDecimals : Uint256) := do
     setStorageAddr contractOwner initialOwner
     setStorage tokenSupply 0
 
   /-
-  @notice Returns the token decimal precision.
-  @return Fixed decimal precision of 18.
+  @notice Returns the token decimal precision set at construction.
+  @return Decimal precision recorded in the contract's immutable storage.
   -/
   function view decimals () : Uint256 := do
-    return 18
+    return tokenDecimals
 
   /-
   @notice Returns the total token supply.
@@ -210,6 +218,7 @@ abbrev tokenSupply := ERC20Base.tokenSupply
 abbrev balances := ERC20Base.balances
 abbrev allowances := ERC20Base.allowances
 abbrev maxUint256 := ERC20Base.maxUint256
+abbrev tokenDecimals := ERC20Base.__verity_immutable_slot_tokenDecimals
 
 abbrev decimals := ERC20Base.decimals
 abbrev totalSupply := ERC20Base.totalSupply

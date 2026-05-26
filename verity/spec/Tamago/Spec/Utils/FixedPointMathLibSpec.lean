@@ -293,4 +293,53 @@ def fixedPointMathLib_clamp_above_max_returns_max
     (x _minValue maxValue result : Uint256) : Prop :=
   maxValue.val < x.val → result = maxValue
 
+/-
+mulDiv(a, b, c) / mulDivUp(a, b, c)
+
+Properties specified:
+- When `c ≠ 0` and the full-precision quotient fits in uint256, `mulDiv`
+  returns `floor((a * b) / c)` and `mulDivUp` returns `ceil((a * b) / c)`
+  computed in unbounded natural-number precision (i.e. without the
+  intermediate-overflow restriction of `mulDivDown` / `mulDivUp`).
+- When `c == 0`, both helpers revert via the underlying Yul implementation.
+  At the Lean modeling layer this surfaces as a return of zero (matching
+  the upstream `Verity.Stdlib.Math.mulDiv512Down` total-function fiction)
+  so the proof state stays tractable; downstream consumers should reach
+  for the `Option`-valued surface `mulDiv512Down? / mulDiv512Up?` when
+  they need the precise revert/overflow condition.
+- When the full-precision quotient exceeds `MAX_UINT256`, the same revert
+  / model-zero distinction applies.
+
+Security conclusions:
+- The 512-bit multiply-divide cannot be fooled by an intermediate-product
+  overflow: provers that establish `(a.val * b.val) / c.val ≤ MAX_UINT256`
+  receive an exact result, not a wrapped one.
+- The Yul code reverts on the boundary conditions, so on-chain integrators
+  observe a clean revert rather than a silent zero, matching solady /
+  Uniswap V3's `FullMath.mulDiv` semantics.
+-/
+def fixedPointMathLib_mulDiv_returns_floor_when_fits
+    (a b c result : Uint256) : Prop :=
+  (c : Nat) ≠ 0 →
+    ((a : Nat) * (b : Nat)) / (c : Nat) ≤ Verity.Stdlib.Math.MAX_UINT256 →
+      (result : Nat) = ((a : Nat) * (b : Nat)) / (c : Nat)
+
+def fixedPointMathLib_mulDiv_zero_on_failure
+    (a b c result : Uint256) : Prop :=
+  (c : Nat) = 0 ∨
+    Verity.Stdlib.Math.MAX_UINT256 < ((a : Nat) * (b : Nat)) / (c : Nat) →
+      result = 0
+
+def fixedPointMathLib_mulDivUp_returns_ceil_when_fits
+    (a b c result : Uint256) : Prop :=
+  (c : Nat) ≠ 0 →
+    (((a : Nat) * (b : Nat)) + ((c : Nat) - 1)) / (c : Nat) ≤ Verity.Stdlib.Math.MAX_UINT256 →
+      (result : Nat) = (((a : Nat) * (b : Nat)) + ((c : Nat) - 1)) / (c : Nat)
+
+def fixedPointMathLib_mulDivUp_zero_on_failure
+    (a b c result : Uint256) : Prop :=
+  (c : Nat) = 0 ∨
+    Verity.Stdlib.Math.MAX_UINT256 < (((a : Nat) * (b : Nat)) + ((c : Nat) - 1)) / (c : Nat) →
+      result = 0
+
 end Tamago.Spec.Utils.FixedPointMathLibSpec

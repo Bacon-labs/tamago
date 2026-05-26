@@ -30,7 +30,7 @@ Security conclusions:
 - Share transfers cannot change total share supply.
 -/
 def erc4626_decimals_spec (result : Uint256) : Prop :=
-  erc20_decimals_spec result
+  result = 18
 
 def erc4626_totalSupply_spec (result : Uint256) (s : ContractState) : Prop :=
   erc20_totalSupply_spec result s

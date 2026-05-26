@@ -5,6 +5,7 @@ namespace Tamago.Utils
 open Verity hiding pure bind
 open Contracts
 open Verity.EVM.Uint256 hiding byte
+open Verity.Stdlib.Math
 
 /-
 @title FixedPointMathLib
@@ -424,6 +425,31 @@ verity_contract FixedPointMathLibBase where
     let boundedBelow := max x minValue
     return (min boundedBelow maxValue)
 
+  /-
+  @notice Full-precision multiply-divide rounding toward zero.
+  @param a First factor.
+  @param b Second factor.
+  @param c Divisor.
+  @return `floor((a * b) / c)` computed in 512-bit precision. Reverts if
+  `c == 0` or if the quotient does not fit in `uint256`. Unlike the naive
+  `(a * b) / c`, this never overflows the intermediate product — the proof
+  surface in `Verity.Stdlib.Math.mulDiv512Down?` returns the exact rational
+  quotient whenever it fits.
+  -/
+  function pure mulDiv (a : Uint256, b : Uint256, c : Uint256) : Uint256 := do
+    return (mulDiv512Down a b c)
+
+  /-
+  @notice Full-precision multiply-divide rounding away from zero.
+  @param a First factor.
+  @param b Second factor.
+  @param c Divisor.
+  @return `ceil((a * b) / c)` computed in 512-bit precision. Reverts if
+  `c == 0` or if the rounded-up quotient does not fit in `uint256`.
+  -/
+  function pure mulDivUp (a : Uint256, b : Uint256, c : Uint256) : Uint256 := do
+    return (mulDiv512Up a b c)
+
 namespace FixedPointMathLib
 
 abbrev maxUint256 := FixedPointMathLibBase.maxUint256
@@ -443,6 +469,8 @@ abbrev log10Up := FixedPointMathLibBase.log10Up
 abbrev log256 := FixedPointMathLibBase.log256
 abbrev log256Up := FixedPointMathLibBase.log256Up
 abbrev clamp := FixedPointMathLibBase.clamp
+abbrev mulDiv := FixedPointMathLibBase.mulDiv
+abbrev mulDivUp := FixedPointMathLibBase.mulDivUp
 
 def spec : Compiler.CompilationModel.CompilationModel :=
   { FixedPointMathLibBase.spec with

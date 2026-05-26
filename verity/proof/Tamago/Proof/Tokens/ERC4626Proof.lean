@@ -41,8 +41,9 @@ attribute [local simp] Tamago.Tokens.safeTransfer Tamago.Tokens.safeTransferFrom
 -- tama: discharges=erc4626_decimals_spec
 theorem decimals_returns_18 (s : ContractState) :
   erc4626_decimals_spec ((Tamago.Tokens.ERC4626.decimals).run s).fst := by
-  simpa [erc4626_decimals_spec, Tamago.Tokens.ERC4626.decimals, Tamago.Tokens.ERC20.decimals]
-    using Tamago.Proof.Tokens.ERC20Proof.decimals_returns_18 s
+  simp [erc4626_decimals_spec, Tamago.Tokens.ERC4626.decimals,
+    Tamago.Tokens.ERC4626Base.decimals, getStorageAddr, Contract.run,
+    ContractResult.fst, Verity.bind, Verity.pure, Bind.bind, Pure.pure]
 
 -- tama: discharges=erc4626_totalSupply_spec
 theorem totalSupply_returns_storage_supply (s : ContractState) :

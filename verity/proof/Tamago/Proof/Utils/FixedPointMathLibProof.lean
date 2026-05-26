@@ -3929,4 +3929,97 @@ theorem fixedPointMathLib_clamp_above_max_returns_max_holds
   simpa [fixedPointMathLib_clamp_above_max_returns_max, clamp_property] using
     (clamp_stays_within_bounds x minValue maxValue s).2.2.2.2
 
+/-!
+### Full-precision multiply-divide
+
+`mulDiv` / `mulDivUp` are thin Verity-source wrappers around the proved
+`Verity.Stdlib.Math.mulDiv512Down` / `mulDiv512Up` helpers. The Tamago specs
+characterise both the "happy" (quotient fits) and "boundary" (zero divisor /
+quotient overflow) cases. Each proof reduces the wrapper through the macro-
+generated function body to the underlying stdlib def, then unpacks the
+`Option`-valued definition by case-splitting on whether the failure boundary
+is crossed.
+-/
+
+private theorem mulDiv_eq_mulDiv512Down (a b c : Uint256) (s : ContractState) :
+    ((Tamago.Utils.FixedPointMathLib.mulDiv a b c).run s).fst =
+      Verity.Stdlib.Math.mulDiv512Down a b c := by
+  simp [Tamago.Utils.FixedPointMathLib.mulDiv,
+    Tamago.Utils.FixedPointMathLibBase.mulDiv,
+    Contract.run, ContractResult.fst, Verity.bind, Verity.pure,
+    Bind.bind, Pure.pure]
+
+private theorem mulDivUp_eq_mulDiv512Up (a b c : Uint256) (s : ContractState) :
+    ((Tamago.Utils.FixedPointMathLib.mulDivUp a b c).run s).fst =
+      Verity.Stdlib.Math.mulDiv512Up a b c := by
+  simp [Tamago.Utils.FixedPointMathLib.mulDivUp,
+    Tamago.Utils.FixedPointMathLibBase.mulDivUp,
+    Contract.run, ContractResult.fst, Verity.bind, Verity.pure,
+    Bind.bind, Pure.pure]
+
+-- tama: discharges=fixedPointMathLib_mulDiv_returns_floor_when_fits
+theorem fixedPointMathLib_mulDiv_returns_floor_when_fits_holds
+    (a b c : Uint256) (s : ContractState) :
+    fixedPointMathLib_mulDiv_returns_floor_when_fits a b c
+      ((mulDiv a b c).run s).fst := by
+  intro hc hfits
+  rw [mulDiv_eq_mulDiv512Down]
+  unfold Verity.Stdlib.Math.mulDiv512Down
+  simp only [Verity.Stdlib.Math.mulDiv512Down?_def]
+  rw [if_neg hc, if_neg (Nat.not_lt.mpr hfits)]
+  -- Goal reduces to ((ofNat q).val = q) given q ≤ MAX_UINT256 < modulus.
+  have hmod : (((a : Nat) * (b : Nat)) / (c : Nat)) <
+      Verity.Core.Uint256.modulus := by
+    have hsucc : Verity.Stdlib.Math.MAX_UINT256 + 1 =
+        Verity.Core.Uint256.modulus :=
+      Verity.Core.Uint256.max_uint256_succ_eq_modulus
+    omega
+  simp [Verity.Core.Uint256.val_ofNat, Nat.mod_eq_of_lt hmod]
+
+-- tama: discharges=fixedPointMathLib_mulDiv_zero_on_failure
+theorem fixedPointMathLib_mulDiv_zero_on_failure_holds
+    (a b c : Uint256) (s : ContractState) :
+    fixedPointMathLib_mulDiv_zero_on_failure a b c
+      ((mulDiv a b c).run s).fst := by
+  intro hfail
+  rw [mulDiv_eq_mulDiv512Down]
+  unfold Verity.Stdlib.Math.mulDiv512Down
+  have hnone : Verity.Stdlib.Math.mulDiv512Down? a b c = none := by
+    rw [← Option.isNone_iff_eq_none,
+        Verity.Proofs.Stdlib.Automation.mulDiv512Down?_none_iff]
+    exact hfail
+  rw [hnone]
+
+-- tama: discharges=fixedPointMathLib_mulDivUp_returns_ceil_when_fits
+theorem fixedPointMathLib_mulDivUp_returns_ceil_when_fits_holds
+    (a b c : Uint256) (s : ContractState) :
+    fixedPointMathLib_mulDivUp_returns_ceil_when_fits a b c
+      ((mulDivUp a b c).run s).fst := by
+  intro hc hfits
+  rw [mulDivUp_eq_mulDiv512Up]
+  unfold Verity.Stdlib.Math.mulDiv512Up
+  simp only [Verity.Stdlib.Math.mulDiv512Up?_def]
+  rw [if_neg hc, if_neg (Nat.not_lt.mpr hfits)]
+  have hmod : ((((a : Nat) * (b : Nat)) + ((c : Nat) - 1)) / (c : Nat)) <
+      Verity.Core.Uint256.modulus := by
+    have hsucc : Verity.Stdlib.Math.MAX_UINT256 + 1 =
+        Verity.Core.Uint256.modulus :=
+      Verity.Core.Uint256.max_uint256_succ_eq_modulus
+    omega
+  simp [Verity.Core.Uint256.val_ofNat, Nat.mod_eq_of_lt hmod]
+
+-- tama: discharges=fixedPointMathLib_mulDivUp_zero_on_failure
+theorem fixedPointMathLib_mulDivUp_zero_on_failure_holds
+    (a b c : Uint256) (s : ContractState) :
+    fixedPointMathLib_mulDivUp_zero_on_failure a b c
+      ((mulDivUp a b c).run s).fst := by
+  intro hfail
+  rw [mulDivUp_eq_mulDiv512Up]
+  unfold Verity.Stdlib.Math.mulDiv512Up
+  have hnone : Verity.Stdlib.Math.mulDiv512Up? a b c = none := by
+    rw [← Option.isNone_iff_eq_none,
+        Verity.Proofs.Stdlib.Automation.mulDiv512Up?_none_iff]
+    exact hfail
+  rw [hnone]
+
 end Tamago.Proof.Utils.FixedPointMathLibProof

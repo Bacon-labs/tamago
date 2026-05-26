@@ -29,8 +29,8 @@ attribute [local simp] Tamago.Tokens.WETHNative.transfer
 -- tama: discharges=weth_decimals_spec
 theorem decimals_returns_18 (s : ContractState) :
   weth_decimals_spec ((Tamago.Tokens.WETH.decimals).run s).fst := by
-  simpa [weth_decimals_spec, Tamago.Tokens.WETH.decimals, Tamago.Tokens.ERC20.decimals]
-    using Tamago.Proof.Tokens.ERC20Proof.decimals_returns_18 s
+  simp [weth_decimals_spec, Tamago.Tokens.WETH.decimals,
+    Tamago.Tokens.WETHBase.decimals, Bind.bind, Pure.pure]
 
 -- tama: discharges=weth_totalSupply_spec
 theorem totalSupply_returns_storage_supply (s : ContractState) :

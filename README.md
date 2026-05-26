@@ -13,7 +13,8 @@ Tamago claims the **first ever** formally verified EVM implementations of `sqrt(
 - `Ownable`: single-owner authorization with ownership transfer and
   renunciation.
 - `ERC20`: fungible token with allowances, owner-controlled minting and
-  burning, fixed 18-decimal metadata, and overflow-safe accounting.
+  burning, deployer-chosen decimal precision (immutable post-construction),
+  and overflow-safe accounting.
 - `ERC721`: non-fungible token with ownership, approvals, operator approvals,
   minting, and transfer behavior.
 - `WETH`: wrapped ETH with ERC20-compatible accounting, deposits, withdrawals,
@@ -21,7 +22,13 @@ Tamago claims the **first ever** formally verified EVM implementations of `sqrt(
 - `ERC4626`: tokenized vault accounting with share/asset conversion previews,
   deposits, minting, withdrawals, redemptions, and ERC20 share behavior.
 - `FixedPointMathLib`: reusable unsigned integer math helpers, including
-  saturating arithmetic, distance, averages, roots, logs, and clamping.
+  saturating arithmetic, distance, averages, roots, logs, clamping, and
+  full-precision `mulDiv` / `mulDivUp`.
+- `SafeTransferLib`: deployable wrapper exercising the Verity stdlib's
+  optional-bool-return ERC-20 ECMs (`transfer` / `transferFrom` / `approve`),
+  with mirror tests against standard, USDT-style no-return, false-return,
+  oversized-return, short-return, no-code, reverting, fee-on-transfer,
+  ERC-777-hook, and rebasing tokens.
 
 Each component has a Verity implementation, a property spec, a Lean proof file,
 and mirror tests that connect the proved properties to generated EVM artifacts.
@@ -87,14 +94,17 @@ import {ERC20Deployer} from "tamago/src/generated/verity/ERC20Deployer.sol";
 import {ERC20Iface} from "tamago/src/generated/verity/ERC20Iface.sol";
 
 contract ExampleTest {
-    function deployToken(address owner) internal returns (ERC20Iface token) {
-        token = ERC20Deployer.deploy(owner);
+    // ERC20 takes the initial owner and the desired token decimals at
+    // construction; both are immutable for the lifetime of the deployment.
+    function deployToken(address owner, uint256 decimals) internal returns (ERC20Iface token) {
+        token = ERC20Deployer.deploy(owner, decimals);
     }
 }
 ```
 
 The same pattern applies to the other generated deployers and interfaces:
-`Ownable`, `ERC721`, `WETH`, `ERC4626`, and `FixedPointMathLib`.
+`Ownable`, `ERC721`, `WETH`, `ERC4626`, `FixedPointMathLib`, and
+`SafeTransferLib`.
 
 ## Repository Layout
 
