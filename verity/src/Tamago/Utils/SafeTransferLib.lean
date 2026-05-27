@@ -12,13 +12,12 @@ open Verity.EVM.Uint256
 The contract functions `transfer`, `transferFrom`, and `approve` forward to
 the underlying ECMs (selectors `0xa9059cbb`, `0x23b872dd`, `0x095ea7b3`)
 with the standard "optional-bool" guard: the target is allowed to either
-return no data when it has code (the USDT pattern) or return data whose
-first 32 bytes equal ABI-encoded `true`. A returned `false`, an EVM revert,
-or a call to a no-code address all revert the wrapper. The guard reads only
-the first 32 bytes of the return area, so longer returns are accepted as
-long as their first word is `1`; short returns combined with stale calldata
-in the output buffer are a known boundary that mirror tests in
-`test/verity/utils/SafeTransferLib.t.sol` document explicitly.
+return no data when it has code (the USDT pattern) or return exactly 32
+bytes equal to ABI-encoded `true`. A returned `false`, an EVM revert, a
+call to a no-code address, an oversized return (>32 bytes), or a short
+return (<32 bytes) all revert the wrapper. The strict return-length
+discipline is enforced by the underlying Yul codegen (Verity stdlib);
+mirror tests in `test/verity/utils/SafeTransferLib.t.sol` pin each branch.
 @dev Tamago consumers normally inline the Lean-side helpers
 `Contracts.safeTransfer` / `Contracts.safeTransferFrom` / `Contracts.safeApprove`
 into their own `verity_contract`s — the deployable contract surfaced here is
