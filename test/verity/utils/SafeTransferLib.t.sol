@@ -384,30 +384,30 @@ contract SafeTransferLibTest is Test {
     }
 
     // ------------------------------------------------------------------
-    // Oversized return data — the optional-bool guard reads only the first
-    // 32 bytes of the return buffer, so any return whose first word equals
-    // `true` is accepted, regardless of how much trailing data follows.
-    // This matches Solidity's `abi.decode(returndata, (bool))` behaviour
-    // when returndata.length >= 32 and the first word is `true`. The guard
-    // is *not* a length-equals-32 check.
+    // Oversized return data — the optional-bool guard rejects any return
+    // whose length exceeds 32 bytes, even if its first word is `true`.
+    // (Tightened by Verity stdlib PR #1939 / pin 9eaf6421 — prior to that
+    // bump these reverts were accepted as success.) Solidity 0.8's
+    // `abi.decode(returndata, (bool))` would accept the same shape; the
+    // wrapper is stricter to reject ambiguous or malicious encodings.
     // ------------------------------------------------------------------
 
-    function testOversizedReturnTokenTransferSucceedsWhenFirstWordIsTrue() public {
+    function testOversizedReturnTokenTransferReverts() public {
         OversizedReturnToken token = new OversizedReturnToken();
-        bool ok = lib.transfer(address(token), address(0xBEEF), 1);
-        assertTrue(ok);
+        vm.expectRevert();
+        lib.transfer(address(token), address(0xBEEF), 1);
     }
 
-    function testOversizedReturnTokenTransferFromSucceedsWhenFirstWordIsTrue() public {
+    function testOversizedReturnTokenTransferFromReverts() public {
         OversizedReturnToken token = new OversizedReturnToken();
-        bool ok = lib.transferFrom(address(token), address(this), address(0xBEEF), 1);
-        assertTrue(ok);
+        vm.expectRevert();
+        lib.transferFrom(address(token), address(this), address(0xBEEF), 1);
     }
 
-    function testOversizedReturnTokenApproveSucceedsWhenFirstWordIsTrue() public {
+    function testOversizedReturnTokenApproveReverts() public {
         OversizedReturnToken token = new OversizedReturnToken();
-        bool ok = lib.approve(address(token), address(0xBEEF), 1);
-        assertTrue(ok);
+        vm.expectRevert();
+        lib.approve(address(token), address(0xBEEF), 1);
     }
 
     // ------------------------------------------------------------------
