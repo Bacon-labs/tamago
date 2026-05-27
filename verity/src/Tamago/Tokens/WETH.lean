@@ -88,6 +88,15 @@ verity_contract WETHBase where
     balances : Address → Uint256 := slot 2
     allowances : Address → Address → Uint256 := slot 3
 
+  errors
+    error InsufficientBalance ()
+    error InsufficientAllowance ()
+    error BalanceOverflow ()
+    error TotalSupplyOverflow ()
+    error InsufficientSupply ()
+    error InsufficientEthBacking ()
+    error EthTransferFailed ()
+
   constants
     maxUint256 : Uint256 := (sub 0 1)
 
@@ -139,9 +148,9 @@ verity_contract WETHBase where
     let sender ← msgSender
     let value ← msgValue
     let currentBalance ← getMapping balances sender
-    let newBalance ← requireSomeUint (safeAdd currentBalance value) "Balance overflow"
+    let newBalance ← requireSomeUintError (safeAdd currentBalance value) BalanceOverflow()
     let currentSupply ← getStorage tokenSupply
-    let newSupply ← requireSomeUint (safeAdd currentSupply value) "Supply overflow"
+    let newSupply ← requireSomeUintError (safeAdd currentSupply value) TotalSupplyOverflow()
     setMapping balances sender newBalance
     setStorage tokenSupply newSupply
     emit "Transfer" [addressToWord zeroAddress, addressToWord sender, value]
@@ -169,12 +178,12 @@ verity_contract WETHBase where
   function transfer (toAddr : Address, amount : Uint256) : Bool := do
     let sender ← msgSender
     let senderBalance ← getMapping balances sender
-    require (senderBalance >= amount) "Insufficient balance"
+    requireError (senderBalance >= amount) InsufficientBalance()
     if sender == toAddr then
       pure ()
     else
       let recipientBalance ← getMapping balances toAddr
-      let newRecipientBalance ← requireSomeUint (safeAdd recipientBalance amount) "Recipient balance overflow"
+      let newRecipientBalance ← requireSomeUintError (safeAdd recipientBalance amount) BalanceOverflow()
       setMapping balances sender (sub senderBalance amount)
       setMapping balances toAddr newRecipientBalance
     emit "Transfer" [addressToWord sender, addressToWord toAddr, amount]
@@ -190,15 +199,15 @@ verity_contract WETHBase where
   function transferFrom (fromAddr : Address, toAddr : Address, amount : Uint256) : Bool := do
     let spender ← msgSender
     let currentAllowance ← getMapping2 allowances fromAddr spender
-    require (currentAllowance >= amount) "Insufficient allowance"
+    requireError (currentAllowance >= amount) InsufficientAllowance()
     let fromBalance ← getMapping balances fromAddr
-    require (fromBalance >= amount) "Insufficient balance"
+    requireError (fromBalance >= amount) InsufficientBalance()
 
     if fromAddr == toAddr then
       pure ()
     else
       let toBalance ← getMapping balances toAddr
-      let newToBalance ← requireSomeUint (safeAdd toBalance amount) "Recipient balance overflow"
+      let newToBalance ← requireSomeUintError (safeAdd toBalance amount) BalanceOverflow()
       setMapping balances fromAddr (sub fromBalance amount)
       setMapping balances toAddr newToBalance
 
@@ -217,15 +226,15 @@ verity_contract WETHBase where
   function withdraw (amount : Uint256) : Bool := do
     let sender ← msgSender
     let currentBalance ← getMapping balances sender
-    require (currentBalance >= amount) "Insufficient balance"
+    requireError (currentBalance >= amount) InsufficientBalance()
     let currentSupply ← getStorage tokenSupply
-    require (currentSupply >= amount) "Insufficient supply"
+    requireError (currentSupply >= amount) InsufficientSupply()
     let currentEth ← selfBalance
-    require (currentEth >= amount) "Insufficient ETH backing"
+    requireError (currentEth >= amount) InsufficientEthBacking()
     setMapping balances sender (sub currentBalance amount)
     setStorage tokenSupply (sub currentSupply amount)
     let sent ← WETHNative.transfer sender amount
-    require (sent != 0) "ETH transfer failed"
+    requireError (sent != 0) EthTransferFailed()
     emit "Transfer" [addressToWord sender, addressToWord zeroAddress, amount]
     emit "Withdrawal" [addressToWord sender, amount]
     return true

@@ -6,6 +6,13 @@ interface ERC20Iface {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
+    error Unauthorized();
+    error NewOwnerIsZeroAddress();
+    error InsufficientBalance();
+    error InsufficientAllowance();
+    error BalanceOverflow();
+    error TotalSupplyOverflow();
+    error InsufficientSupply();
     function decimals() external view returns (uint256);
     function totalSupply() external view returns (uint256);
     function balanceOf(address account) external view returns (uint256);

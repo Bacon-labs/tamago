@@ -281,13 +281,13 @@ private theorem deposit_properties_after_run
       (Verity.EVM.Uint256.mul assets (Verity.EVM.Uint256.add (s.storage tokenSupply.slot) 1))
       (Verity.EVM.Uint256.add (s.storage managedAssets.slot) 1)
   ((s.storageMap balances.slot receiver).val + shares.val > Verity.Stdlib.Math.MAX_UINT256 →
-    (deposit assets receiver).run s = ContractResult.revert "Balance overflow" s) ∧
+    (deposit assets receiver).run s = ContractResult.revert "BalanceOverflow()" s) ∧
   ((s.storageMap balances.slot receiver).val + shares.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
     ((s.storage tokenSupply.slot).val + shares.val > Verity.Stdlib.Math.MAX_UINT256 →
-      (deposit assets receiver).run s = ContractResult.revert "Supply overflow" s) ∧
+      (deposit assets receiver).run s = ContractResult.revert "TotalSupplyOverflow()" s) ∧
     ((s.storage tokenSupply.slot).val + shares.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
       ((s.storage managedAssets.slot).val + assets.val > Verity.Stdlib.Math.MAX_UINT256 →
-        (deposit assets receiver).run s = ContractResult.revert "Total assets overflow" s) ∧
+        (deposit assets receiver).run s = ContractResult.revert "TotalAssetsOverflow()" s) ∧
       ((s.storage managedAssets.slot).val + assets.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
         (deposit assets receiver).run s = ContractResult.success shares ((deposit assets receiver).run s).snd ∧
         ((deposit assets receiver).run s).snd.storageMap balances.slot receiver =
@@ -307,7 +307,7 @@ private theorem deposit_properties_after_run
       simpa using h_balance_overflow
     simp [deposit, assetToken, balances, tokenSupply, managedAssets, msgSender,
       getStorageAddr, getStorage, getMapping, safeTransferFrom,
-      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_overflow,
       Verity.pure, Pure.pure]
   · intro h_balance_no_overflow
@@ -330,7 +330,7 @@ private theorem deposit_properties_after_run
         simpa using h_supply_overflow
       simp [deposit, assetToken, balances, tokenSupply, managedAssets, msgSender,
         getStorageAddr, getStorage, getMapping, safeTransferFrom,
-        Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+        Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
         Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
         h_not_balance_overflow, h_overflow, Verity.pure, Pure.pure]
     · intro h_supply_no_overflow
@@ -352,7 +352,7 @@ private theorem deposit_properties_after_run
         simp [deposit, assetToken, balances, tokenSupply, managedAssets, msgSender,
           getStorageAddr, getStorage, getMapping, setMapping,
           setStorage, safeTransferFrom, Contract.run, ContractResult.snd, Verity.bind,
-          Bind.bind, Verity.require, Verity.Stdlib.Math.requireSomeUint,
+          Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_not_balance_overflow, h_not_supply_overflow,
           h_overflow, Verity.pure, Pure.pure]
       · intro h_assets_no_overflow
@@ -365,7 +365,7 @@ private theorem deposit_properties_after_run
           simp [deposit, assetToken, balances, tokenSupply, managedAssets, msgSender,
             getStorageAddr, getStorage, getMapping, setMapping,
             setStorage, safeTransferFrom, mstore, rawLog, emitEvent,
-            Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+            Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
             Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
             h_not_balance_overflow, h_not_supply_overflow, h_not_assets_overflow,
             Verity.pure, Pure.pure]
@@ -439,7 +439,7 @@ theorem mint_reverts_when_receiver_balance_would_overflow
       Verity.Stdlib.Math.MAX_UINT256 < (s.storageMap 2 receiver).val + shares.val := by
     simpa using h_balance_overflow
   simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
-    getStorageAddr, getStorage, getMapping, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+    getStorageAddr, getStorage, getMapping, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
     Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_overflow,
     Verity.pure, Pure.pure]
 
@@ -460,7 +460,7 @@ theorem mint_reverts_when_total_supply_would_overflow
       Verity.Stdlib.Math.MAX_UINT256 < (s.storage 1).val + shares.val := by
     simpa using h_supply_overflow
   simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
-    getStorageAddr, getStorage, getMapping, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+    getStorageAddr, getStorage, getMapping, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
     Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
     h_not_balance_overflow, h_overflow, Verity.pure, Pure.pure]
 
@@ -494,7 +494,7 @@ theorem mint_reverts_when_total_assets_would_overflow
   simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
     getStorageAddr, getStorage, getMapping, setMapping,
     setStorage, safeTransferFrom, Contract.run, ContractResult.snd, Verity.bind,
-    Bind.bind, Verity.require, Verity.Stdlib.Math.requireSomeUint,
+    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
     Verity.Stdlib.Math.safeAdd, h_not_balance_overflow, h_not_supply_overflow,
     h_overflow, Verity.pure, Pure.pure]
 
@@ -536,7 +536,7 @@ theorem mint_succeeds_when_accounting_does_not_overflow
   simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
     getStorageAddr, getStorage, getMapping, setMapping,
     setStorage, safeTransferFrom, mstore, rawLog, emitEvent,
-    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
     Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
     h_not_balance_overflow, h_not_supply_overflow, h_not_assets_overflow,
     Verity.pure, Pure.pure]
@@ -577,7 +577,7 @@ theorem mint_credits_receiver (shares : Uint256) (receiver : Address) (s : Contr
   simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
     getStorageAddr, getStorage, getMapping, setMapping,
     setStorage, safeTransferFrom, mstore, rawLog, emitEvent,
-    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
     Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
     h_not_balance_overflow, h_not_supply_overflow, h_not_assets_overflow,
     Verity.pure, Pure.pure]
@@ -618,7 +618,7 @@ theorem mint_increases_total_supply (shares : Uint256) (receiver : Address) (s :
   simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
     getStorageAddr, getStorage, getMapping, setMapping,
     setStorage, safeTransferFrom, mstore, rawLog, emitEvent,
-    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
     Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
     h_not_balance_overflow, h_not_supply_overflow, h_not_assets_overflow,
     Verity.pure, Pure.pure]
@@ -659,7 +659,7 @@ theorem mint_increases_total_assets (shares : Uint256) (receiver : Address) (s :
   simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
     getStorageAddr, getStorage, getMapping, setMapping,
     setStorage, safeTransferFrom, mstore, rawLog, emitEvent,
-    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
     Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
     h_not_balance_overflow, h_not_supply_overflow, h_not_assets_overflow,
     Verity.pure, Pure.pure]
@@ -700,7 +700,7 @@ theorem mint_keeps_asset (shares : Uint256) (receiver : Address) (s : ContractSt
   simp [mint, assetToken, balances, tokenSupply, managedAssets, msgSender,
     getStorageAddr, getStorage, getMapping, setMapping,
     setStorage, safeTransferFrom, mstore, rawLog, emitEvent,
-    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
     Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
     h_not_balance_overflow, h_not_supply_overflow, h_not_assets_overflow,
     Verity.pure, Pure.pure]
@@ -720,21 +720,21 @@ private theorem withdraw_properties_after_run
         (Verity.EVM.Uint256.add (s.storage managedAssets.slot) 1))
       (Verity.EVM.Uint256.add (s.storage tokenSupply.slot) 1)
   (assets.val > maxAssets.val →
-    (withdraw assets receiver ownerAddr).run s = ContractResult.revert "Withdraw more than max" s) ∧
+    (withdraw assets receiver ownerAddr).run s = ContractResult.revert "WithdrawMoreThanMax()" s) ∧
   (assets.val ≤ maxAssets.val →
     (s.sender ≠ ownerAddr →
       shares.val > (s.storageMap2 allowances.slot ownerAddr s.sender).val →
-        (withdraw assets receiver ownerAddr).run s = ContractResult.revert "Insufficient allowance" s) ∧
+        (withdraw assets receiver ownerAddr).run s = ContractResult.revert "InsufficientAllowance()" s) ∧
     ((s.sender = ownerAddr ∨
         shares.val ≤ (s.storageMap2 allowances.slot ownerAddr s.sender).val) →
       (shares.val > (s.storageMap balances.slot ownerAddr).val →
-        (withdraw assets receiver ownerAddr).run s = ContractResult.revert "Insufficient balance" s) ∧
+        (withdraw assets receiver ownerAddr).run s = ContractResult.revert "InsufficientBalance()" s) ∧
       (shares.val ≤ (s.storageMap balances.slot ownerAddr).val →
         (shares.val > (s.storage tokenSupply.slot).val →
-          (withdraw assets receiver ownerAddr).run s = ContractResult.revert "Insufficient supply" s) ∧
+          (withdraw assets receiver ownerAddr).run s = ContractResult.revert "InsufficientSupply()" s) ∧
         (shares.val ≤ (s.storage tokenSupply.slot).val →
           (assets.val > (s.storage managedAssets.slot).val →
-            (withdraw assets receiver ownerAddr).run s = ContractResult.revert "Insufficient assets" s) ∧
+            (withdraw assets receiver ownerAddr).run s = ContractResult.revert "InsufficientAssets()" s) ∧
           (assets.val ≤ (s.storage managedAssets.slot).val →
             (withdraw assets receiver ownerAddr).run s =
               ContractResult.success shares ((withdraw assets receiver ownerAddr).run s).snd ∧
@@ -766,7 +766,7 @@ private theorem withdraw_properties_after_run
       omega
     simp [withdraw, assetToken, balances, tokenSupply, managedAssets, msgSender,
       getStorageAddr, getStorage, getMapping, Contract.run, Verity.bind, Bind.bind,
-      Verity.require, h_not_max]
+      Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_not_max]
   · intro h_max
     have h_max_raw :
         assets.val ≤
@@ -788,7 +788,7 @@ private theorem withdraw_properties_after_run
         omega
       simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
         msgSender, getStorageAddr, getStorage, getMapping, getMapping2, Contract.run,
-        Verity.bind, Bind.bind, Verity.require, h_max_raw, h_not_owner_raw,
+        Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_not_owner_raw,
         h_not_allowance, Verity.pure, Pure.pure]
     · intro h_auth
       let shares :=
@@ -810,12 +810,12 @@ private theorem withdraw_properties_after_run
         by_cases h_owner : s.sender = ownerAddr
         · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
             maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-            setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+            setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
             h_max_raw, h_owner, h_not_balance, shares, Verity.pure, Pure.pure]
         · have h_allowance := h_auth_allowance h_owner
           simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
             maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-            setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+            setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
             h_max_raw, h_owner, h_allowance, h_not_balance, shares, Verity.pure, Pure.pure]
       · intro h_balance
         have h_balance_raw : shares.val ≤ (s.storageMap 2 ownerAddr).val := by
@@ -828,13 +828,13 @@ private theorem withdraw_properties_after_run
           by_cases h_owner : s.sender = ownerAddr
           · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
               maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-              setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+              setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
               h_max_raw, h_owner, h_balance_raw, h_not_supply, shares, Verity.pure,
               Pure.pure]
           · have h_allowance := h_auth_allowance h_owner
             simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
               maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-              setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+              setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
               h_max_raw, h_owner, h_allowance, h_balance_raw, h_not_supply, shares,
               Verity.pure, Pure.pure]
         · intro h_supply
@@ -848,13 +848,13 @@ private theorem withdraw_properties_after_run
             by_cases h_owner : s.sender = ownerAddr
             · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                 maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-                setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+                setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                 h_max_raw, h_owner, h_balance_raw, h_supply_raw, h_not_assets, shares,
                 Verity.pure, Pure.pure]
             · have h_allowance := h_auth_allowance h_owner
               simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                 maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-                setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+                setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                 h_max_raw, h_owner, h_allowance, h_balance_raw, h_supply_raw, h_not_assets,
                 shares, Verity.pure, Pure.pure]
           · intro h_assets
@@ -865,25 +865,25 @@ private theorem withdraw_properties_after_run
               · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                   h_max_raw, h_owner, h_balance_raw, h_supply_raw, h_assets_raw, shares,
                   Verity.pure, Pure.pure]
               · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                   h_max_raw, h_owner, h_balance_raw, h_supply_raw, h_assets_raw, shares,
                   Verity.pure, Pure.pure, HSub.hSub]
               · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                   h_max_raw, h_owner, h_balance_raw, h_supply_raw, h_assets_raw, shares,
                   Verity.pure, Pure.pure, HSub.hSub]
               · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                   h_max_raw, h_owner, h_balance_raw, h_supply_raw, h_assets_raw, shares,
                   Verity.pure, Pure.pure, HSub.hSub]
               · refine ⟨?_, ?_⟩
@@ -891,7 +891,7 @@ private theorem withdraw_properties_after_run
                   simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                    Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                     h_max_raw, h_owner, h_balance_raw, h_supply_raw, h_assets_raw, shares,
                     Verity.pure, Pure.pure]
                 · intro h_not_owner _h_not_max
@@ -910,28 +910,28 @@ private theorem withdraw_properties_after_run
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_max_raw, h_allowance_max_bound, h_balance_raw,
                     h_supply_raw, h_assets_raw, shares, Verity.pure, Pure.pure]
                 · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_max_raw, h_allowance_max_bound, h_balance_raw,
                     h_supply_raw, h_assets_raw, shares, Verity.pure, Pure.pure, HSub.hSub]
                 · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_max_raw, h_allowance_max_bound, h_balance_raw,
                     h_supply_raw, h_assets_raw, shares, Verity.pure, Pure.pure, HSub.hSub]
                 · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_max_raw, h_allowance_max_bound, h_balance_raw,
                     h_supply_raw, h_assets_raw, shares, Verity.pure, Pure.pure, HSub.hSub]
                 · refine ⟨?_, ?_⟩
@@ -940,7 +940,7 @@ private theorem withdraw_properties_after_run
                       maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                       setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                       emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                      Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                      Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                       h_allowance_max, h_allowance_max_raw, h_allowance_max_bound, h_balance_raw,
                       h_supply_raw, h_assets_raw, shares, Verity.pure, Pure.pure]
                   · intro _h_not_owner h_not_max
@@ -956,28 +956,28 @@ private theorem withdraw_properties_after_run
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_not_max_raw, h_balance_raw, h_supply_raw,
                     h_assets_raw, shares, Verity.pure, Pure.pure]
                 · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_not_max_raw, h_balance_raw, h_supply_raw,
                     h_assets_raw, shares, Verity.pure, Pure.pure, HSub.hSub]
                 · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_not_max_raw, h_balance_raw, h_supply_raw,
                     h_assets_raw, shares, Verity.pure, Pure.pure, HSub.hSub]
                 · simp [withdraw, assetToken, balances, tokenSupply, managedAssets, allowances,
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_not_max_raw, h_balance_raw, h_supply_raw,
                     h_assets_raw, shares, Verity.pure, Pure.pure, HSub.hSub]
                 · refine ⟨?_, ?_⟩
@@ -990,7 +990,7 @@ private theorem withdraw_properties_after_run
                       maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                       setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                       emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                      Bind.bind, Verity.require, h_max_raw, h_owner, h_allowance,
+                      Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_max_raw, h_owner, h_allowance,
                       h_allowance_max, h_allowance_not_max_raw, h_balance_raw, h_supply_raw,
       h_assets_raw, shares, Verity.pure, Pure.pure, HSub.hSub]
 
@@ -1086,18 +1086,18 @@ private theorem redeem_properties_after_run
       (Verity.EVM.Uint256.mul shares (Verity.EVM.Uint256.add (s.storage managedAssets.slot) 1))
       (Verity.EVM.Uint256.add (s.storage tokenSupply.slot) 1)
   (shares.val > (s.storageMap balances.slot ownerAddr).val →
-    (redeem shares receiver ownerAddr).run s = ContractResult.revert "Redeem more than max" s) ∧
+    (redeem shares receiver ownerAddr).run s = ContractResult.revert "RedeemMoreThanMax()" s) ∧
   (shares.val ≤ (s.storageMap balances.slot ownerAddr).val →
     (s.sender ≠ ownerAddr →
       shares.val > (s.storageMap2 allowances.slot ownerAddr s.sender).val →
-        (redeem shares receiver ownerAddr).run s = ContractResult.revert "Insufficient allowance" s) ∧
+        (redeem shares receiver ownerAddr).run s = ContractResult.revert "InsufficientAllowance()" s) ∧
     ((s.sender = ownerAddr ∨
         shares.val ≤ (s.storageMap2 allowances.slot ownerAddr s.sender).val) →
       (shares.val > (s.storage tokenSupply.slot).val →
-        (redeem shares receiver ownerAddr).run s = ContractResult.revert "Insufficient supply" s) ∧
+        (redeem shares receiver ownerAddr).run s = ContractResult.revert "InsufficientSupply()" s) ∧
       (shares.val ≤ (s.storage tokenSupply.slot).val →
         (assets.val > (s.storage managedAssets.slot).val →
-          (redeem shares receiver ownerAddr).run s = ContractResult.revert "Insufficient assets" s) ∧
+          (redeem shares receiver ownerAddr).run s = ContractResult.revert "InsufficientAssets()" s) ∧
         (assets.val ≤ (s.storage managedAssets.slot).val →
           (redeem shares receiver ownerAddr).run s =
             ContractResult.success assets ((redeem shares receiver ownerAddr).run s).snd ∧
@@ -1124,7 +1124,7 @@ private theorem redeem_properties_after_run
     have h_not_balance : ¬ shares.val ≤ (s.storageMap 2 ownerAddr).val := by omega
     simp [redeem, assetToken, balances, tokenSupply, managedAssets, msgSender,
       getStorageAddr, getStorage, getMapping, Contract.run, Verity.bind, Bind.bind,
-      Verity.require, h_not_balance]
+      Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_not_balance]
   · intro h_balance
     have h_balance_raw : shares.val ≤ (s.storageMap 2 ownerAddr).val := by
       simpa using h_balance
@@ -1141,7 +1141,7 @@ private theorem redeem_properties_after_run
         omega
       simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
         msgSender, getStorageAddr, getStorage, getMapping, getMapping2, Contract.run,
-        Verity.bind, Bind.bind, Verity.require, h_balance_raw, h_not_owner_raw,
+        Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_not_owner_raw,
         h_not_allowance, Verity.pure, Pure.pure]
     · intro h_auth
       have h_auth_allowance :
@@ -1159,12 +1159,12 @@ private theorem redeem_properties_after_run
         by_cases h_owner : s.sender = ownerAddr
         · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
             maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-            setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+            setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
             h_balance_raw, h_owner, h_not_supply, assets, Verity.pure, Pure.pure]
         · have h_allowance := h_auth_allowance h_owner
           simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
             maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-            setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+            setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
             h_balance_raw, h_owner, h_allowance, h_not_supply, assets, Verity.pure,
             Pure.pure]
       · intro h_supply
@@ -1178,13 +1178,13 @@ private theorem redeem_properties_after_run
           by_cases h_owner : s.sender = ownerAddr
           · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
               maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-              setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+              setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
               h_balance_raw, h_owner, h_supply_raw, h_not_assets, assets, Verity.pure,
               Pure.pure]
           · have h_allowance := h_auth_allowance h_owner
             simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
               maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
-              setMapping2, Contract.run, Verity.bind, Bind.bind, Verity.require,
+              setMapping2, Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
               h_balance_raw, h_owner, h_allowance, h_supply_raw, h_not_assets, assets,
               Verity.pure, Pure.pure]
         · intro h_assets
@@ -1195,25 +1195,25 @@ private theorem redeem_properties_after_run
             · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                 maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                 setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                 h_balance_raw, h_owner, h_supply_raw, h_assets_raw, assets, Verity.pure,
                 Pure.pure]
             · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                 maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                 setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                 h_balance_raw, h_owner, h_supply_raw, h_assets_raw, assets, Verity.pure,
                 Pure.pure, HSub.hSub]
             · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                 maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                 setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                 h_balance_raw, h_owner, h_supply_raw, h_assets_raw, assets, Verity.pure,
                 Pure.pure, HSub.hSub]
             · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                 maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                 setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                 h_balance_raw, h_owner, h_supply_raw, h_assets_raw, assets, Verity.pure,
                 Pure.pure, HSub.hSub]
             · refine ⟨?_, ?_⟩
@@ -1221,7 +1221,7 @@ private theorem redeem_properties_after_run
                 simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setStorage, safeTransfer, mstore, rawLog, emitEvent,
-                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+                  Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
                   h_balance_raw, h_owner, h_supply_raw, h_assets_raw, assets, Verity.pure,
                   Pure.pure]
               · intro h_not_owner _h_not_max
@@ -1240,28 +1240,28 @@ private theorem redeem_properties_after_run
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                   emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                  Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                  Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                   h_allowance_max, h_allowance_max_raw, h_allowance_max_bound,
                   h_supply_raw, h_assets_raw, assets, Verity.pure, Pure.pure]
               · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                   emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                  Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                  Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                   h_allowance_max, h_allowance_max_raw, h_allowance_max_bound,
                   h_supply_raw, h_assets_raw, assets, Verity.pure, Pure.pure, HSub.hSub]
               · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                   emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                  Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                  Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                   h_allowance_max, h_allowance_max_raw, h_allowance_max_bound,
                   h_supply_raw, h_assets_raw, assets, Verity.pure, Pure.pure, HSub.hSub]
               · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                   emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                  Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                  Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                   h_allowance_max, h_allowance_max_raw, h_allowance_max_bound,
                   h_supply_raw, h_assets_raw, assets, Verity.pure, Pure.pure, HSub.hSub]
               · refine ⟨?_, ?_⟩
@@ -1270,7 +1270,7 @@ private theorem redeem_properties_after_run
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_max_raw, h_allowance_max_bound,
                     h_supply_raw, h_assets_raw, assets, Verity.pure, Pure.pure]
                 · intro _h_not_owner h_not_max
@@ -1286,28 +1286,28 @@ private theorem redeem_properties_after_run
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                   emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                  Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                  Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                   h_allowance_max, h_allowance_not_max_raw, h_supply_raw, h_assets_raw,
                   assets, Verity.pure, Pure.pure]
               · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                   emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                  Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                  Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                   h_allowance_max, h_allowance_not_max_raw, h_supply_raw, h_assets_raw,
                   assets, Verity.pure, Pure.pure, HSub.hSub]
               · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                   emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                  Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                  Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                   h_allowance_max, h_allowance_not_max_raw, h_supply_raw, h_assets_raw,
                   assets, Verity.pure, Pure.pure, HSub.hSub]
               · simp [redeem, assetToken, balances, tokenSupply, managedAssets, allowances,
                   maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                   setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                   emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                  Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                  Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                   h_allowance_max, h_allowance_not_max_raw, h_supply_raw, h_assets_raw,
                   assets, Verity.pure, Pure.pure, HSub.hSub]
               · refine ⟨?_, ?_⟩
@@ -1320,7 +1320,7 @@ private theorem redeem_properties_after_run
                     maxUint256, msgSender, getStorageAddr, getStorage, getMapping, getMapping2,
                     setMapping, setMapping2, setStorage, safeTransfer, mstore, rawLog,
                     emitEvent, Contract.run, ContractResult.snd, Verity.bind,
-                    Bind.bind, Verity.require, h_balance_raw, h_owner, h_allowance,
+                    Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_owner, h_allowance,
                     h_allowance_max, h_allowance_not_max_raw, h_supply_raw, h_assets_raw,
                     assets, Verity.pure, Pure.pure, HSub.hSub]
 
@@ -1482,7 +1482,7 @@ theorem deposit_pulls_assets_from_sender
   · simp [hasSafeTransferFromTrace, assetTraceContains, deposit, depositShares,
       getStorageAddr, getStorage, getMapping, setMapping, setStorage, msgSender,
       Verity.contractAddress, safeTransferFrom, mstore, rawLog, emitEvent,
-      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
       h_not_balance_raw, h_not_supply_raw, h_not_assets_raw, Verity.pure, Pure.pure]
   · by_cases h_same : s.sender = s.thisAddress
@@ -1527,7 +1527,7 @@ theorem deposit_increases_vault_asset_balance
   · simp [hasSafeTransferFromTrace, assetTraceContains, deposit, depositShares,
       getStorageAddr, getStorage, getMapping, setMapping, setStorage, msgSender,
       Verity.contractAddress, safeTransferFrom, mstore, rawLog, emitEvent,
-      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
       h_not_balance_raw, h_not_supply_raw, h_not_assets_raw, Verity.pure, Pure.pure]
   · by_cases h_same : s.sender = s.thisAddress
@@ -1573,7 +1573,7 @@ theorem mint_pulls_required_assets_from_sender
   · simp [hasSafeTransferFromTrace, assetTraceContains, mint, mintAssets,
       getStorageAddr, getStorage, getMapping, setMapping, setStorage, msgSender,
       Verity.contractAddress, safeTransferFrom, mstore, rawLog, emitEvent,
-      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
       h_not_balance_raw, h_not_supply_raw, h_not_assets_raw, Verity.pure, Pure.pure]
   · by_cases h_same : s.sender = s.thisAddress
@@ -1619,7 +1619,7 @@ theorem mint_increases_vault_asset_balance
   · simp [hasSafeTransferFromTrace, assetTraceContains, mint, mintAssets,
       getStorageAddr, getStorage, getMapping, setMapping, setStorage, msgSender,
       Verity.contractAddress, safeTransferFrom, mstore, rawLog, emitEvent,
-      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
       h_not_balance_raw, h_not_supply_raw, h_not_assets_raw, Verity.pure, Pure.pure]
   · by_cases h_same : s.sender = s.thisAddress
@@ -1656,7 +1656,7 @@ theorem withdraw_sends_assets_to_receiver
     · simp [hasSafeTransferTrace, assetTraceContains, withdraw, withdrawShares,
         getStorageAddr, getStorage, getMapping, getMapping2, setMapping, setMapping2,
         setStorage, msgSender, safeTransfer, mstore, rawLog, emitEvent,
-        Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+        Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
         h_max_raw, h_owner, h_balance_raw, h_supply_raw, h_assets_raw,
         Verity.pure, Pure.pure]
     · have h_allowance : (withdrawShares assets s).val ≤
@@ -1677,7 +1677,7 @@ theorem withdraw_sends_assets_to_receiver
         simp [hasSafeTransferTrace, assetTraceContains, withdraw, withdrawShares,
           getStorageAddr, getStorage, getMapping, getMapping2, setMapping, setMapping2,
           setStorage, msgSender, safeTransfer, mstore, rawLog, emitEvent,
-          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
           h_max_raw, h_owner, h_allowance_raw, h_allowance_max_raw,
           h_allowance_max_bound, h_balance_raw, h_supply_raw, h_assets_raw,
           Verity.pure, Pure.pure]
@@ -1687,7 +1687,7 @@ theorem withdraw_sends_assets_to_receiver
         simp [hasSafeTransferTrace, assetTraceContains, withdraw, withdrawShares,
           getStorageAddr, getStorage, getMapping, getMapping2, setMapping, setMapping2,
           setStorage, msgSender, safeTransfer, mstore, rawLog, emitEvent,
-          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
           h_max_raw, h_owner, h_allowance_raw, h_allowance_not_max_raw, h_balance_raw,
           h_supply_raw, h_assets_raw, Verity.pure, Pure.pure]
   · by_cases h_same : receiver = s.thisAddress
@@ -1734,7 +1734,7 @@ theorem redeem_sends_redeemed_assets_to_receiver
     · simp [hasSafeTransferTrace, assetTraceContains, redeem, redeemAssets,
         getStorageAddr, getStorage, getMapping, getMapping2, setMapping, setMapping2,
         setStorage, msgSender, safeTransfer, mstore, rawLog, emitEvent,
-        Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+        Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
         h_balance_raw, h_owner, h_supply_raw, h_assets_raw, Verity.pure, Pure.pure]
     · have h_allowance : shares.val ≤
           (s.storageMap2 allowances.slot ownerAddr s.sender).val := by
@@ -1750,7 +1750,7 @@ theorem redeem_sends_redeemed_assets_to_receiver
         simp [hasSafeTransferTrace, assetTraceContains, redeem, redeemAssets,
           getStorageAddr, getStorage, getMapping, getMapping2, setMapping, setMapping2,
           setStorage, msgSender, safeTransfer, mstore, rawLog, emitEvent,
-          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
           h_balance_raw, h_owner, h_allowance_raw, h_allowance_max_raw,
           h_allowance_max_bound, h_supply_raw, h_assets_raw, Verity.pure, Pure.pure]
       · have h_allowance_not_max_raw :
@@ -1759,7 +1759,7 @@ theorem redeem_sends_redeemed_assets_to_receiver
         simp [hasSafeTransferTrace, assetTraceContains, redeem, redeemAssets,
           getStorageAddr, getStorage, getMapping, getMapping2, setMapping, setMapping2,
           setStorage, msgSender, safeTransfer, mstore, rawLog, emitEvent,
-          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+          Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
           h_balance_raw, h_owner, h_allowance_raw, h_allowance_not_max_raw, h_supply_raw, h_assets_raw,
           Verity.pure, Pure.pure]
   · by_cases h_same : receiver = s.thisAddress
@@ -1927,20 +1927,20 @@ private theorem transfer_keeps_managed_assets_storage
     · subst h_same
       simp [transfer, balances, managedAssets, msgSender, getMapping, Contract.run,
         ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
-        Verity.require, h_balance]
+        Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance]
     · by_cases h_overflow :
         Verity.Stdlib.Math.MAX_UINT256 <
           (s.storageMap 2 toAddr).val + amount.val
       · simp [transfer, balances, managedAssets, msgSender, getMapping, setMapping,
           Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
+          Pure.pure, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_balance, h_same, h_overflow]
       · simp [transfer, balances, managedAssets, msgSender, getMapping, setMapping,
           Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure,
-          Pure.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
+          Pure.pure, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_balance, h_same, h_overflow]
   · simp [transfer, balances, managedAssets, msgSender, getMapping, Contract.run,
-      ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.require, h_balance]
+      ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance]
 
 private theorem transfer_keeps_token_supply_storage
     (toAddr : Address) (amount : Uint256) (s : ContractState) :
@@ -1967,17 +1967,17 @@ private theorem transferFrom_keeps_managed_assets_storage
           simp [transferFrom, allowances, balances, managedAssets, maxUint256,
             msgSender, getMapping2, getMapping, setMapping2, Contract.run,
             ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
-            Verity.require, h_allowance, h_allowance_max, h_balance, h_max]
+            Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_allowance, h_allowance_max, h_balance, h_max]
         · simp [transferFrom, allowances, balances, managedAssets, maxUint256,
             msgSender, getMapping2, getMapping, setMapping2, Contract.run,
             ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
-            Verity.require, h_allowance, h_balance, h_max]
+            Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_allowance, h_balance, h_max]
       · by_cases h_overflow :
           Verity.Stdlib.Math.MAX_UINT256 <
             (s.storageMap 2 toAddr).val + amount.val
         · simp [transferFrom, allowances, balances, managedAssets, msgSender,
             getMapping2, getMapping, setMapping, Contract.run, ContractResult.snd,
-            getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require,
+            getStorageAddr, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
             Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
             h_allowance, h_balance, h_same, h_overflow]
         · by_cases h_max :
@@ -1987,20 +1987,20 @@ private theorem transferFrom_keeps_managed_assets_storage
             simp [transferFrom, allowances, balances, managedAssets, maxUint256,
               msgSender, getMapping2, getMapping, setMapping, setMapping2,
               Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind,
-              Verity.pure, Pure.pure, Verity.require,
+              Verity.pure, Pure.pure, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
               Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
               h_allowance, h_allowance_max, h_balance, h_same, h_overflow, h_max]
           · simp [transferFrom, allowances, balances, managedAssets, maxUint256,
               msgSender, getMapping2, getMapping, setMapping, setMapping2,
               Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind,
-              Verity.pure, Pure.pure, Verity.require,
+              Verity.pure, Pure.pure, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
               Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
               h_allowance, h_balance, h_same, h_overflow, h_max]
     · simp [transferFrom, allowances, balances, managedAssets, msgSender, getMapping2,
         getMapping, Contract.run, ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind,
-        Verity.require, h_allowance, h_balance]
+        Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_allowance, h_balance]
   · simp [transferFrom, allowances, managedAssets, msgSender, getMapping2, Contract.run,
-      ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Verity.require, h_allowance]
+      ContractResult.snd, getStorageAddr, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_allowance]
 
 private theorem transferFrom_keeps_token_supply_storage
     (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState) :

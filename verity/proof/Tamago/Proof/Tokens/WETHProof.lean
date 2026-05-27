@@ -91,7 +91,7 @@ private theorem deposit_properties_after_run (s : ContractState) :
         Verity.Stdlib.Math.MAX_UINT256 < (s.storageMap 2 s.sender).val + s.msgValue.val := by
       simpa using h_balance_overflow
     simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
-      getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+      getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_overflow]
   · intro h_balance_no_overflow h_supply_overflow
     have h_balance_no_overflow_raw :
@@ -104,55 +104,55 @@ private theorem deposit_properties_after_run (s : ContractState) :
         Verity.Stdlib.Math.MAX_UINT256 < (s.storage 1).val + s.msgValue.val := by
       simpa using h_supply_overflow
     simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
-      getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+      getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
       h_not_balance_overflow, h_overflow, Verity.pure, Pure.pure]
   · by_cases h_balance_overflow :
         Verity.Stdlib.Math.MAX_UINT256 < (s.storageMap 2 s.sender).val + s.msgValue.val
     · simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
-        getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+        getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
         Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_balance_overflow]
     · by_cases h_supply_overflow :
           Verity.Stdlib.Math.MAX_UINT256 < (s.storage 1).val + s.msgValue.val
       · simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
-          getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+          getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
           Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
           h_balance_overflow, h_supply_overflow, Verity.pure, Pure.pure]
       · simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
           getStorage, setMapping, setStorage, Contract.run, ContractResult.snd,
-          Verity.bind, Bind.bind, Verity.require, Verity.Stdlib.Math.requireSomeUint,
+          Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_balance_overflow, h_supply_overflow,
           Verity.pure, Pure.pure]
   · by_cases h_balance_overflow :
         Verity.Stdlib.Math.MAX_UINT256 < (s.storageMap 2 s.sender).val + s.msgValue.val
     · simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
-        getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+        getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
         Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_balance_overflow]
     · by_cases h_supply_overflow :
           Verity.Stdlib.Math.MAX_UINT256 < (s.storage 1).val + s.msgValue.val
       · simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
-          getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+          getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
           Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
           h_balance_overflow, h_supply_overflow, Verity.pure, Pure.pure]
       · simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
           getStorage, setMapping, setStorage, Contract.run, ContractResult.snd,
-          Verity.bind, Bind.bind, Verity.require, Verity.Stdlib.Math.requireSomeUint,
+          Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_balance_overflow, h_supply_overflow,
           Verity.pure, Pure.pure]
   · by_cases h_balance_overflow :
         Verity.Stdlib.Math.MAX_UINT256 < (s.storageMap 2 s.sender).val + s.msgValue.val
     · simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
-        getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+        getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
         Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_balance_overflow]
     · by_cases h_supply_overflow :
           Verity.Stdlib.Math.MAX_UINT256 < (s.storage 1).val + s.msgValue.val
       · simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
-          getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+          getStorage, Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
           Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
           h_balance_overflow, h_supply_overflow, Verity.pure, Pure.pure]
       · simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
           getStorage, setMapping, setStorage, Contract.run, ContractResult.snd,
-          Verity.bind, Bind.bind, Verity.require, Verity.Stdlib.Math.requireSomeUint,
+          Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_balance_overflow, h_supply_overflow,
           Verity.pure, Pure.pure]
   · intro h_balance_no_overflow h_supply_no_overflow h_backing
@@ -181,7 +181,7 @@ private theorem deposit_properties_after_run (s : ContractState) :
       simpa [Verity.Core.Uint256.add_comm] using h_supply_add
     simp [Tamago.Tokens.WETH.deposit, balances, tokenSupply, msgSender, msgValue, getMapping,
       getStorage, setMapping, setStorage, Contract.run, ContractResult.snd,
-      Verity.bind, Bind.bind, Verity.require, Verity.Stdlib.Math.requireSomeUint,
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
       Verity.Stdlib.Math.safeAdd, h_not_balance_overflow, h_not_supply_overflow,
       h_supply_add, h_supply_add_rev, Verity.pure, Pure.pure]
     exact h_backing
@@ -351,7 +351,7 @@ private theorem withdraw_properties_after_run (amount : Uint256) (s : ContractSt
       simpa using h_insufficient_balance
     have h_not_balance : ¬ amount.val ≤ (s.storageMap 2 s.sender).val := by omega
     simp [Tamago.Tokens.WETH.withdraw, balances, tokenSupply, msgSender, getMapping, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_not_balance]
+      ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_not_balance]
   · intro h_balance h_insufficient_supply
     have h_balance_raw : amount.val ≤ (s.storageMap 2 s.sender).val := by
       simpa using h_balance
@@ -359,7 +359,7 @@ private theorem withdraw_properties_after_run (amount : Uint256) (s : ContractSt
       simpa using h_insufficient_supply
     have h_not_supply : ¬ amount.val ≤ (s.storage 1).val := by omega
     simp [Tamago.Tokens.WETH.withdraw, balances, tokenSupply, msgSender, getMapping, getStorage,
-      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+      Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
       h_balance_raw, h_not_supply]
   · intro h_balance h_supply h_insufficient_eth
     have h_balance_raw : amount.val ≤ (s.storageMap 2 s.sender).val := by
@@ -371,7 +371,7 @@ private theorem withdraw_properties_after_run (amount : Uint256) (s : ContractSt
     have h_not_eth : ¬ amount.val ≤ s.selfBalance.val := by omega
     simp [Tamago.Tokens.WETH.withdraw, balances, tokenSupply, msgSender, selfBalance,
       getMapping, getStorage, Contract.run, ContractResult.snd, Verity.bind,
-      Bind.bind, Verity.require, h_balance_raw, h_supply_raw, h_not_eth]
+      Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw, h_supply_raw, h_not_eth]
   · intro h_balance h_supply h_eth h_transfer
     have h_balance_raw : amount.val ≤ (s.storageMap 2 s.sender).val := by
       simpa using h_balance
@@ -384,7 +384,7 @@ private theorem withdraw_properties_after_run (amount : Uint256) (s : ContractSt
       simpa [addressToWord] using h_transfer
     simp [Tamago.Tokens.WETH.withdraw, balances, tokenSupply, msgSender, selfBalance,
       getMapping, getStorage, setMapping, setStorage, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_balance_raw,
+      ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw,
       h_supply_raw, h_eth_raw, h_transfer_raw, Verity.pure, Pure.pure]
   · intro h_balance h_supply h_eth h_transfer
     have h_balance_raw : amount.val ≤ (s.storageMap 2 s.sender).val := by
@@ -398,7 +398,7 @@ private theorem withdraw_properties_after_run (amount : Uint256) (s : ContractSt
       simpa [addressToWord] using h_transfer
     simp [Tamago.Tokens.WETH.withdraw, balances, tokenSupply, msgSender, selfBalance,
       getMapping, getStorage, setMapping, setStorage, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_balance_raw,
+      ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw,
       h_supply_raw, h_eth_raw, h_transfer_raw, Verity.pure, Pure.pure]
   · intro h_balance h_supply h_eth h_transfer
     have h_balance_raw : amount.val ≤ (s.storageMap 2 s.sender).val := by
@@ -412,7 +412,7 @@ private theorem withdraw_properties_after_run (amount : Uint256) (s : ContractSt
       simpa [addressToWord] using h_transfer
     simp [Tamago.Tokens.WETH.withdraw, balances, tokenSupply, msgSender, selfBalance,
       getMapping, getStorage, setMapping, setStorage, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_balance_raw,
+      ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw,
       h_supply_raw, h_eth_raw, h_transfer_raw, Verity.pure, Pure.pure]
   · intro h_balance h_supply h_eth h_transfer
     have h_balance_raw : amount.val ≤ (s.storageMap 2 s.sender).val := by
@@ -426,7 +426,7 @@ private theorem withdraw_properties_after_run (amount : Uint256) (s : ContractSt
       simpa [addressToWord] using h_transfer
     simp [Tamago.Tokens.WETH.withdraw, balances, tokenSupply, msgSender, selfBalance,
       getMapping, getStorage, setMapping, setStorage, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_balance_raw,
+      ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw,
       h_supply_raw, h_eth_raw, h_transfer_raw, Verity.pure, Pure.pure]
   · intro h_balance h_supply h_eth h_transfer
     have h_balance_raw : amount.val ≤ (s.storageMap 2 s.sender).val := by
@@ -444,7 +444,7 @@ private theorem withdraw_properties_after_run (amount : Uint256) (s : ContractSt
       Verity.EVM.Uint256.sub_eq_of_le h_eth_raw
     simp [Tamago.Tokens.WETH.withdraw, balances, tokenSupply, msgSender, selfBalance,
       getMapping, getStorage, setMapping, setStorage, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_balance_raw,
+      ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw,
       h_supply_raw, h_eth_raw, h_transfer_raw, h_self_sub, Verity.pure, Pure.pure]
   · intro h_backing h_balance h_supply h_eth h_transfer
     have h_backing_raw : s.selfBalance.val ≥ (s.storage 1).val := by
@@ -468,7 +468,7 @@ private theorem withdraw_properties_after_run (amount : Uint256) (s : ContractSt
       Verity.EVM.Uint256.sub_eq_of_le h_eth_raw
     simp [Tamago.Tokens.WETH.withdraw, balances, tokenSupply, msgSender, selfBalance,
       getMapping, getStorage, setMapping, setStorage, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_balance_raw,
+      ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_balance_raw,
       h_supply_raw, h_eth_raw, h_transfer_raw, h_supply_sub, h_self_sub,
       Verity.pure, Pure.pure]
     omega

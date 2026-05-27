@@ -60,14 +60,14 @@ contract ERC721Test is Test {
         address newOwner = nonzero(rawNewOwner);
         ERC721Iface token = deployToken();
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("Unauthorized()"))));
         token.transferOwnership(newOwner);
     }
 
     // tama: mirrors=erc721_transferOwnership_reverts_for_zero_owner
     function testFuzzTransferOwnershipRevertsForZeroOwner() public {
         ERC721Iface token = deployToken();
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("NewOwnerIsZeroAddress()"))));
         token.transferOwnership(address(0));
     }
 
@@ -142,7 +142,7 @@ contract ERC721Test is Test {
         address attacker = distinctNonzero(rawAttacker, address(this));
         ERC721Iface token = deployToken();
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("Unauthorized()"))));
         token.renounceOwnership();
     }
 
@@ -279,7 +279,7 @@ contract ERC721Test is Test {
     // tama: mirrors=erc721_approve_reverts_when_token_is_missing
     function testFuzzApproveRevertsWhenTokenIsMissing(uint256 tokenId, address approved) public {
         ERC721Iface token = deployToken();
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Token does not exist"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TokenDoesNotExist()"))));
         token.approve(approved, tokenId);
     }
 
@@ -290,7 +290,7 @@ contract ERC721Test is Test {
         ERC721Iface token = deployToken();
         uint256 tokenId = token.mint(holder);
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Not authorized"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("NotOwnerNorApproved()"))));
         token.approve(approved, tokenId);
     }
 
@@ -329,14 +329,14 @@ contract ERC721Test is Test {
         address recipient = nonzero(rawRecipient);
         ERC721Iface token = deployToken();
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("Unauthorized()"))));
         token.mint(recipient);
     }
 
     // tama: mirrors=erc721_mint_reverts_for_zero_recipient
     function testFuzzMintRevertsForZeroRecipient() public {
         ERC721Iface token = deployToken();
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid recipient"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TransferToZeroAddress()"))));
         token.mint(address(0));
     }
 
@@ -345,7 +345,7 @@ contract ERC721Test is Test {
         ERC721Iface token = deployToken();
         token.mint(address(this));
         vm.store(address(token), slot(2), bytes32(uint256(0)));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Token already minted"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TokenAlreadyExists()"))));
         token.mint(address(this));
     }
 
@@ -353,7 +353,7 @@ contract ERC721Test is Test {
     function testFuzzMintRevertsWhenRecipientBalanceWouldOverflow() public {
         ERC721Iface token = deployToken();
         vm.store(address(token), balanceSlot(address(this)), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("AccountBalanceOverflow()"))));
         token.mint(address(this));
     }
 
@@ -361,7 +361,7 @@ contract ERC721Test is Test {
     function testFuzzMintRevertsWhenTotalSupplyWouldOverflow() public {
         ERC721Iface token = deployToken();
         vm.store(address(token), slot(1), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Supply overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TotalSupplyOverflow()"))));
         token.mint(address(this));
     }
 
@@ -419,7 +419,7 @@ contract ERC721Test is Test {
         ERC721Iface token = deployToken();
         uint256 tokenId = token.mint(holder);
         vm.prank(holder);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid recipient"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TransferToZeroAddress()"))));
         token.transferFrom(holder, address(0), tokenId);
     }
 
@@ -428,7 +428,7 @@ contract ERC721Test is Test {
         address fromAddr = nonzero(rawFrom);
         address toAddr = distinctNonzero(rawRecipient, fromAddr);
         ERC721Iface token = deployToken();
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Token does not exist"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TokenDoesNotExist()"))));
         token.transferFrom(fromAddr, toAddr, tokenId);
     }
 
@@ -439,7 +439,7 @@ contract ERC721Test is Test {
         address toAddr = distinctNonzero(rawRecipient, holder);
         ERC721Iface token = deployToken();
         uint256 tokenId = token.mint(holder);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "From is not owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TransferFromIncorrectOwner()"))));
         token.transferFrom(wrongFrom, toAddr, tokenId);
     }
 
@@ -451,7 +451,7 @@ contract ERC721Test is Test {
         ERC721Iface token = deployToken();
         uint256 tokenId = token.mint(holder);
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Not authorized"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("NotOwnerNorApproved()"))));
         token.transferFrom(holder, toAddr, tokenId);
     }
 
@@ -504,7 +504,7 @@ contract ERC721Test is Test {
         uint256 tokenId = token.mint(holder);
         vm.store(address(token), balanceSlot(holder), bytes32(uint256(0)));
         vm.prank(holder);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientBalance()"))));
         token.transferFrom(holder, toAddr, tokenId);
     }
 
@@ -516,7 +516,7 @@ contract ERC721Test is Test {
         uint256 tokenId = token.mint(holder);
         vm.store(address(token), balanceSlot(toAddr), bytes32(type(uint256).max));
         vm.prank(holder);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("AccountBalanceOverflow()"))));
         token.transferFrom(holder, toAddr, tokenId);
     }
 

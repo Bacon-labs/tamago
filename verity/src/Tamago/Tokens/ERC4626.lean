@@ -102,6 +102,18 @@ verity_contract ERC4626Base where
     allowances : Address → Address → Uint256 := slot 3
     managedAssets : Uint256 := slot 4
 
+  errors
+    error InvalidAsset ()
+    error InsufficientBalance ()
+    error InsufficientAllowance ()
+    error BalanceOverflow ()
+    error TotalSupplyOverflow ()
+    error TotalAssetsOverflow ()
+    error InsufficientSupply ()
+    error InsufficientAssets ()
+    error WithdrawMoreThanMax ()
+    error RedeemMoreThanMax ()
+
   constants
     maxUint256 : Uint256 := (sub 0 1)
 
@@ -113,7 +125,7 @@ verity_contract ERC4626Base where
   @param underlyingAsset ERC20 asset token managed by the vault.
   -/
   constructor (underlyingAsset : Address) := do
-    require (underlyingAsset != zeroAddress) "Invalid asset"
+    requireError (underlyingAsset != zeroAddress) InvalidAsset()
     setStorage tokenSupply 0
     setStorage managedAssets 0
 
@@ -172,12 +184,12 @@ verity_contract ERC4626Base where
   function transfer (toAddr : Address, amount : Uint256) : Bool := do
     let sender ← msgSender
     let senderBalance ← getMapping balances sender
-    require (senderBalance >= amount) "Insufficient balance"
+    requireError (senderBalance >= amount) InsufficientBalance()
     if sender == toAddr then
       pure ()
     else
       let recipientBalance ← getMapping balances toAddr
-      let newRecipientBalance ← requireSomeUint (safeAdd recipientBalance amount) "Recipient balance overflow"
+      let newRecipientBalance ← requireSomeUintError (safeAdd recipientBalance amount) BalanceOverflow()
       setMapping balances sender (sub senderBalance amount)
       setMapping balances toAddr newRecipientBalance
     emit "Transfer" [addressToWord sender, addressToWord toAddr, amount]
@@ -193,15 +205,15 @@ verity_contract ERC4626Base where
   function transferFrom (fromAddr : Address, toAddr : Address, amount : Uint256) : Bool := do
     let spender ← msgSender
     let currentAllowance ← getMapping2 allowances fromAddr spender
-    require (currentAllowance >= amount) "Insufficient allowance"
+    requireError (currentAllowance >= amount) InsufficientAllowance()
     let fromBalance ← getMapping balances fromAddr
-    require (fromBalance >= amount) "Insufficient balance"
+    requireError (fromBalance >= amount) InsufficientBalance()
 
     if fromAddr == toAddr then
       pure ()
     else
       let toBalance ← getMapping balances toAddr
-      let newToBalance ← requireSomeUint (safeAdd toBalance amount) "Recipient balance overflow"
+      let newToBalance ← requireSomeUintError (safeAdd toBalance amount) BalanceOverflow()
       setMapping balances fromAddr (sub fromBalance amount)
       setMapping balances toAddr newToBalance
 
@@ -348,9 +360,9 @@ verity_contract ERC4626Base where
     let currentSupply ← getStorage tokenSupply
     let shares := div (mul assets (add currentSupply 1)) (add currentAssets 1)
     let receiverBalance ← getMapping balances receiver
-    let newReceiverBalance ← requireSomeUint (safeAdd receiverBalance shares) "Balance overflow"
-    let newSupply ← requireSomeUint (safeAdd currentSupply shares) "Supply overflow"
-    let newManagedAssets ← requireSomeUint (safeAdd currentAssets assets) "Total assets overflow"
+    let newReceiverBalance ← requireSomeUintError (safeAdd receiverBalance shares) BalanceOverflow()
+    let newSupply ← requireSomeUintError (safeAdd currentSupply shares) TotalSupplyOverflow()
+    let newManagedAssets ← requireSomeUintError (safeAdd currentAssets assets) TotalAssetsOverflow()
     emit "Transfer" [addressToWord zeroAddress, addressToWord receiver, shares]
     emit "Deposit" [addressToWord sender, addressToWord receiver, assets, shares]
     safeTransferFrom currentAsset sender self assets
@@ -375,9 +387,9 @@ verity_contract ERC4626Base where
     let product := mul shares (add currentAssets 1)
     let assets := div (add product (sub denominator 1)) denominator
     let receiverBalance ← getMapping balances receiver
-    let newReceiverBalance ← requireSomeUint (safeAdd receiverBalance shares) "Balance overflow"
-    let newSupply ← requireSomeUint (safeAdd currentSupply shares) "Supply overflow"
-    let newManagedAssets ← requireSomeUint (safeAdd currentAssets assets) "Total assets overflow"
+    let newReceiverBalance ← requireSomeUintError (safeAdd receiverBalance shares) BalanceOverflow()
+    let newSupply ← requireSomeUintError (safeAdd currentSupply shares) TotalSupplyOverflow()
+    let newManagedAssets ← requireSomeUintError (safeAdd currentAssets assets) TotalAssetsOverflow()
     emit "Transfer" [addressToWord zeroAddress, addressToWord receiver, shares]
     emit "Deposit" [addressToWord sender, addressToWord receiver, assets, shares]
     safeTransferFrom currentAsset sender self assets
@@ -403,17 +415,17 @@ verity_contract ERC4626Base where
     let shares := div (add product (sub denominator 1)) denominator
     let ownerBalance ← getMapping balances ownerAddr
     let maxAssets := div (mul ownerBalance (add currentAssets 1)) (add currentSupply 1)
-    require (assets <= maxAssets) "Withdraw more than max"
+    requireError (assets <= maxAssets) WithdrawMoreThanMax()
     let currentAllowance ← getMapping2 allowances ownerAddr sender
 
     if sender == ownerAddr then
       pure ()
     else
-      require (currentAllowance >= shares) "Insufficient allowance"
+      requireError (currentAllowance >= shares) InsufficientAllowance()
 
-    require (ownerBalance >= shares) "Insufficient balance"
-    require (currentSupply >= shares) "Insufficient supply"
-    require (currentAssets >= assets) "Insufficient assets"
+    requireError (ownerBalance >= shares) InsufficientBalance()
+    requireError (currentSupply >= shares) InsufficientSupply()
+    requireError (currentAssets >= assets) InsufficientAssets()
     if (sender != ownerAddr) && (currentAllowance != maxUint256) then
       setMapping2 allowances ownerAddr sender (sub currentAllowance shares)
     else
@@ -439,17 +451,17 @@ verity_contract ERC4626Base where
     let currentAssets ← getStorage managedAssets
     let currentSupply ← getStorage tokenSupply
     let ownerBalance ← getMapping balances ownerAddr
-    require (shares <= ownerBalance) "Redeem more than max"
+    requireError (shares <= ownerBalance) RedeemMoreThanMax()
     let assets := div (mul shares (add currentAssets 1)) (add currentSupply 1)
     let currentAllowance ← getMapping2 allowances ownerAddr sender
 
     if sender == ownerAddr then
       pure ()
     else
-      require (currentAllowance >= shares) "Insufficient allowance"
+      requireError (currentAllowance >= shares) InsufficientAllowance()
 
-    require (currentSupply >= shares) "Insufficient supply"
-    require (currentAssets >= assets) "Insufficient assets"
+    requireError (currentSupply >= shares) InsufficientSupply()
+    requireError (currentAssets >= assets) InsufficientAssets()
     if (sender != ownerAddr) && (currentAllowance != maxUint256) then
       setMapping2 allowances ownerAddr sender (sub currentAllowance shares)
     else

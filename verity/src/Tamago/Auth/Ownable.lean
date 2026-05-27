@@ -17,6 +17,10 @@ verity_contract OwnableBase where
   storage
     contractOwner : Address := slot 0
 
+  errors
+    error Unauthorized ()
+    error NewOwnerIsZeroAddress ()
+
   /-
   @notice Initializes the contract owner.
   @param initialOwner Address that receives ownership at deployment.
@@ -40,8 +44,8 @@ verity_contract OwnableBase where
   function transferOwnership (newOwner : Address) : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
-    require (sender == currentOwner) "Caller is not the owner"
-    require (newOwner != zeroAddress) "Invalid owner"
+    requireError (sender == currentOwner) Unauthorized()
+    requireError (newOwner != zeroAddress) NewOwnerIsZeroAddress()
     setStorageAddr contractOwner newOwner
     emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord newOwner]
     return true
@@ -53,7 +57,7 @@ verity_contract OwnableBase where
   function renounceOwnership () : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
-    require (sender == currentOwner) "Caller is not the owner"
+    requireError (sender == currentOwner) Unauthorized()
     setStorageAddr contractOwner zeroAddress
     emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord zeroAddress]
     return true

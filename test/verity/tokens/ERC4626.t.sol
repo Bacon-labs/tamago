@@ -183,7 +183,7 @@ contract ERC4626Test is Test {
     function testFuzzTransferRevertsWhenBalanceIsLow(address to, uint256 rawAmount) public {
         (, ERC4626Iface vault) = deployPair();
         uint256 amount = small(rawAmount) + 1;
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientBalance()"))));
         vault.transfer(to, amount);
     }
 
@@ -203,7 +203,7 @@ contract ERC4626Test is Test {
         (ERC20Iface assetToken, ERC4626Iface vault) = deployPair();
         seedDeposit(assetToken, vault, 1, address(this));
         vm.store(address(vault), balanceSlot(to), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Recipient balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         vault.transfer(to, 1);
     }
 
@@ -248,7 +248,7 @@ contract ERC4626Test is Test {
         seedDeposit(assetToken, vault, deposited, address(this));
         uint256 amount = (rawSpend % deposited) + 1;
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient allowance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientAllowance()"))));
         vault.transferFrom(address(this), to, amount);
     }
 
@@ -259,7 +259,7 @@ contract ERC4626Test is Test {
         (, ERC4626Iface vault) = deployPair();
         vault.approve(spender, amount);
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientBalance()"))));
         vault.transferFrom(address(this), to, amount);
     }
 
@@ -272,7 +272,7 @@ contract ERC4626Test is Test {
         vault.approve(spender, 1);
         vm.store(address(vault), balanceSlot(to), bytes32(type(uint256).max));
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Recipient balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         vault.transferFrom(address(this), to, 1);
     }
 
@@ -484,7 +484,7 @@ contract ERC4626Test is Test {
         address owner = nonzeroReceiver(rawReceiver);
         (, ERC4626Iface vault) = deployPair();
         vm.store(address(vault), balanceSlot(owner), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         vault.deposit(1, owner);
     }
 
@@ -493,7 +493,7 @@ contract ERC4626Test is Test {
         address owner = nonzeroReceiver(rawReceiver);
         (, ERC4626Iface vault) = deployPair();
         vm.store(address(vault), storageSlot(1), bytes32(type(uint256).max - 1));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Supply overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TotalSupplyOverflow()"))));
         vault.deposit(2, owner);
     }
 
@@ -502,7 +502,7 @@ contract ERC4626Test is Test {
         address owner = nonzeroReceiver(rawReceiver);
         (, ERC4626Iface vault) = deployPair();
         vm.store(address(vault), storageSlot(4), bytes32(type(uint256).max - 1));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Total assets overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TotalAssetsOverflow()"))));
         vault.deposit(2, owner);
     }
 
@@ -573,7 +573,7 @@ contract ERC4626Test is Test {
     function testFuzzMintRevertsWhenReceiverBalanceWouldOverflow() public {
         (, ERC4626Iface vault) = deployPair();
         vm.store(address(vault), balanceSlot(address(this)), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         vault.mint(1, address(this));
     }
 
@@ -581,7 +581,7 @@ contract ERC4626Test is Test {
     function testFuzzMintRevertsWhenTotalSupplyWouldOverflow() public {
         (, ERC4626Iface vault) = deployPair();
         vm.store(address(vault), storageSlot(1), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Supply overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TotalSupplyOverflow()"))));
         vault.mint(1, address(this));
     }
 
@@ -589,7 +589,7 @@ contract ERC4626Test is Test {
     function testFuzzMintRevertsWhenTotalAssetsWouldOverflow() public {
         (, ERC4626Iface vault) = deployPair();
         vm.store(address(vault), storageSlot(4), bytes32(type(uint256).max - 1));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Total assets overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TotalAssetsOverflow()"))));
         vault.mint(2, address(this));
     }
 
@@ -661,7 +661,7 @@ contract ERC4626Test is Test {
         (ERC20Iface assetToken, ERC4626Iface vault) = deployPair();
         uint256 deposited = small(rawDeposit);
         seedDeposit(assetToken, vault, deposited, address(this));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Withdraw more than max"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("WithdrawMoreThanMax()"))));
         vault.withdraw(deposited + 1, address(this), address(this));
     }
 
@@ -673,7 +673,7 @@ contract ERC4626Test is Test {
         seedDeposit(assetToken, vault, deposited, address(this));
         uint256 assets = (rawWithdraw % deposited) + 1;
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient allowance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientAllowance()"))));
         vault.withdraw(assets, spender, address(this));
     }
 
@@ -683,7 +683,7 @@ contract ERC4626Test is Test {
         vm.store(address(vault), balanceSlot(address(this)), bytes32(uint256(13946)));
         vm.store(address(vault), storageSlot(1), bytes32(uint256(1)));
         vm.store(address(vault), storageSlot(4), bytes32(uint256(19340)));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient supply"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientSupply()"))));
         vault.withdraw(19329, address(this), address(this));
     }
 
@@ -693,7 +693,7 @@ contract ERC4626Test is Test {
         vm.store(address(vault), balanceSlot(address(this)), bytes32(type(uint256).max / 3));
         vm.store(address(vault), storageSlot(1), bytes32(uint256(0)));
         vm.store(address(vault), storageSlot(4), bytes32(uint256(2)));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient assets"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientAssets()"))));
         vault.withdraw(type(uint256).max - 1, address(this), address(this));
     }
 
@@ -782,7 +782,7 @@ contract ERC4626Test is Test {
         (ERC20Iface assetToken, ERC4626Iface vault) = deployPair();
         uint256 deposited = small(rawDeposit);
         seedDeposit(assetToken, vault, deposited, address(this));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Redeem more than max"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("RedeemMoreThanMax()"))));
         vault.redeem(deposited + 1, address(this), address(this));
     }
 
@@ -794,7 +794,7 @@ contract ERC4626Test is Test {
         seedDeposit(assetToken, vault, deposited, address(this));
         uint256 shares = (rawRedeem % deposited) + 1;
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient allowance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientAllowance()"))));
         vault.redeem(shares, spender, address(this));
     }
 
@@ -804,7 +804,7 @@ contract ERC4626Test is Test {
         vm.store(address(vault), balanceSlot(address(this)), bytes32(uint256(1)));
         vm.store(address(vault), storageSlot(1), bytes32(uint256(0)));
         vm.store(address(vault), storageSlot(4), bytes32(uint256(1)));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient supply"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientSupply()"))));
         vault.redeem(1, address(this), address(this));
     }
 
@@ -1063,7 +1063,7 @@ contract ERC4626Test is Test {
         uint256 assets = (rawWithdraw % deposited) + 1;
 
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient allowance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientAllowance()"))));
         vault.withdraw(assets, spender, address(this));
         assertEq(vault.balanceOf(address(this)), deposited);
         assertEq(vault.totalAssets(), deposited);
@@ -1074,7 +1074,7 @@ contract ERC4626Test is Test {
         uint256 deposited = small(rawDeposit);
         seedDeposit(assetToken, vault, deposited, address(this));
 
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Withdraw more than max"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("WithdrawMoreThanMax()"))));
         vault.withdraw(deposited + 1, address(this), address(this));
     }
 
@@ -1086,7 +1086,7 @@ contract ERC4626Test is Test {
         uint256 shares = (rawRedeem % deposited) + 1;
 
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient allowance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientAllowance()"))));
         vault.redeem(shares, spender, address(this));
         assertEq(vault.balanceOf(address(this)), deposited);
         assertEq(vault.totalAssets(), deposited);
@@ -1097,7 +1097,7 @@ contract ERC4626Test is Test {
         uint256 deposited = small(rawDeposit);
         seedDeposit(assetToken, vault, deposited, address(this));
 
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Redeem more than max"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("RedeemMoreThanMax()"))));
         vault.redeem(deposited + 1, address(this), address(this));
     }
 
@@ -1292,7 +1292,7 @@ contract ERC4626Test is Test {
         vm.store(address(vault), balanceSlot(receiver), bytes32(type(uint256).max));
         uint256 senderBefore = assetToken.balanceOf(address(this));
         uint256 vaultBefore = assetToken.balanceOf(address(vault));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         vault.deposit(assets, receiver);
         assertEq(assetToken.balanceOf(address(this)), senderBefore);
         assertEq(assetToken.balanceOf(address(vault)), vaultBefore);
@@ -1309,7 +1309,7 @@ contract ERC4626Test is Test {
         vm.store(address(vault), balanceSlot(receiver), bytes32(type(uint256).max));
         uint256 senderBefore = assetToken.balanceOf(address(this));
         uint256 vaultBefore = assetToken.balanceOf(address(vault));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         vault.mint(shares, receiver);
         assertEq(assetToken.balanceOf(address(this)), senderBefore);
         assertEq(assetToken.balanceOf(address(vault)), vaultBefore);
@@ -1324,7 +1324,7 @@ contract ERC4626Test is Test {
         seedDeposit(assetToken, vault, deposited, address(this));
         uint256 senderBefore = assetToken.balanceOf(address(this));
         uint256 vaultBefore = assetToken.balanceOf(address(vault));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Withdraw more than max"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("WithdrawMoreThanMax()"))));
         vault.withdraw(deposited + extra, receiver, address(this));
         assertEq(assetToken.balanceOf(address(this)), senderBefore);
         assertEq(assetToken.balanceOf(address(vault)), vaultBefore);
@@ -1339,7 +1339,7 @@ contract ERC4626Test is Test {
         seedDeposit(assetToken, vault, deposited, address(this));
         uint256 senderBefore = assetToken.balanceOf(address(this));
         uint256 vaultBefore = assetToken.balanceOf(address(vault));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Redeem more than max"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("RedeemMoreThanMax()"))));
         vault.redeem(deposited + extra, receiver, address(this));
         assertEq(assetToken.balanceOf(address(this)), senderBefore);
         assertEq(assetToken.balanceOf(address(vault)), vaultBefore);

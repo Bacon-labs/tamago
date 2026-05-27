@@ -106,7 +106,7 @@ contract WETHTest is Test {
     function testFuzzTransferRevertsWhenBalanceIsLow(address toAddr, uint96 rawAmount) public {
         WETHIface token = deployToken();
         uint256 amount = positive(rawAmount);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientBalance()"))));
         token.transfer(toAddr, amount);
     }
 
@@ -124,7 +124,7 @@ contract WETHTest is Test {
         address toAddr = address(0xCAFE);
         token.deposit{value: 1}();
         vm.store(address(token), balanceSlot(toAddr), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Recipient balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         token.transfer(toAddr, 1);
     }
 
@@ -157,7 +157,7 @@ contract WETHTest is Test {
         WETHIface token = deployToken();
         token.deposit{value: amount}();
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient allowance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientAllowance()"))));
         token.transferFrom(address(this), toAddr, amount);
     }
 
@@ -168,7 +168,7 @@ contract WETHTest is Test {
         WETHIface token = deployToken();
         token.approve(spender, amount);
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientBalance()"))));
         token.transferFrom(address(this), toAddr, amount);
     }
 
@@ -181,7 +181,7 @@ contract WETHTest is Test {
         token.approve(spender, 1);
         vm.store(address(token), balanceSlot(toAddr), bytes32(type(uint256).max));
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Recipient balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         token.transferFrom(address(this), toAddr, 1);
     }
 
@@ -255,7 +255,7 @@ contract WETHTest is Test {
         WETHIface token = deployToken();
         vm.deal(address(this), 1);
         vm.store(address(token), balanceSlot(address(this)), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         token.deposit{value: 1}();
     }
 
@@ -264,7 +264,7 @@ contract WETHTest is Test {
         WETHIface token = deployToken();
         vm.deal(address(this), 1);
         vm.store(address(token), supplySlot(), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Supply overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TotalSupplyOverflow()"))));
         token.deposit{value: 1}();
     }
 
@@ -333,7 +333,7 @@ contract WETHTest is Test {
     function testFuzzWithdrawRevertsWhenBalanceIsLow(uint96 rawAmount) public {
         WETHIface token = deployToken();
         uint256 amount = positive(rawAmount);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientBalance()"))));
         token.withdraw(amount);
     }
 
@@ -342,7 +342,7 @@ contract WETHTest is Test {
         WETHIface token = deployToken();
         vm.store(address(token), balanceSlot(address(this)), bytes32(uint256(1)));
         vm.store(address(token), supplySlot(), bytes32(uint256(0)));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient supply"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientSupply()"))));
         token.withdraw(1);
     }
 
@@ -351,7 +351,7 @@ contract WETHTest is Test {
         WETHIface token = deployToken();
         vm.store(address(token), balanceSlot(address(this)), bytes32(uint256(1)));
         vm.store(address(token), supplySlot(), bytes32(uint256(1)));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient ETH backing"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientEthBacking()"))));
         token.withdraw(1);
     }
 
@@ -362,7 +362,7 @@ contract WETHTest is Test {
         vm.deal(address(receiver), 1);
         vm.prank(address(receiver));
         token.deposit{value: 1}();
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "ETH transfer failed"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("EthTransferFailed()"))));
         vm.prank(address(receiver));
         token.withdraw(1);
     }

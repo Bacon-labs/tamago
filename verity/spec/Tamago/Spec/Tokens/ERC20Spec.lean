@@ -166,7 +166,7 @@ def erc20_transfer_reverts_when_balance_is_low
     (_toAddr : Address) (amount : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   amount.val > (s.storageMap balances.slot s.sender).val →
-    result = ContractResult.revert "Insufficient balance" s
+    result = ContractResult.revert "InsufficientBalance()" s
 
 def erc20_transfer_to_self_keeps_balances
     (toAddr : Address) (amount : Uint256) (s : ContractState)
@@ -182,7 +182,7 @@ def erc20_transfer_reverts_when_recipient_balance_would_overflow
   amount.val ≤ (s.storageMap balances.slot s.sender).val →
     s.sender ≠ toAddr →
       (s.storageMap balances.slot toAddr).val + amount.val > Verity.Stdlib.Math.MAX_UINT256 →
-        result = ContractResult.revert "Recipient balance overflow" s
+        result = ContractResult.revert "BalanceOverflow()" s
 
 def erc20_transfer_moves_tokens_between_distinct_accounts
     (toAddr : Address) (amount : Uint256) (s : ContractState)
@@ -222,14 +222,14 @@ def erc20_transferFrom_reverts_when_allowance_is_low
     (fromAddr : Address) (_toAddr : Address) (amount : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   amount.val > (s.storageMap2 allowances.slot fromAddr s.sender).val →
-    result = ContractResult.revert "Insufficient allowance" s
+    result = ContractResult.revert "InsufficientAllowance()" s
 
 def erc20_transferFrom_reverts_when_balance_is_low
     (fromAddr : Address) (_toAddr : Address) (amount : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   amount.val ≤ (s.storageMap2 allowances.slot fromAddr s.sender).val →
     amount.val > (s.storageMap balances.slot fromAddr).val →
-      result = ContractResult.revert "Insufficient balance" s
+      result = ContractResult.revert "InsufficientBalance()" s
 
 def erc20_transferFrom_reverts_when_recipient_balance_would_overflow
     (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState)
@@ -238,7 +238,7 @@ def erc20_transferFrom_reverts_when_recipient_balance_would_overflow
     amount.val ≤ (s.storageMap balances.slot fromAddr).val →
       fromAddr ≠ toAddr →
         (s.storageMap balances.slot toAddr).val + amount.val > Verity.Stdlib.Math.MAX_UINT256 →
-          result = ContractResult.revert "Recipient balance overflow" s
+          result = ContractResult.revert "BalanceOverflow()" s
 
 def erc20_transferFrom_to_self_keeps_balances
     (fromAddr toAddr : Address) (amount : Uint256) (s : ContractState)
@@ -310,22 +310,22 @@ def erc20_mint_reverts_for_non_owner
     (_toAddr : Address) (_amount : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   s.sender ≠ s.storageAddr contractOwner.slot →
-    result = ContractResult.revert "Caller is not the owner" s
+    result = ContractResult.revert "Unauthorized()" s
 
-def erc20_mint_reverts_when_recipient_balance_would_overflow
-    (toAddr : Address) (amount : Uint256) (s : ContractState)
-    (result : ContractResult Bool) : Prop :=
-  s.sender = s.storageAddr contractOwner.slot →
-    (s.storageMap balances.slot toAddr).val + amount.val > Verity.Stdlib.Math.MAX_UINT256 →
-      result = ContractResult.revert "Balance overflow" s
+-- The per-recipient balance-overflow revert spec previously asserted that
+-- `mint` reverts with `BalanceOverflow()` when the recipient balance would
+-- overflow. After the solady-parity reorder of `mint` (supply check first),
+-- that branch is mathematically unreachable — pre-mint `balanceOf(to) ≤
+-- totalSupply`, so any input that would overflow the balance also overflows
+-- the supply, which the supply guard catches first with
+-- `TotalSupplyOverflow()`. The supply-overflow spec below subsumes the case.
 
 def erc20_mint_reverts_when_total_supply_would_overflow
     (toAddr : Address) (amount : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   s.sender = s.storageAddr contractOwner.slot →
-    (s.storageMap balances.slot toAddr).val + amount.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
-      (s.storage tokenSupply.slot).val + amount.val > Verity.Stdlib.Math.MAX_UINT256 →
-        result = ContractResult.revert "Supply overflow" s
+    (s.storage tokenSupply.slot).val + amount.val > Verity.Stdlib.Math.MAX_UINT256 →
+      result = ContractResult.revert "TotalSupplyOverflow()" s
 
 def erc20_mint_succeeds_when_owner_and_no_overflow
     (toAddr : Address) (amount : Uint256) (s : ContractState)
@@ -376,14 +376,14 @@ def erc20_burn_reverts_for_non_owner
     (_fromAddr : Address) (_amount : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   s.sender ≠ s.storageAddr contractOwner.slot →
-    result = ContractResult.revert "Caller is not the owner" s
+    result = ContractResult.revert "Unauthorized()" s
 
 def erc20_burn_reverts_when_balance_is_low
     (fromAddr : Address) (amount : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   s.sender = s.storageAddr contractOwner.slot →
     amount.val > (s.storageMap balances.slot fromAddr).val →
-      result = ContractResult.revert "Insufficient balance" s
+      result = ContractResult.revert "InsufficientBalance()" s
 
 def erc20_burn_reverts_when_total_supply_is_low
     (fromAddr : Address) (amount : Uint256) (s : ContractState)
@@ -391,7 +391,7 @@ def erc20_burn_reverts_when_total_supply_is_low
   s.sender = s.storageAddr contractOwner.slot →
     amount.val ≤ (s.storageMap balances.slot fromAddr).val →
       amount.val > (s.storage tokenSupply.slot).val →
-        result = ContractResult.revert "Insufficient supply" s
+        result = ContractResult.revert "InsufficientSupply()" s
 
 def erc20_burn_succeeds_when_owner_has_balance_and_supply
     (fromAddr : Address) (amount : Uint256) (s : ContractState)

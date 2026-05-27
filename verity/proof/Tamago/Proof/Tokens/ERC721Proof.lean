@@ -161,12 +161,12 @@ theorem balanceOf_returns_storage_balance (account : Address) (s : ContractState
   refine ⟨?_, ?_⟩
   · intro h_zero
     subst h_zero
-    simp [balanceOf, zeroAddress, getMapping, Verity.require, Contract.run,
+    simp [balanceOf, zeroAddress, getMapping, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Contract.run,
       Bind.bind, Pure.pure, Verity.bind, Verity.pure]
   · intro h_nonzero
     have h_nonzero_raw : ¬ account = 0 := by
       simpa [zeroAddress] using h_nonzero
-    simp [balanceOf, zeroAddress, getMapping, Verity.require, Contract.run,
+    simp [balanceOf, zeroAddress, getMapping, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Contract.run,
       h_nonzero_raw, Bind.bind, Pure.pure, Verity.bind, Verity.pure]
 
 -- tama: discharges=erc721_ownerOf_spec
@@ -174,7 +174,7 @@ theorem ownerOf_matches_storage_or_reverts (tokenId : Uint256) (s : ContractStat
   erc721_ownerOf_spec tokenId ((ownerOf tokenId).run s) s := by
   cases h_owner : (s.storageMapUint 4 tokenId != 0) <;>
     simp [erc721_ownerOf_spec, ownerOf, tokenOwners, getMappingUint, Contract.run,
-      Verity.bind, Bind.bind, Verity.require, Verity.pure, Pure.pure, h_owner]
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner]
 
 -- tama: discharges=erc721_getApproved_spec
 theorem getApproved_matches_storage_or_reverts (tokenId : Uint256) (s : ContractState) :
@@ -182,7 +182,7 @@ theorem getApproved_matches_storage_or_reverts (tokenId : Uint256) (s : Contract
   cases h_owner : (s.storageMapUint 4 tokenId != 0) <;>
     simp [erc721_getApproved_spec, getApproved, tokenOwners, tokenApprovals,
       getMappingUint, getMappingUintAddr, Contract.run, Verity.bind, Bind.bind,
-      Verity.require, Verity.pure, Pure.pure, h_owner]
+      Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner]
 
 -- tama: discharges=erc721_isApprovedForAll_spec
 theorem isApprovedForAll_matches_storage (ownerAddr operator : Address) (s : ContractState) :
@@ -268,7 +268,7 @@ theorem setApprovalForAll_keeps_balances_and_owners
       simpa using h_missing
     simp [approve, tokenOwners, tokenApprovals, operatorApprovals, getMappingUint,
       getMapping2, setMappingUintAddr, msgSender, Contract.run, ContractResult.snd,
-      Verity.bind, Bind.bind, Verity.require, Verity.pure, Pure.pure, h_missing_raw]
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_missing_raw]
   · intro h_exists h_unauthorized
     have h_exists_raw : (s.storageMapUint 4 tokenId != 0) = true := by
       simpa using h_exists
@@ -287,7 +287,7 @@ theorem setApprovalForAll_keeps_balances_and_owners
       simpa [wordToAddress] using h_unauthorized_prop
     simp [approve, tokenOwners, tokenApprovals, operatorApprovals, getMappingUint,
       getMapping2, setMappingUintAddr, msgSender, Contract.run, ContractResult.snd,
-      Verity.bind, Bind.bind, Verity.require, Verity.pure, Pure.pure, h_exists_raw,
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_exists_raw,
       h_unauthorized_prop_raw, wordToAddress]
   · intro h_exists h_authorized
     have h_exists_raw : (s.storageMapUint 4 tokenId != 0) = true := by
@@ -307,7 +307,7 @@ theorem setApprovalForAll_keeps_balances_and_owners
       simpa [wordToAddress] using h_authorized_prop
     simp [approve, tokenOwners, tokenApprovals, operatorApprovals, getMappingUint,
       getMapping2, setMappingUintAddr, setMappingUint, msgSender, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, Verity.pure, Pure.pure,
+      ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure,
       h_exists_raw, h_authorized_prop_raw, wordToAddress, addressToWord]
   · intro h_exists h_authorized
     have h_exists_raw : (s.storageMapUint 4 tokenId != 0) = true := by
@@ -327,7 +327,7 @@ theorem setApprovalForAll_keeps_balances_and_owners
       simpa [wordToAddress] using h_authorized_prop
     simp [approve, tokenOwners, tokenApprovals, operatorApprovals, getMappingUint,
       getMapping2, setMappingUintAddr, setMappingUint, msgSender, Contract.run,
-      ContractResult.snd, Verity.bind, Bind.bind, Verity.require, Verity.pure, Pure.pure,
+      ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure,
       h_exists_raw, h_authorized_prop_raw, wordToAddress, addressToWord]
 
 -- tama: discharges=erc721_approve_reverts_when_token_is_missing
@@ -390,7 +390,7 @@ private theorem mint_properties_after_run
     have h_not_owner_raw : s.sender ≠ s.storageAddr 0 := by
       simpa using h_not_owner
     simp [mint, contractOwner, msgSender, getStorageAddr, Contract.run,
-      Verity.bind, Bind.bind, Verity.require, h_not_owner_raw]
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_not_owner_raw]
   · intro h_owner h_zero
     have h_owner_raw : s.sender = s.storageAddr 0 := by
       simpa using h_owner
@@ -398,7 +398,7 @@ private theorem mint_properties_after_run
       simpa [zeroAddress] using h_zero
     subst h_zero_raw
     simp [mint, contractOwner, zeroAddress, msgSender, getStorageAddr, Contract.run,
-      Verity.bind, Bind.bind, Verity.require, h_owner_raw]
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
   · intro h_owner h_recipient h_minted
     have h_owner_raw : s.sender = s.storageAddr 0 := by
       simpa using h_owner
@@ -408,7 +408,7 @@ private theorem mint_properties_after_run
       simpa using h_minted
     simp [mint, contractOwner, zeroAddress, nextTokenId, tokenOwners, msgSender,
       getStorageAddr, getStorage, getMappingUint, Contract.run, Verity.bind,
-      Bind.bind, Verity.require, h_owner_raw, h_recipient_raw, h_minted_raw]
+      Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw, h_recipient_raw, h_minted_raw]
   · intro h_owner h_recipient h_unminted h_balance_overflow
     have h_owner_raw : s.sender = s.storageAddr 0 := by
       simpa using h_owner
@@ -421,7 +421,7 @@ private theorem mint_properties_after_run
       simpa using h_balance_overflow
     simp [mint, contractOwner, zeroAddress, balances, nextTokenId, tokenOwners,
       msgSender, getStorageAddr, getStorage, getMappingUint, getMapping, Contract.run,
-      Verity.bind, Bind.bind, Verity.require, Verity.Stdlib.Math.requireSomeUint,
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
       Verity.Stdlib.Math.safeAdd, h_owner_raw, h_recipient_raw, h_unminted_raw,
       h_overflow]
   · intro h_owner h_recipient h_unminted h_balance_no_overflow h_supply_overflow
@@ -442,7 +442,7 @@ private theorem mint_properties_after_run
       simpa using h_supply_overflow
     simp [mint, contractOwner, zeroAddress, balances, tokenSupply, nextTokenId,
       tokenOwners, msgSender, getStorageAddr, getStorage, getMappingUint, getMapping,
-      Contract.run, Verity.bind, Bind.bind, Verity.require,
+      Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
       Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_owner_raw,
       h_recipient_raw, h_unminted_raw, h_not_balance_overflow, h_overflow,
       Verity.pure, Pure.pure]
@@ -469,7 +469,7 @@ private theorem mint_properties_after_run
       simp [mint, contractOwner, zeroAddress, balances, tokenSupply, nextTokenId,
         tokenOwners, msgSender, getStorageAddr, getStorage, getMappingUint, getMapping,
         setMappingUintAddr, setMappingUint, setMapping, setStorage, Contract.run,
-        ContractResult.snd, Verity.bind, Bind.bind, Verity.require,
+        ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require,
         Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd, h_owner_raw,
         h_recipient_raw, h_unminted_raw, h_not_balance_overflow,
         h_not_supply_overflow, Verity.pure, Pure.pure]
@@ -604,14 +604,14 @@ private theorem transferFrom_properties_after_run
       simpa [zeroAddress] using h_zero
     subst h_zero_raw
     simp [transferFrom, zeroAddress, msgSender, Contract.run, Verity.bind, Bind.bind,
-      Verity.require]
+      Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require]
   · intro h_to_nonzero h_missing
     have h_to_nonzero_raw : ¬ toAddr = 0 := by
       simpa [zeroAddress] using h_to_nonzero
     have h_missing_raw : s.storageMapUint 4 tokenId = 0 := by
       simpa using h_missing
     simp [transferFrom, zeroAddress, tokenOwners, msgSender, getMappingUint, Contract.run,
-      Verity.bind, Bind.bind, Verity.require, h_to_nonzero_raw, h_missing_raw]
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_to_nonzero_raw, h_missing_raw]
   · intro h_to_nonzero h_exists h_wrong_owner
     have h_to_nonzero_raw : ¬ toAddr = 0 := by
       simpa [zeroAddress] using h_to_nonzero
@@ -624,7 +624,7 @@ private theorem transferFrom_properties_after_run
         s.storageMapUint 4 tokenId ≠ Core.Uint256.ofNat (Core.Address.toNat fromAddr) := by
       simpa [addressToWord] using h_wrong_owner_raw
     simp [transferFrom, zeroAddress, tokenOwners, msgSender, getMappingUint, Contract.run,
-      Verity.bind, Bind.bind, Verity.require, h_to_nonzero_raw, h_exists_raw,
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_to_nonzero_raw, h_exists_raw,
       h_wrong_owner_raw', addressToWord]
   · intro h_to_nonzero h_exists h_owner h_not_authorized
     have h_to_nonzero_raw : ¬ toAddr = 0 := by
@@ -657,7 +657,10 @@ private theorem transferFrom_properties_after_run
       simpa [addressToWord] using h_not_authorized_prop
     simp [transferFrom, zeroAddress, tokenOwners, tokenApprovals, operatorApprovals,
       msgSender, getMappingUint, getMappingUintAddr, getMapping2, Contract.run,
-      Verity.bind, Bind.bind, Verity.require, h_to_nonzero_raw, h_exists_raw,
+      Verity.bind, Bind.bind, Pure.pure, Verity.pure,
+      Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError,
+      Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate,
+      Verity.require, h_to_nonzero_raw, h_exists_raw,
       h_owner_raw, h_from_word_nonzero_raw, h_not_authorized_prop_raw, addressToWord]
   all_goals
       intro h_to_nonzero h_exists h_owner h_authorized
@@ -695,7 +698,7 @@ private theorem transferFrom_properties_after_run
         simp [transferFrom, zeroAddress, tokenOwners, tokenApprovals, operatorApprovals,
           balances, msgSender, getMappingUint, getMappingUintAddr, getMapping2,
           setMappingUintAddr, setMappingUint, Contract.run, ContractResult.snd,
-          Verity.bind, Bind.bind, Verity.require, Verity.pure, Pure.pure,
+          Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure,
           h_to_nonzero_raw, h_exists_raw, h_owner_raw, h_from_word_nonzero_raw,
           h_authorized_prop_raw, addressToWord]
       | intro h_ne h_insufficient
@@ -705,7 +708,7 @@ private theorem transferFrom_properties_after_run
         simp [transferFrom, zeroAddress, tokenOwners, tokenApprovals, operatorApprovals,
           balances, msgSender, getMappingUint, getMappingUintAddr, getMapping2,
           getMapping, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, h_to_nonzero_raw, h_exists_raw, h_owner_raw,
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_to_nonzero_raw, h_exists_raw, h_owner_raw,
           h_from_word_nonzero_raw, h_authorized_prop_raw, h_ne, h_not_balance,
           addressToWord]
       | intro h_ne h_balance h_overflow
@@ -717,7 +720,7 @@ private theorem transferFrom_properties_after_run
         simp [transferFrom, zeroAddress, tokenOwners, tokenApprovals, operatorApprovals,
           balances, msgSender, getMappingUint, getMappingUintAddr, getMapping2,
           getMapping, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, Verity.Stdlib.Math.requireSomeUint,
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.Stdlib.Math.requireSomeUint,
           Verity.Stdlib.Math.safeAdd, h_to_nonzero_raw, h_exists_raw, h_owner_raw,
           h_from_word_nonzero_raw, h_authorized_prop_raw, h_ne, h_balance_raw,
           h_overflow_raw, addressToWord]
@@ -734,7 +737,7 @@ private theorem transferFrom_properties_after_run
         simp [transferFrom, zeroAddress, tokenOwners, tokenApprovals, operatorApprovals,
           balances, msgSender, getMappingUint, getMappingUintAddr, getMapping2, getMapping,
           setMapping, setMappingUintAddr, setMappingUint, Contract.run, ContractResult.snd,
-          Verity.bind, Bind.bind, Verity.require, Verity.pure, Pure.pure,
+          Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, Contracts.requireSomeUintCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure,
           Verity.Stdlib.Math.requireSomeUint, Verity.Stdlib.Math.safeAdd,
           h_to_nonzero_raw, h_exists_raw, h_owner_raw, h_from_word_nonzero_raw,
           h_authorized_prop_raw, h_ne, h_balance_raw, h_not_overflow, addressToWord]

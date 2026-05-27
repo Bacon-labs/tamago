@@ -135,13 +135,13 @@ Security conclusions:
 def weth_deposit_reverts_when_sender_balance_would_overflow
     (s : ContractState) (result : ContractResult Bool) : Prop :=
   (s.storageMap balances.slot s.sender).val + s.msgValue.val > Verity.Stdlib.Math.MAX_UINT256 →
-    result = ContractResult.revert "Balance overflow" s
+    result = ContractResult.revert "BalanceOverflow()" s
 
 def weth_deposit_reverts_when_total_supply_would_overflow
     (s : ContractState) (result : ContractResult Bool) : Prop :=
   (s.storageMap balances.slot s.sender).val + s.msgValue.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
     (s.storage tokenSupply.slot).val + s.msgValue.val > Verity.Stdlib.Math.MAX_UINT256 →
-      result = ContractResult.revert "Supply overflow" s
+      result = ContractResult.revert "TotalSupplyOverflow()" s
 
 def weth_deposit_succeeds_when_accounting_does_not_overflow
     (s : ContractState) (result : ContractResult Bool) : Prop :=
@@ -199,20 +199,20 @@ Security conclusions:
 def weth_withdraw_reverts_when_balance_is_low
     (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=
   amount.val > (s.storageMap balances.slot s.sender).val →
-    result = ContractResult.revert "Insufficient balance" s
+    result = ContractResult.revert "InsufficientBalance()" s
 
 def weth_withdraw_reverts_when_total_supply_is_low
     (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=
   amount.val ≤ (s.storageMap balances.slot s.sender).val →
     amount.val > (s.storage tokenSupply.slot).val →
-      result = ContractResult.revert "Insufficient supply" s
+      result = ContractResult.revert "InsufficientSupply()" s
 
 def weth_withdraw_reverts_when_eth_backing_is_low
     (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=
   amount.val ≤ (s.storageMap balances.slot s.sender).val →
     amount.val ≤ (s.storage tokenSupply.slot).val →
       amount.val > s.selfBalance.val →
-        result = ContractResult.revert "Insufficient ETH backing" s
+        result = ContractResult.revert "InsufficientEthBacking()" s
 
 def weth_withdraw_reverts_when_native_transfer_fails
     (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=
@@ -220,7 +220,7 @@ def weth_withdraw_reverts_when_native_transfer_fails
     amount.val ≤ (s.storage tokenSupply.slot).val →
       amount.val ≤ s.selfBalance.val →
         Contracts.call 50000 (addressToWord s.sender) amount 0 0 0 0 = 0 →
-          result = ContractResult.revert "ETH transfer failed" s
+          result = ContractResult.revert "EthTransferFailed()" s
 
 def weth_withdraw_succeeds_when_balance_supply_eth_and_transfer_are_enough
     (amount : Uint256) (s : ContractState) (result : ContractResult Bool) : Prop :=

@@ -33,7 +33,7 @@ private theorem transferOwnership_properties_after_run (newOwner : Address) (s :
     have h_not_owner_raw : s.sender ≠ s.storageAddr 0 := by
       simpa [contractOwner] using h_not_owner
     simp [transferOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-      Verity.bind, Bind.bind, Verity.require, h_not_owner_raw,
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_not_owner_raw,
       ownable_transferOwnership_reverts_for_non_owner]
   · intro h_owner h_zero
     have h_owner_raw : s.sender = s.storageAddr 0 := by
@@ -42,7 +42,7 @@ private theorem transferOwnership_properties_after_run (newOwner : Address) (s :
       simpa [zeroAddress] using h_zero
     subst h_zero_raw
     simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
-      Contract.run, Verity.bind, Bind.bind, Verity.require, h_owner_raw,
+      Contract.run, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw,
       ownable_transferOwnership_reverts_for_zero_owner]
   · intro h_owner h_nonzero
     have h_owner_raw : s.sender = s.storageAddr 0 := by
@@ -51,7 +51,7 @@ private theorem transferOwnership_properties_after_run (newOwner : Address) (s :
       simpa [zeroAddress] using h_nonzero
     simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
       setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-      Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_nonzero_raw,
+      Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_nonzero_raw,
       ownable_transferOwnership_succeeds_for_owner_to_nonzero]
   · intro h_owner h_nonzero
     have h_owner_raw : s.sender = s.storageAddr 0 := by
@@ -60,7 +60,7 @@ private theorem transferOwnership_properties_after_run (newOwner : Address) (s :
       simpa [zeroAddress] using h_nonzero
     simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
       setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-      Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_nonzero_raw,
+      Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_nonzero_raw,
       ownable_transferOwnership_sets_new_owner]
   · intro slotIdx h_slot
     have h_slot_raw : slotIdx ≠ 0 := by
@@ -70,27 +70,27 @@ private theorem transferOwnership_properties_after_run (newOwner : Address) (s :
       · subst h_zero_raw
         simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
           setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, h_owner_raw, h_slot_raw,
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw, h_slot_raw,
           ownable_transferOwnership_keeps_other_owner_slots]
       · simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
           setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw, h_slot_raw,
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw, h_slot_raw,
           ownable_transferOwnership_keeps_other_owner_slots]
     · simp [transferOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-        ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw,
+        ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw,
         ownable_transferOwnership_keeps_other_owner_slots]
   · by_cases h_owner_raw : s.sender = s.storageAddr 0
     · by_cases h_zero_raw : newOwner = 0
       · subst h_zero_raw
         simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
           setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, h_owner_raw, ownable_transferOwnership_keeps_uint_storage]
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw, ownable_transferOwnership_keeps_uint_storage]
       · simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
           setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw,
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw,
           ownable_transferOwnership_keeps_uint_storage]
     · simp [transferOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-        ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw,
+        ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw,
         ownable_transferOwnership_keeps_uint_storage]
   · by_cases h_owner_raw : s.sender = s.storageAddr 0
     · by_cases h_zero_raw : newOwner = 0
@@ -99,52 +99,52 @@ private theorem transferOwnership_properties_after_run (newOwner : Address) (s :
         · funext slotIdx account
           simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
             setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-            Verity.require, h_owner_raw]
+            Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
         · funext slotIdx key
           simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
             setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-            Verity.require, h_owner_raw]
+            Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
         · funext slotIdx ownerAddr spender
           simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
             setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-            Verity.require, h_owner_raw]
+            Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
       · refine ⟨?_, ?_, ?_⟩
         · funext slotIdx account
           simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
             setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-            Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw]
+            Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw]
         · funext slotIdx key
           simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
             setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-            Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw]
+            Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw]
         · funext slotIdx ownerAddr spender
           simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
             setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-            Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw]
+            Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw]
     · refine ⟨?_, ?_, ?_⟩
       · funext slotIdx account
         simp [transferOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-          ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw]
+          ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
       · funext slotIdx key
         simp [transferOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-          ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw]
+          ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
       · funext slotIdx ownerAddr spender
         simp [transferOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-          ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw]
+          ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
   · by_cases h_owner_raw : s.sender = s.storageAddr 0
     · by_cases h_zero_raw : newOwner = 0
       · subst h_zero_raw
         funext slotIdx
         simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
           setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, h_owner_raw]
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
       · funext slotIdx
         simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
           setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw]
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_zero_raw]
     · funext slotIdx
       simp [transferOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
-        Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw]
+        Contract.run, ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
 
 -- tama: discharges=ownable_transferOwnership_reverts_for_non_owner
 theorem transferOwnership_reverts_for_non_owner (newOwner : Address) (s : ContractState) :
@@ -207,21 +207,21 @@ private theorem renounceOwnership_properties_after_run (s : ContractState) :
     have h_not_owner_raw : s.sender ≠ s.storageAddr 0 := by
       simpa [contractOwner] using h_not_owner
     simp [renounceOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-      Verity.bind, Bind.bind, Verity.require, h_not_owner_raw,
+      Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_not_owner_raw,
       ownable_renounceOwnership_reverts_for_non_owner]
   · intro h_owner
     have h_owner_raw : s.sender = s.storageAddr 0 := by
       simpa [contractOwner] using h_owner
     simp [renounceOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
       setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-      Verity.require, Verity.pure, Pure.pure, h_owner_raw,
+      Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw,
       ownable_renounceOwnership_succeeds_for_owner]
   · intro h_owner
     have h_owner_raw : s.sender = s.storageAddr 0 := by
       simpa [contractOwner] using h_owner
     simp [renounceOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
       setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-      Verity.require, Verity.pure, Pure.pure, h_owner_raw,
+      Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw,
       ownable_renounceOwnership_clears_owner]
   · intro slotIdx h_slot
     have h_slot_raw : slotIdx ≠ 0 := by
@@ -229,51 +229,51 @@ private theorem renounceOwnership_properties_after_run (s : ContractState) :
     by_cases h_owner_raw : s.sender = s.storageAddr 0
     · simp [renounceOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
         setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-        Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_slot_raw,
+        Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw, h_slot_raw,
         ownable_renounceOwnership_keeps_other_owner_slots]
     · simp [renounceOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-        ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw,
+        ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw,
         ownable_renounceOwnership_keeps_other_owner_slots]
   · by_cases h_owner_raw : s.sender = s.storageAddr 0
     · simp [renounceOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
         setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-        Verity.require, Verity.pure, Pure.pure, h_owner_raw,
+        Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw,
         ownable_renounceOwnership_keeps_uint_storage]
     · simp [renounceOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-        ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw,
+        ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw,
         ownable_renounceOwnership_keeps_uint_storage]
   · by_cases h_owner_raw : s.sender = s.storageAddr 0
     · refine ⟨?_, ?_, ?_⟩
       · funext slotIdx account
         simp [renounceOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
           setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, Verity.pure, Pure.pure, h_owner_raw]
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw]
       · funext slotIdx key
         simp [renounceOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
           setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, Verity.pure, Pure.pure, h_owner_raw]
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw]
       · funext slotIdx ownerAddr spender
         simp [renounceOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
           setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-          Verity.require, Verity.pure, Pure.pure, h_owner_raw]
+          Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw]
     · refine ⟨?_, ?_, ?_⟩
       · funext slotIdx account
         simp [renounceOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-          ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw]
+          ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
       · funext slotIdx key
         simp [renounceOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-          ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw]
+          ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
       · funext slotIdx ownerAddr spender
         simp [renounceOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-          ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw]
+          ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
   · by_cases h_owner_raw : s.sender = s.storageAddr 0
     · funext slotIdx
       simp [renounceOwnership, contractOwner, zeroAddress, msgSender, getStorageAddr,
         setStorageAddr, Contract.run, ContractResult.snd, Verity.bind, Bind.bind,
-        Verity.require, Verity.pure, Pure.pure, h_owner_raw]
+        Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, Verity.pure, Pure.pure, h_owner_raw]
     · funext slotIdx
       simp [renounceOwnership, contractOwner, msgSender, getStorageAddr, Contract.run,
-        ContractResult.snd, Verity.bind, Bind.bind, Verity.require, h_owner_raw]
+        ContractResult.snd, Verity.bind, Bind.bind, Contracts.requireCustomError, Contracts.revertCustomError, Contracts.formatCustomError, String.intercalate, List.intercalate, Pure.pure, Verity.pure, Verity.require, h_owner_raw]
 
 -- tama: discharges=ownable_renounceOwnership_reverts_for_non_owner
 theorem renounceOwnership_reverts_for_non_owner (s : ContractState) :
