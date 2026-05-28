@@ -472,4 +472,112 @@ contract FixedPointMathLibTest is Test {
             assertEq(result, maxValue);
         }
     }
+
+    uint256 internal constant MAX_UINT256 = type(uint256).max;
+
+    /// Bounded fuzz over `(a, b, c)` such that the full-precision quotient
+    /// `(a * b) / c` is guaranteed to fit in uint256. Forge cannot statically
+    /// pick `(a, b, c)` with this property, so we run with c bounded by
+    /// `MAX_UINT256 / max(a, b) + 1`, which guarantees `a*b/c ≤ min(a, b)`.
+    function _boundForFloor(uint256 a, uint256 b, uint256 cRaw) internal pure returns (uint256 c) {
+        uint256 ab_upper = a == 0 || b == 0 ? 0 : (a > b ? a : b);
+        if (ab_upper == 0) {
+            c = (cRaw % 1024) + 1; // any nonzero divisor; quotient is 0 anyway
+        } else {
+            // Force c >= ab_upper so the quotient ≤ min(a,b) ≤ MAX_UINT256.
+            uint256 lower = ab_upper;
+            c = lower + (cRaw % (MAX_UINT256 - lower + 1));
+        }
+    }
+
+    // tama: mirrors=fixedPointMathLib_mulDiv_returns_floor_when_fits
+    function testFuzzMulDivReturnsFloorWhenFits(uint256 a, uint256 b, uint256 cRaw) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        uint256 c = _boundForFloor(a, b, cRaw);
+        // Sanity: c > 0 guaranteed by the bounder.
+        uint256 result = lib_.mulDiv(a, b, c);
+        // Use unchecked-safe full-precision math via Solidity's native uint256
+        // multiplication restricted to the cases where the bounder guarantees
+        // no intermediate overflow: a or b is zero, OR c ≥ max(a, b) so the
+        // 512-bit product fits when divided.
+        if (a == 0 || b == 0) {
+            assertEq(result, 0);
+            return;
+        }
+        // Compute expected via OpenZeppelin's full-precision algorithm via
+        // mulmod trick. For our bounded c, (a*b)/c fits, so we can verify the
+        // contract's claim using the same algorithm forge tests rely on
+        // elsewhere — but the simpler invariant suffices: result ≤ min(a, b).
+        uint256 minab = a < b ? a : b;
+        assertLe(result, minab);
+        // Cross-check: result * c ≤ a*b ≤ (result + 1) * c. Use mulmod-aware
+        // check by recovering remainder.
+        uint256 r = mulmod(a, b, c);
+        // result * c + r should match a * b in the integers. Since
+        // result ≤ min(a, b) and c is chosen so result*c doesn't overflow,
+        // we can verify via the round-trip.
+        unchecked {
+            // result fits in uint256, c fits in uint256, result*c may overflow
+            // for general inputs — but our bounder enforces result ≤ min(a,b),
+            // so result * c ≤ min(a,b) * c ≤ a*b ≤ MAX, fitting fine.
+            assertEq(result * c + r, a * b);
+        }
+    }
+
+    // tama: mirrors=fixedPointMathLib_mulDiv_zero_on_failure
+    function testFuzzMulDivRevertsOnZeroDivisor(uint256 a, uint256 b) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        // The proof says the Lean model returns 0 on failure; the Yul codegen
+        // reverts. Mirror tests assert the on-chain Yul behavior, which is the
+        // user-observable contract.
+        vm.expectRevert();
+        lib_.mulDiv(a, b, 0);
+    }
+
+    function testFuzzMulDivRevertsOnOverflow(uint256 aRaw, uint256 bRaw) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        // Force overflow: pick a, b near MAX with c = 1 so quotient = a*b
+        // which exceeds 2^256 when both a > 1 and b > 1.
+        uint256 a = (aRaw % (MAX_UINT256 - 2)) + 2; // >= 2
+        uint256 b = (bRaw % (MAX_UINT256 - 2)) + 2;
+        // a * b overflows uint256 iff a > MAX/b.
+        if (a <= MAX_UINT256 / b) return; // no overflow, skip
+        vm.expectRevert();
+        lib_.mulDiv(a, b, 1);
+    }
+
+    // tama: mirrors=fixedPointMathLib_mulDivUp_returns_ceil_when_fits
+    function testFuzzMulDivUpReturnsCeilWhenFits(uint256 a, uint256 b, uint256 cRaw) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        uint256 c = _boundForFloor(a, b, cRaw);
+        uint256 result = lib_.mulDivUp(a, b, c);
+        if (a == 0 || b == 0) {
+            assertEq(result, 0);
+            return;
+        }
+        // ceil((a*b)/c) ≥ floor((a*b)/c), and differs by at most 1.
+        uint256 floor_ = lib_.mulDiv(a, b, c);
+        uint256 r = mulmod(a, b, c);
+        if (r == 0) {
+            assertEq(result, floor_);
+        } else {
+            assertEq(result, floor_ + 1);
+        }
+    }
+
+    // tama: mirrors=fixedPointMathLib_mulDivUp_zero_on_failure
+    function testFuzzMulDivUpRevertsOnZeroDivisor(uint256 a, uint256 b) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        vm.expectRevert();
+        lib_.mulDivUp(a, b, 0);
+    }
+
+    function testFuzzMulDivUpRevertsOnOverflow(uint256 aRaw, uint256 bRaw) public {
+        FixedPointMathLibIface lib_ = deployLib();
+        uint256 a = (aRaw % (MAX_UINT256 - 2)) + 2;
+        uint256 b = (bRaw % (MAX_UINT256 - 2)) + 2;
+        if (a <= MAX_UINT256 / b) return;
+        vm.expectRevert();
+        lib_.mulDivUp(a, b, 1);
+    }
 }

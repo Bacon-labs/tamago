@@ -17,18 +17,20 @@ as a set of small first-principles properties.
 Basic ERC20 views
 
 Properties specified:
-- decimals() is fixed at 18.
+- decimals() returns the value recorded in the contract's immutable storage at
+  construction, exposing the deployer-chosen precision.
 - totalSupply(), balanceOf(account), and allowance(owner, spender) return the
   values from their storage locations.
 - owner() delegates to the shared Ownable owner spec.
 
 Security conclusions:
-- Balance, allowance, supply, and owner getters expose the state used by
-  mutating functions.
+- Balance, allowance, supply, owner, and decimals getters expose the state used
+  by mutating functions and by integrators that need to interpret the unit
+  scale.
 - Later safety properties are about the same state users can inspect publicly.
 -/
-def erc20_decimals_spec (result : Uint256) : Prop :=
-  result = 18
+def erc20_decimals_spec (result : Uint256) (s : ContractState) : Prop :=
+  result = s.storage tokenDecimals.slot
 
 def erc20_totalSupply_spec (result : Uint256) (s : ContractState) : Prop :=
   result = s.storage tokenSupply.slot

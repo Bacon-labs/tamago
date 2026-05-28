@@ -6,3 +6,4 @@ import Tamago.Proof.Tokens.ERC4626Proof
 import Tamago.Proof.Tokens.WETHProof
 import Tamago.Proof.Utils.ClzProof
 import Tamago.Proof.Utils.FixedPointMathLibProof
+import Tamago.Proof.Utils.SafeTransferLibProof

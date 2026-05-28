@@ -29,7 +29,7 @@ Security conclusions:
 - Transfers cannot create or destroy wrapped supply.
 -/
 def weth_decimals_spec (result : Uint256) : Prop :=
-  erc20_decimals_spec result
+  result = 18
 
 def weth_totalSupply_spec (result : Uint256) (s : ContractState) : Prop :=
   erc20_totalSupply_spec result s

@@ -11,7 +11,11 @@ contract ERC20Test is Test {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     function deployToken() internal returns (ERC20Iface token) {
-        token = ERC20Deployer.deploy(address(this));
+        token = ERC20Deployer.deploy(address(this), 18);
+    }
+
+    function deployTokenWithDecimals(uint256 d) internal returns (ERC20Iface token) {
+        token = ERC20Deployer.deploy(address(this), d);
     }
 
     function small(uint256 raw) internal pure returns (uint256) {
@@ -48,6 +52,16 @@ contract ERC20Test is Test {
     function testFuzzDecimalsSpec() public {
         ERC20Iface token = deployToken();
         assertEq(token.decimals(), 18);
+    }
+
+    // Parameterized decimals: any deployer-chosen value round-trips through
+    // decimals() and is preserved across mutating calls (mint touches a
+    // different storage slot).
+    function testFuzzDecimalsParameterized(uint256 rawDecimals) public {
+        ERC20Iface token = deployTokenWithDecimals(rawDecimals);
+        assertEq(token.decimals(), rawDecimals);
+        token.mint(address(this), 1);
+        assertEq(token.decimals(), rawDecimals);
     }
 
     // tama: mirrors=erc20_totalSupply_spec

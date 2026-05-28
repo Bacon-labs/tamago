@@ -5,3 +5,4 @@ import Tamago.Spec.Tokens.ERC721Spec
 import Tamago.Spec.Tokens.WETHSpec
 import Tamago.Spec.Tokens.ERC4626Spec
 import Tamago.Spec.Utils.FixedPointMathLibSpec
+import Tamago.Spec.Utils.SafeTransferLibSpec
