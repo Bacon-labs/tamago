@@ -7,6 +7,13 @@ interface WETHIface {
     event Approval(address indexed owner, address indexed spender, uint256 value);
     event Deposit(address indexed dst, uint256 wad);
     event Withdrawal(address indexed src, uint256 wad);
+    error InsufficientBalance();
+    error InsufficientAllowance();
+    error BalanceOverflow();
+    error TotalSupplyOverflow();
+    error InsufficientSupply();
+    error InsufficientEthBacking();
+    error EthTransferFailed();
     function decimals() external view returns (uint256);
     function totalSupply() external view returns (uint256);
     function balanceOf(address account) external view returns (uint256);

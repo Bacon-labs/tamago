@@ -32,6 +32,19 @@ verity_contract ERC721Base where
     tokenApprovals : Uint256 → Uint256 := slot 5
     operatorApprovals : Address → Address → Uint256 := slot 6
 
+  errors
+    error Unauthorized ()
+    error NewOwnerIsZeroAddress ()
+    error BalanceQueryForZeroAddress ()
+    error TokenDoesNotExist ()
+    error NotOwnerNorApproved ()
+    error TransferToZeroAddress ()
+    error TokenAlreadyExists ()
+    error TransferFromIncorrectOwner ()
+    error InsufficientBalance ()
+    error AccountBalanceOverflow ()
+    error TotalSupplyOverflow ()
+
   /-
   @notice Initializes token ownership, supply, and token ID tracking.
   @param initialOwner Address that receives ownership at deployment.
@@ -65,8 +78,8 @@ verity_contract ERC721Base where
   function transferOwnership (newOwner : Address) : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
-    require (sender == currentOwner) "Caller is not the owner"
-    require (newOwner != zeroAddress) "Invalid owner"
+    requireError (sender == currentOwner) Unauthorized()
+    requireError (newOwner != zeroAddress) NewOwnerIsZeroAddress()
     setStorageAddr contractOwner newOwner
     emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord newOwner]
     return true
@@ -78,7 +91,7 @@ verity_contract ERC721Base where
   function renounceOwnership () : Bool := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
-    require (sender == currentOwner) "Caller is not the owner"
+    requireError (sender == currentOwner) Unauthorized()
     setStorageAddr contractOwner zeroAddress
     emit "OwnershipTransferred" [addressToWord currentOwner, addressToWord zeroAddress]
     return true
@@ -89,7 +102,7 @@ verity_contract ERC721Base where
   @return Current token balance for `account`.
   -/
   function view balanceOf (account : Address) : Uint256 := do
-    require (account != zeroAddress) "Invalid owner"
+    requireError (account != zeroAddress) BalanceQueryForZeroAddress()
     let currentBalance ← getMapping balances account
     return currentBalance
 
@@ -100,7 +113,7 @@ verity_contract ERC721Base where
   -/
   function view ownerOf (tokenId : Uint256) : Address := do
     let ownerWord ← getMappingUint tokenOwners tokenId
-    require (ownerWord != 0) "Token does not exist"
+    requireError (ownerWord != 0) TokenDoesNotExist()
     return wordToAddress ownerWord
 
   /-
@@ -110,7 +123,7 @@ verity_contract ERC721Base where
   -/
   function view getApproved (tokenId : Uint256) : Address := do
     let ownerWord ← getMappingUint tokenOwners tokenId
-    require (ownerWord != 0) "Token does not exist"
+    requireError (ownerWord != 0) TokenDoesNotExist()
     let approvedAddr ← getMappingUintAddr tokenApprovals tokenId
     return approvedAddr
 
@@ -133,10 +146,10 @@ verity_contract ERC721Base where
   function approve (approved : Address, tokenId : Uint256) : Bool := do
     let sender ← msgSender
     let ownerWord ← getMappingUint tokenOwners tokenId
-    require (ownerWord != 0) "Token does not exist"
+    requireError (ownerWord != 0) TokenDoesNotExist()
     let tokenOwner := wordToAddress ownerWord
     let operatorFlag ← getMapping2 operatorApprovals tokenOwner sender
-    require ((sender == tokenOwner) || (operatorFlag != 0)) "Not authorized"
+    requireError ((sender == tokenOwner) || (operatorFlag != 0)) NotOwnerNorApproved()
     setMappingUintAddr tokenApprovals tokenId approved
     emit "Approval" [addressToWord tokenOwner, addressToWord approved, tokenId]
     return true
@@ -161,17 +174,17 @@ verity_contract ERC721Base where
   function mint (toAddr : Address) : Uint256 := do
     let sender ← msgSender
     let currentOwner ← getStorageAddr contractOwner
-    require (sender == currentOwner) "Caller is not the owner"
-    require (toAddr != zeroAddress) "Invalid recipient"
+    requireError (sender == currentOwner) Unauthorized()
+    requireError (toAddr != zeroAddress) TransferToZeroAddress()
 
     let tokenId ← getStorage nextTokenId
     let currentOwnerWord ← getMappingUint tokenOwners tokenId
-    require (currentOwnerWord == 0) "Token already minted"
+    requireError (currentOwnerWord == 0) TokenAlreadyExists()
 
     let recipientBalance ← getMapping balances toAddr
-    let newRecipientBalance ← requireSomeUint (safeAdd recipientBalance 1) "Balance overflow"
+    let newRecipientBalance ← requireSomeUintError (safeAdd recipientBalance 1) AccountBalanceOverflow()
     let currentSupply ← getStorage tokenSupply
-    let newSupply ← requireSomeUint (safeAdd currentSupply 1) "Supply overflow"
+    let newSupply ← requireSomeUintError (safeAdd currentSupply 1) TotalSupplyOverflow()
 
     setMappingUintAddr tokenOwners tokenId toAddr
     setMapping balances toAddr newRecipientBalance
@@ -189,27 +202,27 @@ verity_contract ERC721Base where
   -/
   function transferFrom (fromAddr : Address, toAddr : Address, tokenId : Uint256) : Bool := do
     let sender ← msgSender
-    require (toAddr != zeroAddress) "Invalid recipient"
+    requireError (toAddr != zeroAddress) TransferToZeroAddress()
 
     let ownerWord ← getMappingUint tokenOwners tokenId
-    require (ownerWord != 0) "Token does not exist"
+    requireError (ownerWord != 0) TokenDoesNotExist()
 
     let fromWord := addressToWord fromAddr
-    require (ownerWord == fromWord) "From is not owner"
+    requireError (ownerWord == fromWord) TransferFromIncorrectOwner()
 
     let approvedWord ← getMappingUint tokenApprovals tokenId
     let operatorWord ← getMapping2 operatorApprovals fromAddr sender
     let senderWord := addressToWord sender
     let authorized := (sender == fromAddr) || (approvedWord == senderWord) || (operatorWord != 0)
-    require authorized "Not authorized"
+    requireError authorized NotOwnerNorApproved()
 
     if fromAddr == toAddr then
       pure ()
     else
       let fromBalance ← getMapping balances fromAddr
-      require (fromBalance >= 1) "Insufficient balance"
+      requireError (fromBalance >= 1) InsufficientBalance()
       let toBalance ← getMapping balances toAddr
-      let newToBalance ← requireSomeUint (safeAdd toBalance 1) "Balance overflow"
+      let newToBalance ← requireSomeUintError (safeAdd toBalance 1) AccountBalanceOverflow()
       setMapping balances fromAddr (sub fromBalance 1)
       setMapping balances toAddr newToBalance
 

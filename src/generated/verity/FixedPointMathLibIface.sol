@@ -18,4 +18,6 @@ interface FixedPointMathLibIface {
     function log10(uint256 x) external pure returns (uint256);
     function log10Up(uint256 x) external pure returns (uint256);
     function clamp(uint256 x, uint256 minValue, uint256 maxValue) external pure returns (uint256);
+    function mulDiv(uint256 a, uint256 b, uint256 c) external pure returns (uint256);
+    function mulDivUp(uint256 a, uint256 b, uint256 c) external pure returns (uint256);
 }

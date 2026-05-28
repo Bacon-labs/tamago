@@ -36,14 +36,14 @@ contract OwnableTest is Test {
         newOwner = nonzero(newOwner);
         OwnableIface ownable = deployOwnable();
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("Unauthorized()"))));
         ownable.transferOwnership(newOwner);
     }
 
     // tama: mirrors=ownable_transferOwnership_reverts_for_zero_owner
     function testFuzzTransferOwnershipRevertsForZeroOwner() public {
         OwnableIface ownable = deployOwnable();
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("NewOwnerIsZeroAddress()"))));
         ownable.transferOwnership(address(0));
     }
 
@@ -114,7 +114,7 @@ contract OwnableTest is Test {
         attacker = outsider(attacker);
         OwnableIface ownable = deployOwnable();
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("Unauthorized()"))));
         ownable.renounceOwnership();
     }
 

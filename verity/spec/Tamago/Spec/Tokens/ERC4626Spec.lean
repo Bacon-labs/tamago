@@ -30,7 +30,7 @@ Security conclusions:
 - Share transfers cannot change total share supply.
 -/
 def erc4626_decimals_spec (result : Uint256) : Prop :=
-  erc20_decimals_spec result
+  result = 18
 
 def erc4626_totalSupply_spec (result : Uint256) (s : ContractState) : Prop :=
   erc20_totalSupply_spec result s
@@ -281,7 +281,7 @@ def erc4626_deposit_reverts_when_receiver_balance_would_overflow
       (Verity.EVM.Uint256.mul assets (Verity.EVM.Uint256.add (s.storage tokenSupply.slot) 1))
       (Verity.EVM.Uint256.add (s.storage managedAssets.slot) 1)
   (s.storageMap balances.slot receiver).val + shares.val > Verity.Stdlib.Math.MAX_UINT256 →
-    result = ContractResult.revert "Balance overflow" s
+    result = ContractResult.revert "BalanceOverflow()" s
 
 def erc4626_deposit_reverts_when_total_supply_would_overflow
     (assets : Uint256) (receiver : Address) (s : ContractState)
@@ -292,7 +292,7 @@ def erc4626_deposit_reverts_when_total_supply_would_overflow
       (Verity.EVM.Uint256.add (s.storage managedAssets.slot) 1)
   (s.storageMap balances.slot receiver).val + shares.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
     (s.storage tokenSupply.slot).val + shares.val > Verity.Stdlib.Math.MAX_UINT256 →
-      result = ContractResult.revert "Supply overflow" s
+      result = ContractResult.revert "TotalSupplyOverflow()" s
 
 def erc4626_deposit_reverts_when_total_assets_would_overflow
     (assets : Uint256) (receiver : Address) (s : ContractState)
@@ -304,7 +304,7 @@ def erc4626_deposit_reverts_when_total_assets_would_overflow
   (s.storageMap balances.slot receiver).val + shares.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
     (s.storage tokenSupply.slot).val + shares.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
       (s.storage managedAssets.slot).val + assets.val > Verity.Stdlib.Math.MAX_UINT256 →
-        result = ContractResult.revert "Total assets overflow" s
+        result = ContractResult.revert "TotalAssetsOverflow()" s
 
 def erc4626_deposit_succeeds_when_accounting_does_not_overflow
     (assets : Uint256) (receiver : Address) (s : ContractState)
@@ -390,14 +390,14 @@ def erc4626_mint_reverts_when_receiver_balance_would_overflow
     (shares : Uint256) (receiver : Address) (s : ContractState)
     (result : ContractResult Uint256) : Prop :=
   (s.storageMap balances.slot receiver).val + shares.val > Verity.Stdlib.Math.MAX_UINT256 →
-    result = ContractResult.revert "Balance overflow" s
+    result = ContractResult.revert "BalanceOverflow()" s
 
 def erc4626_mint_reverts_when_total_supply_would_overflow
     (shares : Uint256) (receiver : Address) (s : ContractState)
     (result : ContractResult Uint256) : Prop :=
   (s.storageMap balances.slot receiver).val + shares.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
     (s.storage tokenSupply.slot).val + shares.val > Verity.Stdlib.Math.MAX_UINT256 →
-      result = ContractResult.revert "Supply overflow" s
+      result = ContractResult.revert "TotalSupplyOverflow()" s
 
 def erc4626_mint_reverts_when_total_assets_would_overflow
     (shares : Uint256) (receiver : Address) (s : ContractState)
@@ -412,7 +412,7 @@ def erc4626_mint_reverts_when_total_assets_would_overflow
   (s.storageMap balances.slot receiver).val + shares.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
     (s.storage tokenSupply.slot).val + shares.val ≤ Verity.Stdlib.Math.MAX_UINT256 →
       (s.storage managedAssets.slot).val + assets.val > Verity.Stdlib.Math.MAX_UINT256 →
-        result = ContractResult.revert "Total assets overflow" s
+        result = ContractResult.revert "TotalAssetsOverflow()" s
 
 def erc4626_mint_succeeds_when_accounting_does_not_overflow
     (shares : Uint256) (receiver : Address) (s : ContractState)
@@ -519,7 +519,7 @@ def erc4626_withdraw_reverts_when_assets_exceed_max
         (Verity.EVM.Uint256.add (s.storage managedAssets.slot) 1))
       (Verity.EVM.Uint256.add (s.storage tokenSupply.slot) 1)
   assets.val > maxAssets.val →
-    result = ContractResult.revert "Withdraw more than max" s
+    result = ContractResult.revert "WithdrawMoreThanMax()" s
 
 def erc4626_withdraw_reverts_when_allowance_is_low
     (assets : Uint256) (_receiver ownerAddr : Address) (s : ContractState)
@@ -539,7 +539,7 @@ def erc4626_withdraw_reverts_when_allowance_is_low
   assets.val ≤ maxAssets.val →
     s.sender ≠ ownerAddr →
       shares.val > (s.storageMap2 allowances.slot ownerAddr s.sender).val →
-        result = ContractResult.revert "Insufficient allowance" s
+        result = ContractResult.revert "InsufficientAllowance()" s
 
 def erc4626_withdraw_reverts_when_total_supply_is_low
     (assets : Uint256) (_receiver ownerAddr : Address) (s : ContractState)
@@ -561,7 +561,7 @@ def erc4626_withdraw_reverts_when_total_supply_is_low
       shares.val ≤ (s.storageMap2 allowances.slot ownerAddr s.sender).val) →
         shares.val ≤ (s.storageMap balances.slot ownerAddr).val →
           shares.val > (s.storage tokenSupply.slot).val →
-            result = ContractResult.revert "Insufficient supply" s
+            result = ContractResult.revert "InsufficientSupply()" s
 
 def erc4626_withdraw_reverts_when_total_assets_is_low
     (assets : Uint256) (_receiver ownerAddr : Address) (s : ContractState)
@@ -584,7 +584,7 @@ def erc4626_withdraw_reverts_when_total_assets_is_low
         shares.val ≤ (s.storageMap balances.slot ownerAddr).val →
           shares.val ≤ (s.storage tokenSupply.slot).val →
             assets.val > (s.storage managedAssets.slot).val →
-              result = ContractResult.revert "Insufficient assets" s
+              result = ContractResult.revert "InsufficientAssets()" s
 
 def erc4626_withdraw_succeeds_when_accounting_and_allowance_are_enough
     (assets : Uint256) (_receiver ownerAddr : Address) (s : ContractState)
@@ -755,7 +755,7 @@ def erc4626_redeem_reverts_when_shares_exceed_max
     (shares : Uint256) (_receiver ownerAddr : Address) (s : ContractState)
     (result : ContractResult Uint256) : Prop :=
   shares.val > (s.storageMap balances.slot ownerAddr).val →
-    result = ContractResult.revert "Redeem more than max" s
+    result = ContractResult.revert "RedeemMoreThanMax()" s
 
 def erc4626_redeem_reverts_when_allowance_is_low
     (shares : Uint256) (_receiver ownerAddr : Address) (s : ContractState)
@@ -763,7 +763,7 @@ def erc4626_redeem_reverts_when_allowance_is_low
   shares.val ≤ (s.storageMap balances.slot ownerAddr).val →
     s.sender ≠ ownerAddr →
       shares.val > (s.storageMap2 allowances.slot ownerAddr s.sender).val →
-        result = ContractResult.revert "Insufficient allowance" s
+        result = ContractResult.revert "InsufficientAllowance()" s
 
 def erc4626_redeem_reverts_when_total_supply_is_low
     (shares : Uint256) (_receiver ownerAddr : Address) (s : ContractState)
@@ -772,7 +772,7 @@ def erc4626_redeem_reverts_when_total_supply_is_low
     (s.sender = ownerAddr ∨
       shares.val ≤ (s.storageMap2 allowances.slot ownerAddr s.sender).val) →
         shares.val > (s.storage tokenSupply.slot).val →
-          result = ContractResult.revert "Insufficient supply" s
+          result = ContractResult.revert "InsufficientSupply()" s
 
 def erc4626_redeem_succeeds_when_accounting_and_allowance_are_enough
     (shares : Uint256) (_receiver ownerAddr : Address) (s : ContractState)

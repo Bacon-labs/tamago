@@ -42,13 +42,13 @@ Security conclusions:
 def ownable_transferOwnership_reverts_for_non_owner
     (_newOwner : Address) (s : ContractState) (result : ContractResult Bool) : Prop :=
   s.sender ≠ s.storageAddr contractOwner.slot →
-    result = ContractResult.revert "Caller is not the owner" s
+    result = ContractResult.revert "Unauthorized()" s
 
 def ownable_transferOwnership_reverts_for_zero_owner
     (newOwner : Address) (s : ContractState) (result : ContractResult Bool) : Prop :=
   s.sender = s.storageAddr contractOwner.slot →
     newOwner = zeroAddress →
-      result = ContractResult.revert "Invalid owner" s
+      result = ContractResult.revert "NewOwnerIsZeroAddress()" s
 
 def ownable_transferOwnership_succeeds_for_owner_to_nonzero
     (newOwner : Address) (s : ContractState) (result : ContractResult Bool) : Prop :=
@@ -99,7 +99,7 @@ Security conclusions:
 def ownable_renounceOwnership_reverts_for_non_owner
     (s : ContractState) (result : ContractResult Bool) : Prop :=
   s.sender ≠ s.storageAddr contractOwner.slot →
-    result = ContractResult.revert "Caller is not the owner" s
+    result = ContractResult.revert "Unauthorized()" s
 
 def ownable_renounceOwnership_succeeds_for_owner
     (s : ContractState) (result : ContractResult Bool) : Prop :=

@@ -108,7 +108,7 @@ Security conclusions:
 -/
 def erc721_balanceOf_spec (account : Address) (result : ContractResult Uint256) (s : ContractState) : Prop :=
   (account = zeroAddress →
-    result = ContractResult.revert "Invalid owner" s) ∧
+    result = ContractResult.revert "BalanceQueryForZeroAddress()" s) ∧
   (account ≠ zeroAddress →
     result = ContractResult.success (s.storageMap balances.slot account) s)
 
@@ -117,14 +117,14 @@ def erc721_ownerOf_spec (tokenId : Uint256) (result : ContractResult Address) (s
   if ownerWord != 0 then
     result = ContractResult.success (wordToAddress ownerWord) s
   else
-    result = ContractResult.revert "Token does not exist" s
+    result = ContractResult.revert "TokenDoesNotExist()" s
 
 def erc721_getApproved_spec (tokenId : Uint256) (result : ContractResult Address) (s : ContractState) : Prop :=
   let ownerWord := s.storageMapUint tokenOwners.slot tokenId
   if ownerWord != 0 then
     result = ContractResult.success (wordToAddress (s.storageMapUint tokenApprovals.slot tokenId)) s
   else
-    result = ContractResult.revert "Token does not exist" s
+    result = ContractResult.revert "TokenDoesNotExist()" s
 
 def erc721_isApprovedForAll_spec (ownerAddr operator : Address) (result : Bool) (s : ContractState) : Prop :=
   result = (s.storageMap2 operatorApprovals.slot ownerAddr operator != 0)
@@ -181,7 +181,7 @@ def erc721_approve_reverts_when_token_is_missing
     (_approved : Address) (tokenId : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   s.storageMapUint tokenOwners.slot tokenId = 0 →
-    result = ContractResult.revert "Token does not exist" s
+    result = ContractResult.revert "TokenDoesNotExist()" s
 
 def erc721_approve_reverts_when_sender_is_not_authorized
     (_approved : Address) (tokenId : Uint256) (s : ContractState)
@@ -190,7 +190,7 @@ def erc721_approve_reverts_when_sender_is_not_authorized
     ((s.sender == wordToAddress (s.storageMapUint tokenOwners.slot tokenId)) ||
       (s.storageMap2 operatorApprovals.slot
         (wordToAddress (s.storageMapUint tokenOwners.slot tokenId)) s.sender != 0)) = false →
-        result = ContractResult.revert "Not authorized" s
+        result = ContractResult.revert "NotOwnerNorApproved()" s
 
 def erc721_approve_succeeds_when_sender_is_authorized
     (_approved : Address) (tokenId : Uint256) (s : ContractState)
@@ -231,20 +231,20 @@ Security conclusions:
 def erc721_mint_reverts_for_non_owner
     (_toAddr : Address) (s : ContractState) (result : ContractResult Uint256) : Prop :=
   s.sender ≠ s.storageAddr contractOwner.slot →
-    result = ContractResult.revert "Caller is not the owner" s
+    result = ContractResult.revert "Unauthorized()" s
 
 def erc721_mint_reverts_for_zero_recipient
     (toAddr : Address) (s : ContractState) (result : ContractResult Uint256) : Prop :=
   s.sender = s.storageAddr contractOwner.slot →
     toAddr = zeroAddress →
-      result = ContractResult.revert "Invalid recipient" s
+      result = ContractResult.revert "TransferToZeroAddress()" s
 
 def erc721_mint_reverts_when_next_token_is_already_minted
     (toAddr : Address) (s : ContractState) (result : ContractResult Uint256) : Prop :=
   s.sender = s.storageAddr contractOwner.slot →
     toAddr ≠ zeroAddress →
       s.storageMapUint tokenOwners.slot (s.storage nextTokenId.slot) ≠ 0 →
-        result = ContractResult.revert "Token already minted" s
+        result = ContractResult.revert "TokenAlreadyExists()" s
 
 def erc721_mint_reverts_when_recipient_balance_would_overflow
     (toAddr : Address) (s : ContractState) (result : ContractResult Uint256) : Prop :=
@@ -252,7 +252,7 @@ def erc721_mint_reverts_when_recipient_balance_would_overflow
     toAddr ≠ zeroAddress →
       s.storageMapUint tokenOwners.slot (s.storage nextTokenId.slot) = 0 →
         (s.storageMap balances.slot toAddr).val + 1 > Verity.Stdlib.Math.MAX_UINT256 →
-          result = ContractResult.revert "Balance overflow" s
+          result = ContractResult.revert "AccountBalanceOverflow()" s
 
 def erc721_mint_reverts_when_total_supply_would_overflow
     (toAddr : Address) (s : ContractState) (result : ContractResult Uint256) : Prop :=
@@ -261,7 +261,7 @@ def erc721_mint_reverts_when_total_supply_would_overflow
       s.storageMapUint tokenOwners.slot (s.storage nextTokenId.slot) = 0 →
         (s.storageMap balances.slot toAddr).val + 1 ≤ Verity.Stdlib.Math.MAX_UINT256 →
           (s.storage tokenSupply.slot).val + 1 > Verity.Stdlib.Math.MAX_UINT256 →
-            result = ContractResult.revert "Supply overflow" s
+            result = ContractResult.revert "TotalSupplyOverflow()" s
 
 def erc721_mint_succeeds_with_next_token_id
     (toAddr : Address) (s : ContractState) (result : ContractResult Uint256) : Prop :=
@@ -335,14 +335,14 @@ def erc721_transferFrom_reverts_for_zero_recipient
     (_fromAddr toAddr : Address) (_tokenId : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   toAddr = zeroAddress →
-    result = ContractResult.revert "Invalid recipient" s
+    result = ContractResult.revert "TransferToZeroAddress()" s
 
 def erc721_transferFrom_reverts_when_token_is_missing
     (_fromAddr toAddr : Address) (tokenId : Uint256) (s : ContractState)
     (result : ContractResult Bool) : Prop :=
   toAddr ≠ zeroAddress →
     s.storageMapUint tokenOwners.slot tokenId = 0 →
-      result = ContractResult.revert "Token does not exist" s
+      result = ContractResult.revert "TokenDoesNotExist()" s
 
 def erc721_transferFrom_reverts_when_from_is_not_owner
     (fromAddr toAddr : Address) (tokenId : Uint256) (s : ContractState)
@@ -350,7 +350,7 @@ def erc721_transferFrom_reverts_when_from_is_not_owner
   toAddr ≠ zeroAddress →
     s.storageMapUint tokenOwners.slot tokenId ≠ 0 →
       s.storageMapUint tokenOwners.slot tokenId ≠ addressToWord fromAddr →
-        result = ContractResult.revert "From is not owner" s
+        result = ContractResult.revert "TransferFromIncorrectOwner()" s
 
 def erc721_transferFrom_reverts_when_sender_is_not_authorized
     (fromAddr toAddr : Address) (tokenId : Uint256) (s : ContractState)
@@ -361,7 +361,7 @@ def erc721_transferFrom_reverts_when_sender_is_not_authorized
         (((s.sender == fromAddr) ||
           (s.storageMapUint tokenApprovals.slot tokenId == addressToWord s.sender)) ||
           (s.storageMap2 operatorApprovals.slot fromAddr s.sender != 0)) = false →
-          result = ContractResult.revert "Not authorized" s
+          result = ContractResult.revert "NotOwnerNorApproved()" s
 
 def erc721_transferFrom_to_self_succeeds
     (fromAddr toAddr : Address) (tokenId : Uint256) (s : ContractState)
@@ -422,7 +422,7 @@ def erc721_transferFrom_reverts_when_from_balance_is_low
           (s.storageMap2 operatorApprovals.slot fromAddr s.sender != 0)) = true →
           fromAddr ≠ toAddr →
             (s.storageMap balances.slot fromAddr).val < 1 →
-              result = ContractResult.revert "Insufficient balance" s
+              result = ContractResult.revert "InsufficientBalance()" s
 
 def erc721_transferFrom_reverts_when_to_balance_would_overflow
     (fromAddr toAddr : Address) (tokenId : Uint256) (s : ContractState)
@@ -436,7 +436,7 @@ def erc721_transferFrom_reverts_when_to_balance_would_overflow
           fromAddr ≠ toAddr →
             (s.storageMap balances.slot fromAddr).val ≥ 1 →
               (s.storageMap balances.slot toAddr).val + 1 > Verity.Stdlib.Math.MAX_UINT256 →
-                result = ContractResult.revert "Balance overflow" s
+                result = ContractResult.revert "AccountBalanceOverflow()" s
 
 def erc721_transferFrom_between_distinct_accounts_succeeds
     (fromAddr toAddr : Address) (tokenId : Uint256) (s : ContractState)

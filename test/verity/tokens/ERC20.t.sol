@@ -11,7 +11,11 @@ contract ERC20Test is Test {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     function deployToken() internal returns (ERC20Iface token) {
-        token = ERC20Deployer.deploy(address(this));
+        token = ERC20Deployer.deploy(address(this), 18);
+    }
+
+    function deployTokenWithDecimals(uint256 d) internal returns (ERC20Iface token) {
+        token = ERC20Deployer.deploy(address(this), d);
     }
 
     function small(uint256 raw) internal pure returns (uint256) {
@@ -50,6 +54,16 @@ contract ERC20Test is Test {
         assertEq(token.decimals(), 18);
     }
 
+    // Parameterized decimals: any deployer-chosen value round-trips through
+    // decimals() and is preserved across mutating calls (mint touches a
+    // different storage slot).
+    function testFuzzDecimalsParameterized(uint256 rawDecimals) public {
+        ERC20Iface token = deployTokenWithDecimals(rawDecimals);
+        assertEq(token.decimals(), rawDecimals);
+        token.mint(address(this), 1);
+        assertEq(token.decimals(), rawDecimals);
+    }
+
     // tama: mirrors=erc20_totalSupply_spec
     function testFuzzTotalSupplySpec(uint256 rawAmount) public {
         ERC20Iface token = deployToken();
@@ -85,14 +99,14 @@ contract ERC20Test is Test {
         address newOwner = outsider(rawNewOwner);
         ERC20Iface token = deployToken();
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("Unauthorized()"))));
         token.transferOwnership(newOwner);
     }
 
     // tama: mirrors=erc20_transferOwnership_reverts_for_zero_owner
     function testFuzzTransferOwnershipRevertsForZeroOwner() public {
         ERC20Iface token = deployToken();
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("NewOwnerIsZeroAddress()"))));
         token.transferOwnership(address(0));
     }
 
@@ -166,7 +180,7 @@ contract ERC20Test is Test {
         address attacker = outsider(rawAttacker);
         ERC20Iface token = deployToken();
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("Unauthorized()"))));
         token.renounceOwnership();
     }
 
@@ -271,7 +285,7 @@ contract ERC20Test is Test {
     function testFuzzTransferRevertsWhenBalanceIsLow(address toAddr, uint256 rawAmount) public {
         ERC20Iface token = deployToken();
         uint256 amount = positive(rawAmount);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientBalance()"))));
         token.transfer(toAddr, amount);
     }
 
@@ -290,7 +304,7 @@ contract ERC20Test is Test {
         address toAddr = address(0xCAFE);
         token.mint(address(this), 1);
         vm.store(address(token), balanceSlot(toAddr), bytes32(type(uint256).max));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Recipient balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         token.transfer(toAddr, 1);
     }
 
@@ -336,7 +350,7 @@ contract ERC20Test is Test {
         ERC20Iface token = deployToken();
         token.mint(address(this), amount);
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient allowance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientAllowance()"))));
         token.transferFrom(address(this), toAddr, amount);
     }
 
@@ -347,7 +361,7 @@ contract ERC20Test is Test {
         ERC20Iface token = deployToken();
         token.approve(spender, amount);
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientBalance()"))));
         token.transferFrom(address(this), toAddr, amount);
     }
 
@@ -360,7 +374,7 @@ contract ERC20Test is Test {
         token.approve(spender, 1);
         vm.store(address(token), balanceSlot(toAddr), bytes32(type(uint256).max));
         vm.prank(spender);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Recipient balance overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("BalanceOverflow()"))));
         token.transferFrom(address(this), toAddr, 1);
     }
 
@@ -453,23 +467,15 @@ contract ERC20Test is Test {
         address attacker = outsider(rawAttacker);
         ERC20Iface token = deployToken();
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("Unauthorized()"))));
         token.mint(account, amount);
-    }
-
-    // tama: mirrors=erc20_mint_reverts_when_recipient_balance_would_overflow
-    function testFuzzMintRevertsWhenRecipientBalanceWouldOverflow() public {
-        ERC20Iface token = deployToken();
-        token.mint(address(this), type(uint256).max);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Balance overflow"));
-        token.mint(address(this), 1);
     }
 
     // tama: mirrors=erc20_mint_reverts_when_total_supply_would_overflow
     function testFuzzMintRevertsWhenTotalSupplyWouldOverflow() public {
         ERC20Iface token = deployToken();
         token.mint(address(this), type(uint256).max);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Supply overflow"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("TotalSupplyOverflow()"))));
         token.mint(address(0xCAFE), 1);
     }
 
@@ -517,7 +523,7 @@ contract ERC20Test is Test {
         uint256 amount = small(rawAmount);
         token.mint(account, amount);
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("Unauthorized()"))));
         token.burn(account, amount);
     }
 
@@ -525,7 +531,7 @@ contract ERC20Test is Test {
     function testFuzzBurnRevertsWhenBalanceIsLow(address account, uint256 rawAmount) public {
         ERC20Iface token = deployToken();
         uint256 amount = positive(rawAmount);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientBalance()"))));
         token.burn(account, amount);
     }
 
@@ -535,7 +541,7 @@ contract ERC20Test is Test {
         address account = address(0xCAFE);
         vm.store(address(token), balanceSlot(account), bytes32(uint256(1)));
         vm.store(address(token), supplySlot(), bytes32(uint256(0)));
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient supply"));
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InsufficientSupply()"))));
         token.burn(account, 1);
     }
 

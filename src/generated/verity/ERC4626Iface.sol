@@ -7,6 +7,16 @@ interface ERC4626Iface {
     event Approval(address indexed owner, address indexed spender, uint256 value);
     event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
     event Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
+    error InvalidAsset();
+    error InsufficientBalance();
+    error InsufficientAllowance();
+    error BalanceOverflow();
+    error TotalSupplyOverflow();
+    error TotalAssetsOverflow();
+    error InsufficientSupply();
+    error InsufficientAssets();
+    error WithdrawMoreThanMax();
+    error RedeemMoreThanMax();
     function decimals() external view returns (uint256);
     function totalSupply() external view returns (uint256);
     function balanceOf(address account) external view returns (uint256);
